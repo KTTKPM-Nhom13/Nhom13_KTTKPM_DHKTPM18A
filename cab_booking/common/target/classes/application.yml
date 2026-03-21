@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: common-service
+#
+#  security:
+#    oauth2:
+#      resourceserver:
+#        jwt:
+#          public-key-location: http://auth-service/jwks.json

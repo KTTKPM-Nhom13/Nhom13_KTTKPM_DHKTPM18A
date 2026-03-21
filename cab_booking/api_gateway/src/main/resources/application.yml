@@ -1,0 +1,45 @@
+server:
+  port: 8080 # Cổng chạy chính của hệ thống (User sẽ gọi vào đây)
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          # Cấu hình các tuyến đường (Routes)
+          routes:
+            # 1. Điều hướng sang Auth Service (Xử lý Login/Register)
+            - id: auth-service
+              uri: http://localhost:8081 # Port thực tế của auth_service
+              predicates:
+                - Path=/auth/** # Mọi request bắt đầu bằng /auth/ sẽ vào đây
+
+            # 2. Điều hướng sang các Service nghiệp vụ (Ví dụ: Cab Service)
+#            - id: cab-service
+#              uri: http://localhost:8082 # Port thực tế của cab-service
+#              predicates:
+#                - Path=/api/v1/cabs/**
+
+          # Cấu hình CORS (Nếu bạn gọi từ React/Next.js ở dưới máy local)
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                allowedOrigins: "http://localhost:3000" # Port của Front-end
+                allowedMethods:
+                  - GET
+                  - POST
+                  - PUT
+                  - DELETE
+                  - OPTIONS
+                allowedHeaders: "*"
+
+  # Cấu hình Security để Gateway biết dùng Public Key từ module Common
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Đường dẫn tới file public key trong module common (đã import)
+          public-key-location: classpath:certs/public_key.pem
