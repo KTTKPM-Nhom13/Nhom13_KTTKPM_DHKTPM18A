@@ -5,6 +5,13 @@ spring:
   application:
     name: api-gateway
 
+  data:
+    redis:
+      host: redis
+      port: 6379
+      password: redis123
+      timeout: 2000ms
+
   cloud:
     gateway:
       discovery:
@@ -12,22 +19,43 @@ spring:
           enabled: false
           lower-case-service-id: true
       routes:
+        # route-level RequestRateLimiter
         - id: auth-service
           uri: http://auth-service:8081
           predicates:
-            - Path=/auth/**
+            - Path=/api/auth/**
+          filters:
+            - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 1
+                # nổ” tối đa 2 request ngay lúc đầu, sau đó mỗi giây hồi lại 1 request.
+                redis-rate-limiter.burstCapacity: 2
+                key-resolver: "#{@ipKeyResolver}"
+
+        # route-level RequestRateLimiter
+        - id: eta-service
+          uri: http://eta-service:8082
+          predicates:
+            - Path=/api/eta/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 5
+                redis-rate-limiter.burstCapacity: 10
+                key-resolver: "#{@ipKeyResolver}"
+
+      default-filters:
+        - name: Retry
+          args:
+            retries: 1
+            series: SERVER_ERROR
 
 logging:
   level:
     root: INFO
-    # Tắt log chi tiết về việc Mapping và Matching Route mỗi vài giây
-    org.springframework.cloud.gateway.route.RouteDefinitionRouteLocator: INFO
-
-    # Nếu vẫn còn thấy log liên quan đến việc tìm Route trong bộ nhớ
-    org.springframework.cloud.gateway.repository.InMemoryRouteDefinitionRepository: INFO
-
-    # Tắt log của bộ nạp Route định kỳ
-    org.springframework.cloud.gateway.route.CachingRouteLocator: INFO
+    org.springframework.cloud.gateway: DEBUG
+    iuh.fit.api_gateway: DEBUG
 
 eureka:
   client:

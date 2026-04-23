@@ -26,6 +26,18 @@
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
 
+		<!-- RATE LIMIT: hỗ trợ RequestRateLimiter của Spring Cloud Gateway,Redis Reactive - dùng cho Rate Limiting với Spring Cloud Gateway -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis-reactive</artifactId>
+		</dependency>
+
+		<!-- RATE LIMIT Redis Sync:  dùng cho filter custom của bạn với StringRedisTemplate - dùng cho GlobalRateLimitFilter -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+
 		<!-- OAuth2 Resource Server NOT needed on Gateway - it only routes requests -->
 		<!-- Resource Server is configured on individual microservices instead -->
 		<!-- <dependency>
@@ -33,6 +45,7 @@
 			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
 		</dependency> -->
 
+		<!-- RATE LIMIT -->
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-gateway</artifactId>
@@ -58,6 +71,7 @@
 			<version>1.78</version>
 		</dependency>
 
+			<!-- RATE LIMIT: kéo config từ config server -->
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-config</artifactId>
