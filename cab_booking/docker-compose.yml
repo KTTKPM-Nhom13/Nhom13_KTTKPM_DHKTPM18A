@@ -6,6 +6,21 @@ include:
   - api-gateway/docker-compose.yaml
   - auth-service/docker-compose.yaml
 
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: cab-redis
+    command: redis-server --requirepass redis123
+    ports:
+      - "6379:6379"
+    networks:
+      - cab-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis123", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
 volumes:
   maven-cache:
     driver: local

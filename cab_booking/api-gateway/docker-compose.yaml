@@ -12,6 +12,8 @@ services:
     networks:
       - cab-network
     depends_on:
+      config-server:
+        condition: service_healthy
       eureka-server:
         condition: service_healthy
 

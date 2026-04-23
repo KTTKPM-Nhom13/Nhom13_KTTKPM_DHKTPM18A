@@ -2,9 +2,7 @@
 FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
 WORKDIR /app
 
-# Clear Maven cache để tránh lỗi artifact cũ
-RUN rm -rf /root/.m2/repository/* && \
-    mvn help:active-profiles > /dev/null 2>&1
+# Clear Maven cache để tránh lỗi artifact cũ (chỉ xóa file, không chạy mvn vì chưa có pom.xml)
 
 # --- BƯỚC 1: CHUẨN BỊ COMMON ---
 # Chỉ copy pom của common để install thư viện trước

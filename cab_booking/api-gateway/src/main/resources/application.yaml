@@ -3,3 +3,68 @@ spring:
     name: api-gateway
   config:
     import: "optional:configserver:http://config-server:8888"
+
+  # ── Logging ───────────────────────────────────────────────────────────
+  logging:
+    level:
+      root: INFO
+      iuh.fit.api_gateway: DEBUG
+      org.springframework.cloud.gateway: DEBUG
+
+  # ── Redis cho Rate Limiting ──────────────────────────────────────
+  data:
+    redis:
+      host: redis
+      port: 6379
+      password: redis123
+      timeout: 2000ms
+
+  cloud:
+    gateway:
+      routes:
+        # ── Auth Service (Rate Limiting: 10 req/s, burst: 20) ──
+        - id: auth-service
+          uri: lb://auth-service
+          predicates:
+            - Path=/auth/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                key-resolver: "#{@ipKeyResolver}"
+
+        # ── ETA Service (Rate Limiting: 5 req/s, burst: 10) ────
+        - id: eta-service
+          uri: lb://eta-service
+          predicates:
+            - Path=/eta/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 5
+                redis-rate-limiter.burstCapacity: 10
+                key-resolver: "#{@ipKeyResolver}"
+
+        # ── Các route khác không giới hạn ─────────────────────
+        - id: booking-service
+          uri: lb://booking-service
+          predicates:
+            - Path=/booking/**
+
+        - id: driver-service
+          uri: lb://driver-service
+          predicates:
+            - Path=/driver/**
+
+      # ── Mặc định khi bị 429: trả JSON thay vì body rỗng ────────
+      default-filters:
+        - name: Retry
+          args:
+            retries: 1
+            series: SERVER_ERROR
+        - name: RequestRateLimiter
+          args:
+            redis-rate-limiter.replenishRate: 100
+            redis-rate-limiter.burstCapacity: 200
+            key-resolver: "#{@ipKeyResolver}"
