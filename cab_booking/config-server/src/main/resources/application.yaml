@@ -10,7 +10,11 @@ spring:
     config:
       server:
         native:
-          search-locations: ${CONFIG_LOCATION:file:/app/config/}
+          search-locations: 
+            - file:${user.dir}/cab_booking/cab-booking-config/
+            - file:${user.dir}/cab-booking-config/
+            - file:./../cab-booking-config/
+            - file:./cab-booking-config/
 
 eureka:
   client:

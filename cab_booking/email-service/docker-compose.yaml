@@ -1,0 +1,33 @@
+services:
+  email-service:
+    build:
+      context: ..
+      dockerfile: ./email-service/Dockerfile
+    container_name: email-service
+    ports:
+      - "${EMAIL_SERVICE_PORT}:8087"
+    environment:
+      - SPRING_PROFILES_ACTIVE=default
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=${EUREKA_DEFAULT_ZONE}
+      - BREVO_BASE_URL=${BREVO_BASE_URL}
+      - BREVO_API_KEY=${BREVO_API_KEY}
+      - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL}
+      - BREVO_SENDER_NAME=${BREVO_SENDER_NAME}
+    volumes:
+      - maven-cache:/root/.m2
+    networks:
+      - cab-network
+    depends_on:
+      config-server:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+
+volumes:
+  maven-cache:
+    driver: local
+
+networks:
+  cab-network:
+    driver: bridge

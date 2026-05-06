@@ -1,30 +1,21 @@
-# Stage 1: Build
-FROM eclipse-temurin:21-jdk-alpine AS build
+FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
 WORKDIR /app
 
-# Copy Maven config + source
-COPY .mvn/ .mvn
-COPY mvnw pom.xml ./
+COPY common/pom.xml ./common/
+RUN mvn -f ./common/pom.xml dependency:resolve dependency:resolve-plugins -U -B 2>&1
 
-# --- BƯỚC 2: TẢI THƯ VIỆN & PLUGIN (QUAN TRỌNG) ---
-# Lệnh này sẽ tải hết "phụ tùng" về và lưu vào 1 Layer riêng.
-# Nếu pom.xml không đổi, bước này sẽ tốn 0 giây ở lần build sau.
-RUN ./mvnw dependency:go-offline -B
+COPY common/src ./common/src
+RUN mvn -f ./common/pom.xml clean install -DskipTests -U -B 2>&1
 
-# --- BƯỚC 3: MỚI COPY SOURCE CODE ---
-COPY src ./src
+COPY api-gateway/pom.xml ./api-gateway/
+RUN mvn -f ./api-gateway/pom.xml dependency:resolve dependency:resolve-plugins -U -B 2>&1
 
-# Build
-RUN ./mvnw clean package -DskipTests
+COPY api-gateway/src ./api-gateway/src
+RUN mvn -f ./api-gateway/pom.xml clean package -DskipTests -U -B 2>&1
 
-# Stage 2: Run
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
+COPY --from=builder /app/api-gateway/target/*.jar app.jar
 
-# Copy JAR từ build stage
-COPY --from=build /app/target/*.jar app.jar
-
-# Port mặc định của Gateway
 EXPOSE 8080
-
 ENTRYPOINT ["java", "-jar", "app.jar"]

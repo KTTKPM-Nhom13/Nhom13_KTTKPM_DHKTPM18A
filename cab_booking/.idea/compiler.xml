@@ -16,6 +16,7 @@
     </annotationProcessing>
     <bytecodeTargetLevel>
       <module name="cab_booking" target="21" />
+      <module name="kubernetes" target="21" />
     </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">

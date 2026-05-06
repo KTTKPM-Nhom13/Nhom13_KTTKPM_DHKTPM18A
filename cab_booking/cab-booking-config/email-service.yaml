@@ -1,0 +1,27 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: email-service
+
+app:
+  security:
+    public-endpoints: /internal/**
+
+integration:
+  brevo:
+    base-url: ${BREVO_BASE_URL:https://api.brevo.com}
+    api-key: ${BREVO_API_KEY:}
+    sender-email: ${BREVO_SENDER_EMAIL:no-reply@example.com}
+    sender-name: ${BREVO_SENDER_NAME:CAB Booking}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://eureka-server:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}:${random.value}

@@ -28,6 +28,9 @@ services:
       - SPRING_DATASOURCE_USERNAME=${AUTH_DB_USER}
       - SPRING_DATASOURCE_PASSWORD=${AUTH_DB_PASSWORD}
       - JWT_PRIVATE_KEY=${JWT_PRIVATE_KEY}
+      - AUTH_JWT_ACCESS_TOKEN_MINUTES=${AUTH_ACCESS_TOKEN_MINUTES}
+      - AUTH_JWT_REFRESH_TOKEN_DAYS=${AUTH_REFRESH_TOKEN_DAYS}
+      - INTEGRATION_EMAIL_SERVICE_URL=${EMAIL_SERVICE_URL}
       - SPRING_PROFILES_ACTIVE=default
       - SPRING_CONFIG_IMPORT=configserver:http://config-server:8888
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=${EUREKA_DEFAULT_ZONE}
@@ -37,6 +40,8 @@ services:
       - cab-network
     depends_on:
       eureka-server:
+        condition: service_healthy
+      config-server:
         condition: service_healthy
       auth-db:
         condition: service_healthy

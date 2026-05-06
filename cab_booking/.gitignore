@@ -1,0 +1,27 @@
+# --- Security and Environment ---
+.env
+*.pem
+certs/
+
+# --- IDE - IntelliJ ---
+.idea/
+*.iml
+out/
+gen/
+
+# --- Java / Maven ---
+target/
+*.class
+*.jar
+*.war
+*.ear
+.mvn/wrapper/maven-wrapper.properties
+
+# --- OS / Logs ---
+*.log
+.DS_Store
+Thumbs.db
+temp/
+
+# --- Docker ---
+docker-compose.override.yml

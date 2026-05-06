@@ -19,7 +19,8 @@ services:
     networks:
       - cab-network
     depends_on:
-      - config-server
+      config-server:
+        condition: service_healthy
 
 volumes:
   maven-cache:

@@ -7,6 +7,13 @@
         <option value="$PROJECT_DIR$/../btn/Nhom13_KTTKPM_DHKTPM18A/cab_booking/api_gateway/pom.xml" />
         <option value="$PROJECT_DIR$/cab_booking/api_gateway/pom.xml" />
         <option value="$PROJECT_DIR$/cab_booking/service/auth_service/pom.xml" />
+        <option value="$PROJECT_DIR$/cab_booking/config-server/pom.xml" />
+        <option value="$PROJECT_DIR$/cab_booking/common/pom.xml" />
+        <option value="$PROJECT_DIR$/cab_booking/api-gateway/pom.xml" />
+        <option value="$PROJECT_DIR$/cab_booking/auth-service/pom.xml" />
+        <option value="$PROJECT_DIR$/cab_booking/eureka/pom.xml" />
+        <option value="$PROJECT_DIR$/cab_booking/notification-service/pom.xml" />
+        <option value="$PROJECT_DIR$/cab_booking/review-service/pom.xml" />
       </list>
     </option>
     <option name="ignoredFiles">
@@ -15,7 +22,7 @@
       </set>
     </option>
   </component>
-  <component name="ProjectRootManager" version="2" languageLevel="JDK_21" default="true" project-jdk-name="21" project-jdk-type="JavaSDK">
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_22_PREVIEW" project-jdk-name="21" project-jdk-type="JavaSDK">
     <output url="file://$PROJECT_DIR$/out" />
   </component>
 </project>
