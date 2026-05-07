@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: driver-service
+  config:
+    import: "optional:configserver:http://localhost:8888"

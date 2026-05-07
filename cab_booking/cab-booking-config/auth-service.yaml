@@ -14,6 +14,22 @@ spring:
       ddl-auto: update
     show-sql: true
 
+app:
+  security:
+    public-endpoints: >
+      /auth/register/request-otp,
+      /auth/register/verify-otp,
+      /auth/register,
+      /auth/register/email,
+      /auth/login,
+      /auth/refresh,
+      /auth/logout,
+      /auth/verify,
+      /auth/token,
+      /auth/password/forgot/request-otp,
+      /auth/password/forgot/reset,
+      /internal/auth/users/**
+
 # ĐƯA EUREKA RA NGOÀI, KHÔNG NẰM TRONG SPRING
 eureka:
   client:
@@ -29,6 +45,12 @@ auth:
   jwt:
     access-token-minutes: ${AUTH_ACCESS_TOKEN_MINUTES:120}
     refresh-token-days: ${AUTH_REFRESH_TOKEN_DAYS:30}
+  registration:
+    otp-minutes: ${AUTH_REGISTRATION_OTP_MINUTES:10}
+    otp-length: ${AUTH_REGISTRATION_OTP_LENGTH:6}
+  password-reset:
+    otp-minutes: ${AUTH_PASSWORD_RESET_OTP_MINUTES:10}
+    otp-length: ${AUTH_PASSWORD_RESET_OTP_LENGTH:6}
 
 integration:
   email-service:

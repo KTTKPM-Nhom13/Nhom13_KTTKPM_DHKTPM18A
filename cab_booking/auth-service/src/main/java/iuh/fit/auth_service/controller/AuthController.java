@@ -1,11 +1,19 @@
 package iuh.fit.auth_service.controller;
 
+import iuh.fit.auth_service.dto.request.ChangePasswordRequest;
 import iuh.fit.auth_service.dto.request.LoginRequest;
 import iuh.fit.auth_service.dto.request.LogoutRequest;
 import iuh.fit.auth_service.dto.request.RefreshTokenRequest;
+import iuh.fit.auth_service.dto.request.RequestForgotPasswordOtpRequest;
 import iuh.fit.auth_service.dto.request.RegisterRequest;
+import iuh.fit.auth_service.dto.request.RequestRegisterOtpRequest;
+import iuh.fit.auth_service.dto.request.ResetForgotPasswordRequest;
+import iuh.fit.auth_service.dto.request.VerifyRegisterOtpRequest;
 import iuh.fit.auth_service.dto.request.VerifyTokenRequest;
 import iuh.fit.auth_service.dto.response.AuthTokenResponse;
+import iuh.fit.auth_service.dto.response.ChangePasswordResponse;
+import iuh.fit.auth_service.dto.response.RegisterOtpResponse;
+import iuh.fit.auth_service.dto.response.VerifyRegisterOtpResponse;
 import iuh.fit.auth_service.service.AuthService;
 import iuh.fit.common.dto.response.ApiResponse;
 import iuh.fit.common.security.JwtTokenService;
@@ -33,6 +41,23 @@ public class AuthController {
     AuthService authService;
     JwtTokenService jwtTokenService;
 
+    @PostMapping("/register/request-otp")
+    public ApiResponse<RegisterOtpResponse> requestRegisterOtp(@Valid @RequestBody RequestRegisterOtpRequest request) {
+        return ApiResponse.<RegisterOtpResponse>builder()
+                .message("Registration OTP sent successfully")
+                .result(authService.requestRegisterOtp(request))
+                .build();
+    }
+
+    @PostMapping("/register/verify-otp")
+    public ApiResponse<VerifyRegisterOtpResponse> verifyRegisterOtp(
+            @Valid @RequestBody VerifyRegisterOtpRequest request) {
+        return ApiResponse.<VerifyRegisterOtpResponse>builder()
+                .message("Registration OTP verified successfully")
+                .result(authService.verifyRegisterOtp(request))
+                .build();
+    }
+
     @PostMapping("/register")
     public ApiResponse<AuthTokenResponse> register(@Valid @RequestBody RegisterRequest request) {
         return ApiResponse.<AuthTokenResponse>builder()
@@ -42,10 +67,10 @@ public class AuthController {
     }
 
     @PostMapping("/register/email")
-    public ApiResponse<AuthTokenResponse> registerByEmail(@Valid @RequestBody RegisterRequest request) {
-        return ApiResponse.<AuthTokenResponse>builder()
-                .message("Registered by email successfully")
-                .result(authService.register(request))
+    public ApiResponse<RegisterOtpResponse> registerByEmail(@Valid @RequestBody RequestRegisterOtpRequest request) {
+        return ApiResponse.<RegisterOtpResponse>builder()
+                .message("Registration OTP sent successfully")
+                .result(authService.requestRegisterOtp(request))
                 .build();
     }
 
@@ -54,6 +79,32 @@ public class AuthController {
         return ApiResponse.<AuthTokenResponse>builder()
                 .message("Logged in successfully")
                 .result(authService.login(request))
+                .build();
+    }
+
+    @PostMapping("/password/change")
+    public ApiResponse<ChangePasswordResponse> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        return ApiResponse.<ChangePasswordResponse>builder()
+                .message("Password changed successfully")
+                .result(authService.changePassword(request))
+                .build();
+    }
+
+    @PostMapping("/password/forgot/request-otp")
+    public ApiResponse<RegisterOtpResponse> requestForgotPasswordOtp(
+            @Valid @RequestBody RequestForgotPasswordOtpRequest request) {
+        return ApiResponse.<RegisterOtpResponse>builder()
+                .message("Forgot-password OTP sent successfully")
+                .result(authService.requestForgotPasswordOtp(request))
+                .build();
+    }
+
+    @PostMapping("/password/forgot/reset")
+    public ApiResponse<ChangePasswordResponse> resetForgotPassword(
+            @Valid @RequestBody ResetForgotPasswordRequest request) {
+        return ApiResponse.<ChangePasswordResponse>builder()
+                .message("Password reset successfully")
+                .result(authService.resetForgotPassword(request))
                 .build();
     }
 
@@ -95,7 +146,7 @@ public class AuthController {
                 .result(Map.of(
                         "status", "success",
                         "userId", jwt.getSubject(),
-                        "issuer", jwt.getIssuer(),
+                        "issuer", String.valueOf(jwt.getClaims().get("iss")),
                         "allClaims", jwt.getClaims()))
                 .build();
     }

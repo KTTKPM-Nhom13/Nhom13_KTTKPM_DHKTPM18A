@@ -11,4 +11,6 @@ public interface AuthSessionRepository extends JpaRepository<AuthSession, UUID> 
     Optional<AuthSession> findByRefreshToken(String refreshToken);
 
     Optional<AuthSession> findByUserAndDeviceId(AuthUser user, String deviceId);
+
+    java.util.List<AuthSession> findAllByUser(AuthUser user);
 }

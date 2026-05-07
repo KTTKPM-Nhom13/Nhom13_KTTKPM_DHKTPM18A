@@ -20,6 +20,8 @@ public class GatewaySecurityConfig {
     private static final String[] PUBLIC_URLS = {
             "/auth/**",
             "/api/auth/**",
+            "/api/users/**",
+            "/api/drivers/**",
             "/eureka/**",
             "/eta/**",
             "/api/eta/**",
@@ -60,7 +62,7 @@ public class GatewaySecurityConfig {
     }
 
     @Bean
-    public JwtDecoder jwtDecoder() throws Exception {
+    public JwtDecoder blockingJwtDecoder() throws Exception {
         return JwtSupport.createJwtDecoder();
     }
 }

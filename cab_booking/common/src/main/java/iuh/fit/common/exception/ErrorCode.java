@@ -25,7 +25,12 @@ public enum ErrorCode {
     AUTH_USER_NOT_FOUND(404, "Auth user not found", HttpStatus.NOT_FOUND),
     AUTH_SESSION_NOT_FOUND(404, "Auth session not found", HttpStatus.NOT_FOUND),
     ACCOUNT_DISABLED(403, "Account is disabled", HttpStatus.FORBIDDEN),
-    EMAIL_DELIVERY_FAILED(502, "Email delivery failed", HttpStatus.BAD_GATEWAY);
+    ACCOUNT_PENDING_DELETION(403, "Account is pending deletion", HttpStatus.FORBIDDEN),
+    ACCOUNT_RESTORE_WINDOW_EXPIRED(410, "Account restore window has expired", HttpStatus.GONE),
+    EMAIL_DELIVERY_FAILED(502, "Email delivery failed", HttpStatus.BAD_GATEWAY),
+    REGISTRATION_EMAIL_NOT_VERIFIED(400, "Email is not verified for registration", HttpStatus.BAD_REQUEST),
+    REGISTRATION_OTP_INVALID(400, "Registration OTP is invalid", HttpStatus.BAD_REQUEST),
+    REGISTRATION_OTP_EXPIRED(400, "Registration OTP has expired", HttpStatus.BAD_REQUEST);
 
     int code;
     String message;

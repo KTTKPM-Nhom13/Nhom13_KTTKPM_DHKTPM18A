@@ -50,4 +50,17 @@ public class AuthUser extends BaseEntity {
 
     @Column(name = "last_login_at")
     LocalDateTime lastLoginAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_status", nullable = false, length = 30)
+    AccountLifecycleStatus accountStatus = AccountLifecycleStatus.ACTIVE;
+
+    @Column(name = "deletion_requested_at")
+    LocalDateTime deletionRequestedAt;
+
+    @Column(name = "scheduled_deletion_at")
+    LocalDateTime scheduledDeletionAt;
+
+    @Column(name = "deletion_reason", length = 255)
+    String deletionReason;
 }

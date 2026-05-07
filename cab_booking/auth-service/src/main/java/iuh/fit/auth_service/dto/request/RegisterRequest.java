@@ -29,6 +29,9 @@ public class RegisterRequest {
     @Size(max = 500)
     String avatarUrl;
 
+    @Size(max = 30)
+    String role;
+
     @NotBlank
     @Size(max = 120)
     String deviceId;

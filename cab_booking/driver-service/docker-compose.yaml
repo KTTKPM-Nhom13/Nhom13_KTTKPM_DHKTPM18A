@@ -1,0 +1,51 @@
+services:
+  driver-db:
+    image: postgres:16-alpine
+    container_name: driver-db
+    environment:
+      - POSTGRES_DB=${DRIVER_DB_NAME}
+      - POSTGRES_USER=${DRIVER_DB_USER}
+      - POSTGRES_PASSWORD=${DRIVER_DB_PASSWORD}
+    ports:
+      - "${DRIVER_DB_PORT}:5432"
+    networks:
+      - cab-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DRIVER_DB_USER} -d ${DRIVER_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  driver-service:
+    build:
+      context: ..
+      dockerfile: ./driver-service/Dockerfile
+    container_name: driver-service
+    ports:
+      - "${DRIVER_SERVICE_PORT}:8083"
+    environment:
+      - SPRING_DATASOURCE_URL=${DRIVER_DB_JDBC_URL}
+      - SPRING_DATASOURCE_USERNAME=${DRIVER_DB_USER}
+      - SPRING_DATASOURCE_PASSWORD=${DRIVER_DB_PASSWORD}
+      - SPRING_PROFILES_ACTIVE=default
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=${EUREKA_DEFAULT_ZONE}
+    volumes:
+      - maven-cache:/root/.m2
+    networks:
+      - cab-network
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      driver-db:
+        condition: service_healthy
+
+volumes:
+  maven-cache:
+    driver: local
+
+networks:
+  cab-network:
+    driver: bridge
