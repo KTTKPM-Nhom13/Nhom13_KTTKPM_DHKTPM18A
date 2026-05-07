@@ -1,0 +1,64 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: booking-service
+  
+  # Cấu hình Database
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres-db:5432/booking_db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false # Tắt log SQL để dễ nhìn log Kafka/Redis hơn
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # Cấu hình Redis
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
+  # Cấu hình chuẩn cho KAFKA (Phiên bản mới 4.x)
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+    consumer:
+      group-id: booking-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+
+# Tắt Eureka nếu chưa có server để tránh spam lỗi log
+eureka:
+  client:
+    enabled: ${EUREKA_CLIENT_ENABLED:false}
+    serviceUrl:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://eureka:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+
+resilience4j:
+  retry:
+    instances:
+      driverService:
+        max-attempts: 3
+        wait-duration: 3s
+
+app:
+  security:
+    jwt:
+      public-key-path: classpath:certs/public_key.pem

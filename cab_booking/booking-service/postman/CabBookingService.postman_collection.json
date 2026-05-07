@@ -1,0 +1,199 @@
+{
+	"info": {
+		"_postman_id": "cab-booking-service",
+		"name": "Cab Booking Service API",
+		"description": "Postman collection để test Booking Service (Security tạm thời vô hiệu hóa trong dev).",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "lastBookingId",
+			"value": "",
+			"type": "any"
+		}
+	],
+	"item": [
+		{
+			"name": "1. Tạo Booking mới",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+							"pm.test(\"success=true\", function () { pm.expect(pm.response.json().success).to.eql(true); });",
+							"pm.test(\"Có bookingId\", function () {",
+							"    var d = pm.response.json().data;",
+							"    pm.expect(d).to.have.property('id');",
+							"    pm.expect(d.status).to.eql('MATCHING');",
+							"    pm.collectionVariables.set('lastBookingId', d.id);",
+							"    console.log('Booking ID:', d.id);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [{ "key": "Content-Type", "value": "application/json" }],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"pickupLocation\": \"12 Nguyễn Văn Bảo, Phường 4, Gò Vấp, TP.HCM\",\n    \"dropoffLocation\": \"Sân bay Tân Sơn Nhất\",\n    \"customerNote\": \"Mang theo vali lớn\",\n    \"pickupCoordinates\": { \"lat\": 10.8221, \"lng\": 106.6885 },\n    \"dropoffCoordinates\": { \"lat\": 10.8188, \"lng\": 106.6619 },\n    \"vehicleType\": \"SEDAN\",\n    \"paymentMethod\": \"CARD\",\n    \"estimatedFare\": 50000,\n    \"promoCode\": \"FIRST_RIDE\",\n    \"idempotencyKey\": \"{{$guid}}\"\n}"
+				},
+				"url": { "raw": "{{baseUrl}}/api/v1/bookings", "host": ["{{baseUrl}}"], "path": ["api", "v1", "bookings"] }
+			}
+		},
+		{
+			"name": "2. Bắt đầu chuyến đi (Driver: /start)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+							"pm.test(\"status=IN_PROGRESS\", function () {",
+							"    pm.expect(pm.response.json().data.status).to.eql('IN_PROGRESS');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/bookings/{{lastBookingId}}/start",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "v1", "bookings", "{{lastBookingId}}", "start"]
+				},
+				"description": "Driver App gọi sau khi đón được khách. Chuyển ASSIGNED → IN_PROGRESS."
+			}
+		},
+		{
+			"name": "3. Hoàn thành chuyến đi (Driver: /complete)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });",
+							"pm.test(\"status=COMPLETED\", function () {",
+							"    pm.expect(pm.response.json().data.status).to.eql('COMPLETED');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/bookings/{{lastBookingId}}/complete",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "v1", "bookings", "{{lastBookingId}}", "complete"]
+				},
+				"description": "Driver App gọi khi đến nơi. Chuyển IN_PROGRESS → COMPLETED. Gửi ride.finished → Payment Service."
+			}
+		},
+		{
+			"name": "4. Start - Sai trạng thái (400/409)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status 4xx\", function () {",
+							"    pm.expect(pm.response.code).to.be.oneOf([400, 409, 500]);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/bookings/{{lastBookingId}}/start",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "v1", "bookings", "{{lastBookingId}}", "start"]
+				},
+				"description": "Test lỗi — booking đang IN_PROGRESS mà gọi /start lần nữa → phải reject."
+			}
+		},
+		{
+			"name": "5. Complete - Sai trạng thái (400/409)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status 4xx\", function () {",
+							"    pm.expect(pm.response.code).to.be.oneOf([400, 409, 500]);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/bookings/{{lastBookingId}}/complete",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "v1", "bookings", "{{lastBookingId}}", "complete"]
+				},
+				"description": "Test lỗi — booking chưa IN_PROGRESS mà gọi /complete → phải reject."
+			}
+		},
+		{
+			"name": "6. Validation - Thiếu pickupLocation",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status 400\", function () { pm.response.to.have.status(400); });",
+							"pm.test(\"success=false\", function () { pm.expect(pm.response.json().success).to.eql(false); });"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [{ "key": "Content-Type", "value": "application/json" }],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"dropoffLocation\": \"Sân bay Tân Sơn Nhất\"\n}"
+				},
+				"url": { "raw": "{{baseUrl}}/api/v1/bookings", "host": ["{{baseUrl}}"], "path": ["api", "v1", "bookings"] }
+			}
+		},
+		{
+			"name": "7. Health Check",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": ["pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"]
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": { "raw": "{{baseUrl}}/actuator/health", "host": ["{{baseUrl}}"], "path": ["actuator", "health"] }
+			}
+		}
+	]
+}

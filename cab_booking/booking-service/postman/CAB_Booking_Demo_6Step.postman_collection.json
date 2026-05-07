@@ -1,0 +1,271 @@
+{
+	"info": {
+		"_postman_id": "cab-booking-demo",
+		"name": "CAB Booking — Demo 6-Step Flow",
+		"description": "Kịch bản demo hoàn chỉnh 6 bước cho buổi bảo vệ đồ án. \nChạy tuần tự từ 1→6. Booking ID được tự động lưu qua Collection Variable.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "lastBookingId",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "STEP 1 — Login (lấy token mock)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+							"pm.test('Có accessToken', function () {",
+							"    var d = pm.response.json().data;",
+							"    pm.expect(d).to.have.property('accessToken');",
+							"    pm.collectionVariables.set('authToken', d.accessToken);",
+							"    console.log('Token:', d.accessToken);",
+							"});"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [{ "key": "Content-Type", "value": "application/json" }],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"phone\": \"0909123456\",\n    \"password\": \"demo123\"\n}"
+				},
+				"url": { "raw": "{{baseUrl}}/api/mock/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "mock", "auth", "login"] }
+			}
+		},
+		{
+			"name": "STEP 2 — Get Price Estimate (Pricing Mock)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+							"pm.test('Có quoteToken & estimatedFare', function () {",
+							"    var d = pm.response.json().data;",
+							"    pm.expect(d).to.have.property('quoteToken');",
+							"    pm.expect(d).to.have.property('estimatedFare');",
+							"    pm.expect(d).to.have.property('etaMinutes');",
+							"    pm.collectionVariables.set('quoteToken', d.quoteToken);",
+							"    pm.collectionVariables.set('estimatedFare', d.estimatedFare);",
+							"    console.log('QuoteToken:', d.quoteToken);",
+							"    console.log('Fare:', d.estimatedFare);",
+							"});"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [{ "key": "Content-Type", "value": "application/json" }],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"pickupLocation\": \"12 Nguyễn Văn Bảo, Phường 4, Gò Vấp, TP.HCM\",\n    \"dropoffLocation\": \"Sân bay Tân Sơn Nhất\",\n    \"vehicleType\": \"SEDAN\",\n    \"promoCode\": \"FIRST_RIDE\"\n}"
+				},
+				"url": { "raw": "{{baseUrl}}/api/mock/pricing/estimate", "host": ["{{baseUrl}}"], "path": ["api", "mock", "pricing", "estimate"] }
+			}
+		},
+		{
+			"name": "STEP 3 — Get Nearby Drivers (Driver Mock)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+							"pm.test('Có danh sách tài xế', function () {",
+							"    var d = pm.response.json().data;",
+							"    pm.expect(d).to.be.an('array');",
+							"    pm.expect(d.length).to.be.above(0);",
+							"    console.log('Drivers:', JSON.stringify(d, null, 2));",
+							"});"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/mock/driver/nearby?location=10.8221,106.6885&vehicleType=SEDAN",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "mock", "driver", "nearby"],
+					"query": [
+						{ "key": "location", "value": "10.8221,106.6885" },
+						{ "key": "vehicleType", "value": "SEDAN" }
+					]
+				}
+			}
+		},
+		{
+			"name": "STEP 4 — Create Booking (core API)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+							"pm.test('success=true & status=MATCHING', function () {",
+							"    var d = pm.response.json();",
+							"    pm.expect(d.success).to.eql(true);",
+							"    pm.expect(d.data.status).to.eql('MATCHING');",
+							"    pm.expect(d.data).to.have.property('id');",
+							"    pm.collectionVariables.set('lastBookingId', d.data.id);",
+							"    console.log('Booking ID:', d.data.id);",
+							"    console.log('Status:', d.data.status);",
+							"});"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" },
+					{ "key": "Authorization", "value": "Bearer {{authToken}}", "disabled": true }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"pickupLocation\": \"12 Nguyễn Văn Bảo, Phường 4, Gò Vấp, TP.HCM\",\n    \"dropoffLocation\": \"Sân bay Tân Sơn Nhất\",\n    \"customerNote\": \"Mang theo vali lớn\",\n    \"pickupCoordinates\": { \"lat\": 10.8221, \"lng\": 106.6885 },\n    \"dropoffCoordinates\": { \"lat\": 10.8188, \"lng\": 106.6619 },\n    \"vehicleType\": \"SEDAN\",\n    \"paymentMethod\": \"CARD\",\n    \"estimatedFare\": 50000,\n    \"promoCode\": \"FIRST_RIDE\",\n    \"quoteToken\": \"{{quoteToken}}\",\n    \"idempotencyKey\": \"{{$guid}}\"\n}"
+				},
+				"url": { "raw": "{{baseUrl}}/api/v1/bookings", "host": ["{{baseUrl}}"], "path": ["api", "v1", "bookings"] }
+			}
+		},
+		{
+			"name": "STEP 5 — Driver Match (Mock AI → ride.assigned)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+							"pm.test('Có driver info', function () {",
+							"    var d = pm.response.json().data;",
+							"    pm.expect(d).to.have.property('id');",
+							"    pm.expect(d).to.have.property('name');",
+							"    console.log('Matched Driver:', d.name, '|', d.vehicleType);",
+							"});"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/mock/driver/match/{{lastBookingId}}?vehicleType=SEDAN",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "mock", "driver", "match", "{{lastBookingId}}"],
+					"query": [{ "key": "vehicleType", "value": "SEDAN" }]
+				},
+				"description": "Gọi mock driver matching → gửi ride.assigned lên Kafka. RideEventListener sẽ cập nhật trạng thái booking sang ASSIGNED."
+			}
+		},
+		{
+			"name": "STEP 6a — Start Ride (Driver: ASSIGNED → IN_PROGRESS)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+							"pm.test('status=IN_PROGRESS', function () {",
+							"    pm.expect(pm.response.json().data.status).to.eql('IN_PROGRESS');",
+							"    console.log('Ride started!');",
+							"});"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/bookings/{{lastBookingId}}/start",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "v1", "bookings", "{{lastBookingId}}", "start"]
+				}
+			}
+		},
+		{
+			"name": "STEP 6b — Complete Ride (Driver: IN_PROGRESS → COMPLETED)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+							"pm.test('status=COMPLETED', function () {",
+							"    pm.expect(pm.response.json().data.status).to.eql('COMPLETED');",
+							"    console.log('Ride completed! ride.finished sent to Kafka.');",
+							"});"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/bookings/{{lastBookingId}}/complete",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "v1", "bookings", "{{lastBookingId}}", "complete"]
+				}
+			}
+		},
+		{
+			"name": "ERR — Start ride khi chưa ASSIGNED (verify state machine)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Status 409 Conflict', function () { pm.response.to.have.status(409); });",
+							"pm.test('Có message lỗi', function () {",
+							"    pm.expect(pm.response.json().message).to.include('ASSIGNED');",
+							"    console.log('Đúng! State machine đã reject đúng.');",
+							"});"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/bookings/{{lastBookingId}}/start",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "v1", "bookings", "{{lastBookingId}}", "start"]
+				},
+				"description": "Sau STEP 6a, booking đã ở IN_PROGRESS. Gọi lại /start → phải trả 409 với message 'ASSIGNED'."
+			}
+		},
+		{
+			"name": "Health Check",
+			"event": [
+				{
+					"listen": "test",
+					"script": { "exec": ["pm.test('Status 200', function () { pm.response.to.have.status(200); });"] }
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": { "raw": "{{baseUrl}}/actuator/health", "host": ["{{baseUrl}}"], "path": ["actuator", "health"] }
+			}
+		}
+	]
+}

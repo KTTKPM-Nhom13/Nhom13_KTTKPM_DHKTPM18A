@@ -12,9 +12,12 @@
         <module name="auth-service" />
         <module name="common" />
         <module name="eureka" />
+        <module name="booking-service" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
+      <module name="booking-service.main" target="21" />
+      <module name="booking-service.test" target="21" />
       <module name="cab_booking" target="21" />
       <module name="kubernetes" target="21" />
     </bytecodeTargetLevel>
@@ -23,6 +26,7 @@
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="api-gateway" options="-parameters" />
       <module name="auth-service" options="-parameters" />
+      <module name="booking-service" options="-parameters" />
       <module name="cab_booking" options="" />
       <module name="common" options="-parameters" />
       <module name="config-server" options="-parameters" />
