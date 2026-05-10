@@ -19,5 +19,7 @@ public class AuthUserSummaryResponse {
     String phoneNumber;
     String role;
     boolean emailVerified;
+    String accountStatus;
+    LocalDateTime scheduledDeletionAt;
     LocalDateTime lastLoginAt;
 }

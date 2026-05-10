@@ -38,4 +38,48 @@ public class EmailServiceClient {
             log.warn("Failed to send welcome email to {}", to, ex);
         }
     }
+
+    public void sendRegistrationOtpEmail(String to, String otpCode, long otpMinutes) {
+        EmailDispatchRequest request = EmailDispatchRequest.builder()
+                .to(to)
+                .subject("Your CAB Booking verification code")
+                .textContent("Your verification code is " + otpCode + ". It expires in " + otpMinutes + " minutes.")
+                .htmlContent("<p>Your verification code is <strong>" + otpCode
+                        + "</strong>.</p><p>It expires in " + otpMinutes + " minutes.</p>")
+                .build();
+
+        try {
+            restClientBuilder.build()
+                    .post()
+                    .uri(emailServiceUrl + "/internal/emails/send")
+                    .body(request)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception ex) {
+            log.warn("Failed to send registration OTP email to {}", to, ex);
+            throw ex;
+        }
+    }
+
+    public void sendForgotPasswordOtpEmail(String to, String otpCode, long otpMinutes) {
+        EmailDispatchRequest request = EmailDispatchRequest.builder()
+                .to(to)
+                .subject("Your CAB Booking password reset code")
+                .textContent("Your password reset code is " + otpCode + ". It expires in " + otpMinutes + " minutes.")
+                .htmlContent("<p>Your password reset code is <strong>" + otpCode
+                        + "</strong>.</p><p>It expires in " + otpMinutes + " minutes.</p>")
+                .build();
+
+        try {
+            restClientBuilder.build()
+                    .post()
+                    .uri(emailServiceUrl + "/internal/emails/send")
+                    .body(request)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception ex) {
+            log.warn("Failed to send forgot-password OTP email to {}", to, ex);
+            throw ex;
+        }
+    }
 }

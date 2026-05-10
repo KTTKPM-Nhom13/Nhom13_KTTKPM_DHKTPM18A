@@ -55,7 +55,7 @@ spring:
         - id: driver-service
           uri: lb://driver-service
           predicates:
-            - Path=/driver/**
+            - Path=/driver/**,/api/drivers/**
 
       # ── Mặc định khi bị 429: trả JSON thay vì body rỗng ────────
       default-filters:

@@ -26,3 +26,7 @@ eureka:
   instance:
     prefer-ip-address: true
     instance-id: ${spring.application.name}:${server.port}:${random.value}
+
+integration:
+  auth-service:
+    url: ${AUTH_SERVICE_URL:http://auth-service:8081}

@@ -1,0 +1,112 @@
+package iuh.fit.payment_service.controller;
+
+import iuh.fit.common.dto.response.ApiResponse;
+import iuh.fit.payment_service.dto.request.ChargePaymentRequest;
+import iuh.fit.payment_service.dto.response.PaymentResponse;
+import iuh.fit.payment_service.service.PaymentSagaService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/payments")
+@RequiredArgsConstructor
+@FieldDefaults(level = lombok.AccessLevel.PRIVATE, makeFinal = true)
+@Slf4j
+@Tag(name = "Payment API", description = "Payment processing and transaction management APIs")
+public class PaymentController {
+
+    private final PaymentSagaService paymentSagaService;
+
+    @PostMapping("/charge")
+    @Operation(
+            summary = "Charge payment",
+            description = "Initiates a payment charge for a ride. Supports idempotency via X-Idempotency-Key header or request body."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Payment processed successfully"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid request or payment declined"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Idempotency conflict - duplicate request"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "502", description = "Payment gateway error")
+    })
+    public ResponseEntity<ApiResponse<PaymentResponse>> chargePayment(
+            @Valid @RequestBody ChargePaymentRequest request,
+            @Parameter(description = "Idempotency key to prevent duplicate charges")
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String headerIdempotencyKey
+    ) {
+        log.info("[Controller] POST /api/payments/charge - rideId={}, customerId={}, amount={}, headerIdemKey={}",
+                request.getRideId(), request.getCustomerId(), request.getAmount(), headerIdempotencyKey);
+
+        if (headerIdempotencyKey != null && !headerIdempotencyKey.isBlank()
+                && (request.getIdempotencyKey() == null || request.getIdempotencyKey().isBlank())) {
+            request.setIdempotencyKey(headerIdempotencyKey);
+        }
+
+        PaymentResponse response = paymentSagaService.startPaymentSaga(request);
+
+        String message;
+        switch (response.getStatus()) {
+            case SUCCESS:
+                message = "Payment completed successfully";
+                break;
+            case FAILED:
+            case FAILED_FINAL:
+                message = "Payment failed: " + response.getFailureReason();
+                break;
+            case PENDING:
+            case RETRY:
+                message = "Payment is being processed";
+                break;
+            default:
+                message = "Payment saga initiated";
+        }
+
+        return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
+                .message(message)
+                .result(response)
+                .build());
+    }
+
+    @GetMapping("/txn/{transactionId}")
+    @Operation(summary = "Get payment by transaction ID")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Payment found"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Payment not found")
+    })
+    public ResponseEntity<ApiResponse<PaymentResponse>> getPaymentByTransactionId(
+            @Parameter(description = "Transaction ID", example = "txn_abc123def456")
+            @PathVariable String transactionId
+    ) {
+        log.info("[Controller] GET /api/payments/txn/{}", transactionId);
+        PaymentResponse response = paymentSagaService.getPaymentByTransactionId(transactionId);
+        return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
+                .message("Payment retrieved successfully")
+                .result(response)
+                .build());
+    }
+
+    @GetMapping("/ride/{rideId}")
+    @Operation(summary = "Get payment by ride ID")
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Payment found"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Payment not found")
+    })
+    public ResponseEntity<ApiResponse<PaymentResponse>> getPaymentByRideId(
+            @Parameter(description = "Ride ID", example = "r123")
+            @PathVariable String rideId
+    ) {
+        log.info("[Controller] GET /api/payments/ride/{}", rideId);
+        PaymentResponse response = paymentSagaService.getPaymentByRideId(rideId);
+        return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
+                .message("Payment retrieved successfully")
+                .result(response)
+                .build());
+    }
+}

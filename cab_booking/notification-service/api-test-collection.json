@@ -1,0 +1,163 @@
+{
+	"info": {
+		"_postman_id": "c1a2b3c4-d5e6-4f7g-8h9i-j0k1l2m3n4o5",
+		"name": "Cab Booking Service Tests",
+		"description": "Collection for testing Notification and Review services",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Notification Service",
+			"item": [
+				{
+					"name": "Get User Notifications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/notifications/user/user123",
+							"host": [
+								"{{gateway_url}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"user",
+								"user123"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Test Notification (Create)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/notifications/test?userId=user123&message=Hello from test API",
+							"host": [
+								"{{gateway_url}}"
+							],
+							"path": [
+								"api",
+								"notifications",
+								"test"
+							],
+							"query": [
+								{
+									"key": "userId",
+									"value": "user123"
+								},
+								{
+									"key": "message",
+									"value": "Hello from test API"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Review Service",
+			"item": [
+				{
+					"name": "Create Review",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"rideId\": \"ride_001\",\n    \"userId\": \"user123\",\n    \"driverId\": \"driver456\",\n    \"rating\": 5,\n    \"comment\": \"Excellent ride! Smooth driving.\"\n}"
+						},
+						"url": {
+							"raw": "{{gateway_url}}/api/reviews",
+							"host": [
+								"{{gateway_url}}"
+							],
+							"path": [
+								"api",
+								"reviews"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Driver Reviews",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/reviews/driver/driver456",
+							"host": [
+								"{{gateway_url}}"
+							],
+							"path": [
+								"api",
+								"reviews",
+								"driver",
+								"driver456"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Reviews",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{gateway_url}}/api/reviews/user/user123",
+							"host": [
+								"{{gateway_url}}"
+							],
+							"path": [
+								"api",
+								"reviews",
+								"user",
+								"user123"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "gateway_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		}
+	]
+}

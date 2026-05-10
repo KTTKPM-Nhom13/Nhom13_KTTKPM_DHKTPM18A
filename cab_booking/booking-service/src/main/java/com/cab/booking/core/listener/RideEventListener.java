@@ -1,5 +1,6 @@
 package com.cab.booking.core.listener;
 
+import com.cab.booking.core.dto.event.DriverStatusEvent;
 import com.cab.booking.core.dto.event.inbound.PaymentCompletedEvent;
 import com.cab.booking.core.dto.event.outbound.RideAssignedEvent;
 import com.cab.booking.core.entity.Booking;
@@ -19,69 +20,74 @@ public class RideEventListener {
 
     private final BookingRepository bookingRepository;
 
-    // ================================================================
-    // ride.assigned — cập nhật MATCHING → ASSIGNED
-    // ================================================================
     @KafkaListener(topics = "ride.assigned", groupId = "booking-service-group")
     public void handleRideAssigned(RideAssignedEvent event) {
-        log.info("⚡ [ride.assigned] rideId={} | driverId={}",
-                event.getRideId(), event.getDriverId());
+        log.info("[ride.assigned] rideId={} | driverId={}", event.getRideId(), event.getDriverId());
 
         UUID rideId;
         try {
             rideId = UUID.fromString(event.getRideId());
         } catch (IllegalArgumentException ex) {
-            log.error("❌ rideId '{}' không hợp lệ, bỏ qua.", event.getRideId());
+            log.error("Invalid rideId '{}', skipping event.", event.getRideId());
             return;
         }
 
         Booking booking = bookingRepository.findById(rideId).orElse(null);
         if (booking == null) {
-            log.error("❌ Không tìm thấy booking: {}", rideId);
+            log.error("Booking not found: {}", rideId);
             return;
         }
 
         if (booking.getStatus() != BookingStatus.MATCHING) {
-            log.warn("⚠️ booking {} đang ở [{}], bỏ qua ride.assigned", booking.getId(), booking.getStatus());
+            log.warn("Booking {} is in status {}, skipping ride.assigned", booking.getId(), booking.getStatus());
             return;
         }
 
         booking.setAssignedDriverId(event.getDriverId());
         booking.setStatus(BookingStatus.ASSIGNED);
         bookingRepository.save(booking);
-        log.info("✅ booking {} → ASSIGNED | driver={}", booking.getId(), event.getDriverId());
+        log.info("Booking {} moved to ASSIGNED with driver {}", booking.getId(), event.getDriverId());
     }
 
-    // ================================================================
-    // payment.completed — cập nhật COMPLETED → PAID
-    // ================================================================
+    @KafkaListener(topics = "driver.status.changed", groupId = "booking-service-group")
+    public void handleDriverStatusChanged(DriverStatusEvent event) {
+        log.info(
+                "[driver.status.changed] driverId={} | availability={} | activeForBooking={} | rideId={} | rideStatus={}",
+                event.getDriverId(),
+                event.getAvailabilityStatus(),
+                event.getActiveForBooking(),
+                event.getRideId(),
+                event.getRideStatus());
+    }
+
     @KafkaListener(topics = "payment.completed", groupId = "booking-service-group")
     public void handlePaymentCompleted(PaymentCompletedEvent event) {
-        log.info("💰 [payment.completed] rideId={} | eventId={}",
-                event.getRideId(), event.getEventId());
+        log.info("[payment.completed] rideId={} | eventId={}", event.getRideId(), event.getEventId());
 
         UUID rideId;
         try {
             rideId = UUID.fromString(event.getRideId());
         } catch (IllegalArgumentException ex) {
-            log.error("❌ rideId '{}' không hợp lệ, bỏ qua.", event.getRideId());
+            log.error("Invalid rideId '{}', skipping event.", event.getRideId());
             return;
         }
 
         Booking booking = bookingRepository.findById(rideId).orElse(null);
         if (booking == null) {
-            log.error("❌ Không tìm thấy booking: {}", rideId);
+            log.error("Booking not found: {}", rideId);
             return;
         }
 
         if (booking.getStatus() != BookingStatus.COMPLETED) {
-            log.warn("⚠️ booking {} đang ở [{}], bỏ qua payment.completed", booking.getId(), booking.getStatus());
+            log.warn("Booking {} is in status {}, skipping payment.completed", booking.getId(), booking.getStatus());
             return;
         }
 
         booking.setStatus(BookingStatus.PAID);
         bookingRepository.save(booking);
-        log.info("✅ booking {} → PAID | customer={} | fare={}",
-                booking.getId(), booking.getCustomerId(), booking.getEstimatedFare());
+        log.info("Booking {} moved to PAID | customer={} | fare={}",
+                booking.getId(),
+                booking.getCustomerId(),
+                booking.getEstimatedFare());
     }
 }

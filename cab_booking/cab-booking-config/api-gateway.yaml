@@ -44,6 +44,11 @@ spring:
           predicates:
             - Path=/api/users/**
 
+        - id: driver-service
+          uri: lb://driver-service
+          predicates:
+            - Path=/api/drivers/**
+
         - id: review-service
           uri: lb://review-service
           predicates:

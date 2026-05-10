@@ -22,6 +22,9 @@ public class UserProfileResponse {
     String gender;
     LocalDate dateOfBirth;
     String defaultPickupNote;
+    String accountStatus;
+    LocalDateTime deletionRequestedAt;
+    LocalDateTime scheduledDeletionAt;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 }

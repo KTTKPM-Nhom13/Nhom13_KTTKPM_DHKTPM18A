@@ -4,6 +4,8 @@ import iuh.fit.common.model.BaseEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
@@ -13,6 +15,7 @@ import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -46,6 +49,19 @@ public class UserProfile extends BaseEntity {
 
     @Column(name = "default_pickup_note", length = 255)
     String defaultPickupNote;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_status", nullable = false, length = 30)
+    AccountLifecycleStatus accountStatus = AccountLifecycleStatus.ACTIVE;
+
+    @Column(name = "deletion_requested_at")
+    LocalDateTime deletionRequestedAt;
+
+    @Column(name = "scheduled_deletion_at")
+    LocalDateTime scheduledDeletionAt;
+
+    @Column(name = "deletion_reason", length = 255)
+    String deletionReason;
 
     @OneToMany(mappedBy = "userProfile", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     List<UserDevice> devices = new ArrayList<>();

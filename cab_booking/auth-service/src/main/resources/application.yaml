@@ -1,5 +1,5 @@
 spring:
   application:
-    name: auth-service # Tên này phải khớp với tên file trên Config Server
+    name: auth-service
   config:
-    import: "optional:configserver:http://localhost:8888" # Gọi đến server để lấy toàn bộ config về
+    import: "${SPRING_CONFIG_IMPORT:optional:configserver:http://localhost:8888}"
