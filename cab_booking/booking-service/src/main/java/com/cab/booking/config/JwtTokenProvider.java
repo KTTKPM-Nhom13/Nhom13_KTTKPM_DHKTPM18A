@@ -2,69 +2,49 @@ package com.cab.booking.config;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import jakarta.annotation.PostConstruct;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.util.FileCopyUtils;
+import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.nio.charset.StandardCharsets;
-import java.security.KeyFactory;
-import java.security.PublicKey;
-import java.security.spec.X509EncodedKeySpec;
-import java.util.Base64;
+import java.security.Key;
 
-// @Component  // ❌ TẠM VÔ HIỆU HÓA — Auth Service chưa hoàn thiện, không có public_key.pem
+@Slf4j
+@Component
 public class JwtTokenProvider {
 
-    private PublicKey publicKey;
+    private final Key key;
 
-    @PostConstruct
-    public void init() throws Exception {
-        ClassPathResource resource = new ClassPathResource("certs/public_key.pem");
-        String key;
-        try (Reader reader = new InputStreamReader(resource.getInputStream(), StandardCharsets.UTF_8)) {
-            key = FileCopyUtils.copyToString(reader);
-        }
-
-        // Dùng Regex "quét sạch" mọi loại Header, Footer và khoảng trắng/xuống dòng
-        String publicKeyPEM = key
-                .replaceAll("-----BEGIN.*?-----", "") // Cắt mọi header bắt đầu bằng -----BEGIN và kết thúc bằng -----
-                .replaceAll("-----END.*?-----", "")   // Cắt mọi footer
-                .replaceAll("\\s+", "");              // Cắt toàn bộ dấu cách, \n, \r
-
-        byte[] encoded = Base64.getDecoder().decode(publicKeyPEM);
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(encoded);
-        this.publicKey = keyFactory.generatePublic(keySpec);
+    public JwtTokenProvider(@Value("${app.security.jwt.secret}") String secret) {
+        this.key = Keys.hmacShaKeyFor(secret.getBytes());
     }
 
-    public boolean validateToken(String authToken) {
+    public boolean validateToken(String token) {
         try {
-            Jwts.parserBuilder().setSigningKey(publicKey).build().parseClaimsJws(authToken);
+            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
             return true;
         } catch (Exception ex) {
-            // Log the exception if needed
+            log.error("Invalid JWT token: {}", ex.getMessage());
         }
         return false;
     }
 
-    public String getUsernameFromToken(String token) {
+    public String getUserIdFromToken(String token) {
         Claims claims = Jwts.parserBuilder()
-                .setSigningKey(publicKey)
+                .setSigningKey(key)
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
+        // Assuming userId is the subject of the token
         return claims.getSubject();
     }
 
     public String getRoleFromToken(String token) {
         Claims claims = Jwts.parserBuilder()
-                .setSigningKey(publicKey)
+                .setSigningKey(key)
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
         return claims.get("role", String.class);
     }
 }
-

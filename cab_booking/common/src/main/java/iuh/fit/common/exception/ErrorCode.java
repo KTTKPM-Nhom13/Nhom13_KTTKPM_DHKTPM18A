@@ -25,7 +25,10 @@ public enum ErrorCode {
     AUTH_USER_NOT_FOUND(404, "Auth user not found", HttpStatus.NOT_FOUND),
     AUTH_SESSION_NOT_FOUND(404, "Auth session not found", HttpStatus.NOT_FOUND),
     ACCOUNT_DISABLED(403, "Account is disabled", HttpStatus.FORBIDDEN),
-    EMAIL_DELIVERY_FAILED(502, "Email delivery failed", HttpStatus.BAD_GATEWAY);
+    EMAIL_DELIVERY_FAILED(502, "Email delivery failed", HttpStatus.BAD_GATEWAY),
+    BOOKING_NOT_FOUND(404, "Booking not found", HttpStatus.NOT_FOUND),
+    BOOKING_ALREADY_ACCEPTED(409, "Booking already accepted by another driver", HttpStatus.CONFLICT),
+    INVALID_STATE(400, "Invalid state transition", HttpStatus.BAD_REQUEST);
 
     int code;
     String message;

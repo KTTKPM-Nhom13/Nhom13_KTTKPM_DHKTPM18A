@@ -9,6 +9,7 @@ include:
   - user-service/docker-compose.yaml
   - notification-service/docker-compose.yaml
   - review-service/docker-compose.yaml
+  - booking-service/docker-compose.yaml
 
 services:
   redis:

@@ -1,7 +1,7 @@
 package com.cab.booking.core.listener;
 
-import com.cab.booking.core.dto.event.PaymentCompletedEvent;
-import com.cab.booking.core.dto.event.RideAssignedEvent;
+import com.cab.booking.core.dto.event.inbound.PaymentCompletedEvent;
+import com.cab.booking.core.dto.event.outbound.RideAssignedEvent;
 import com.cab.booking.core.entity.Booking;
 import com.cab.booking.core.enums.BookingStatus;
 import com.cab.booking.core.repository.BookingRepository;
