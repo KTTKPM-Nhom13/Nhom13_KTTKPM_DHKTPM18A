@@ -10,19 +10,24 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 /**
  * BookingController — Quản lý các API endpoints của chuyến đi.
  *
- * <p>Demo endpoints:
- * - GET  /api/v1/bookings/demo/success  — Trả về response thành công
- * - GET  /api/v1/bookings/demo/not-found — Ném BookingException (404)
- * - GET  /api/v1/bookings/demo/conflict  — Ném BookingException (409)
- * - POST /api/v1/bookings               — Tạo chuyến đi mới
- * - POST /api/v1/bookings/{id}/start    — Bắt đầu chuyến đi
+ * <p>
+ * Demo endpoints:
+ * - GET /api/v1/bookings/demo/success — Trả về response thành công
+ * - GET /api/v1/bookings/demo/not-found — Ném BookingException (404)
+ * - GET /api/v1/bookings/demo/conflict — Ném BookingException (409)
+ * - POST /api/v1/bookings — Tạo chuyến đi mới
+ * - POST /api/v1/bookings/{id}/start — Bắt đầu chuyến đi
  * - POST /api/v1/bookings/{id}/complete — Hoàn thành chuyến đi
  */
 @Tag(name = "Booking API", description = "Quản lý vòng đời chuyến đi (Dành cho Khách hàng, Tài xế và Hệ thống)")
@@ -32,6 +37,25 @@ import java.util.UUID;
 public class BookingController {
 
     private final BookingService bookingService;
+
+    // ============================================================
+    // HEALTH CHECK — Không yêu cầu xác thực (public)
+    // ============================================================
+
+    /**
+     * Ping endpoint — kiểm tra nhanh service còn sống không.
+     * Không cần Bearer token.
+     * GET /api/v1/bookings/ping
+     */
+    @Operation(summary = "Ping", description = "Kiểm tra nhanh booking-service có đang hoạt động không")
+    @GetMapping("/ping")
+    public ApiResponse<Map<String, Object>> ping() {
+        return ApiResponse.success("booking-service is running", Map.of(
+                "service", "booking-service",
+                "status", "UP",
+                "timestamp", LocalDateTime.now().toString()
+        ));
+    }
 
     // ============================================================
     // DEMO ENDPOINTS — Để test standardized response & exception handling
@@ -58,10 +82,14 @@ public class BookingController {
     // ============================================================
 
     @PostMapping
-    public ApiResponse<BookingResponse> createRide(@Valid @RequestBody BookingRequest request) {
-        String mockCustomerId = "cus-mock-123"; // TODO: thay bằng JWT customerId khi Auth Service hoàn thiện
+    public ApiResponse<BookingResponse> createRide(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody BookingRequest request) {
+        // subject = user UUID được set bởi auth-service
+        // (AuthTokenService.generateAccessToken)
+        String customerId = jwt.getSubject();
         return ApiResponse.success("Tạo chuyến đi thành công",
-                bookingService.createRide(mockCustomerId, request));
+                bookingService.createRide(customerId, request));
     }
 
     // ============================================================
@@ -90,7 +118,8 @@ public class BookingController {
     }
 
     @PostMapping("/{id}/cancel")
-    public ApiResponse<BookingResponse> cancelRide(@PathVariable UUID id, @RequestParam(defaultValue = "Khách hàng yêu cầu hủy") String reason) {
+    public ApiResponse<BookingResponse> cancelRide(@PathVariable UUID id,
+            @RequestParam(defaultValue = "Khách hàng yêu cầu hủy") String reason) {
         return ApiResponse.success("Hủy chuyến đi thành công",
                 bookingService.cancelRide(id, reason));
     }
@@ -147,15 +176,4 @@ public class BookingController {
                 bookingService.getNearbyMatchingBookings(lat, lng, radius));
     }
 
-    // ============================================================
-    // API HỆ THỐNG / WEBHOOK
-    // ============================================================
-
-    @PostMapping("/{id}/payment-callback")
-    public ApiResponse<BookingResponse> paymentCallback(
-            @PathVariable UUID id,
-            @RequestParam String transactionId) {
-        return ApiResponse.success("Thanh toán thành công",
-                bookingService.processPaymentCallback(id, transactionId));
-    }
 }

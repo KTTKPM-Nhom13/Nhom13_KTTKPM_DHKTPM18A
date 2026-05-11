@@ -1,61 +1,14 @@
 package com.cab.booking.config;
 
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
-import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
-import org.springframework.web.filter.OncePerRequestFilter;
-
-import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-
-@Component
-public class JwtAuthFilter extends OncePerRequestFilter {
-
-    private final JwtTokenProvider jwtTokenProvider;
-
-    public JwtAuthFilter(JwtTokenProvider jwtTokenProvider) {
-        this.jwtTokenProvider = jwtTokenProvider;
-    }
-
-    @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
-
-        String token = getJwtFromRequest(request);
-
-        if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
-            String userId = jwtTokenProvider.getUserIdFromToken(token);
-            String role = jwtTokenProvider.getRoleFromToken(token);
-
-            // Bổ sung ROLE_ prefix cho Spring Security nếu cần, hoặc giả định token đã có
-            List<SimpleGrantedAuthority> authorities = Collections.singletonList(
-                    new SimpleGrantedAuthority(role != null ? role : "ROLE_USER")
-            );
-
-            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                    userId, null, authorities);
-            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-        }
-
-        filterChain.doFilter(request, response);
-    }
-
-    private String getJwtFromRequest(HttpServletRequest request) {
-        String bearerToken = request.getHeader("Authorization");
-        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7);
-        }
-        return null;
-    }
-}
+// FILE NÀY ĐÃ BỊ VÔ HIỆU HÓA.
+//
+// Lý do: JwtAuthFilter cũ dùng HMAC-SHA256 (symmetric secret key) để validate JWT.
+// Điều này KHÔNG TƯƠNG THÍCH với auth-service vốn ký token bằng RSA private key.
+// Kết quả: mọi token hợp lệ đều bị từ chối bởi filter này.
+//
+// Thay thế: Module common (iuh.fit.common.config.SecurityConfig) đã cấu hình
+// oauth2ResourceServer với NimbusJwtDecoder dùng RSA public key — đây là cơ chế đúng.
+// Spring Security tự động validate JWT qua oauth2ResourceServer, không cần filter thủ công.
+//
+// KHÔNG XÓA FILE NÀY nếu muốn giữ lịch sử. Nội dung bên dưới không được compile
+// vì không có class declaration.

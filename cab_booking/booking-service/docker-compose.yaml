@@ -1,45 +1,57 @@
-version: '3.8'
-
 services:
-  # 1. PostgreSQL với PGVector
+  # 1. PostgreSQL với PGVector cho Booking
   postgres-db:
     image: pgvector/pgvector:pg15
     container_name: booking-postgres
     environment:
-      POSTGRES_DB: booking_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ${BOOKING_DB_NAME}
+      POSTGRES_USER: ${BOOKING_DB_USER}
+      POSTGRES_PASSWORD: ${BOOKING_DB_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${BOOKING_DB_PORT}:5432"
     networks:
       - cab-network
     command: postgres -c "shared_preload_libraries=vector"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U ${BOOKING_DB_USER} -d ${BOOKING_DB_NAME}" ]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # 5. Booking Service
+  # 2. Booking Service
   booking-service:
     build:
-      context: . # Sửa thành dấu chấm vì đang đứng trong chính thư mục này
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: ./booking-service/Dockerfile
     container_name: cab-booking-service
     ports:
-      - "8081:8081"
+      - "${BOOKING_SERVICE_PORT}:8081"
     environment:
-      - EUREKA_SERVER_URL=http://eureka-server:8761/eureka/
-      - KAFKA_URL=kafka:9092
-      - POSTGRES_URL=jdbc:postgresql://booking-postgres:5432/booking_db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
+      - EUREKA_SERVER_URL=${EUREKA_DEFAULT_ZONE}
+      - KAFKA_URL=${KAFKA_BOOTSTRAP_SERVERS}
+      - POSTGRES_URL=${BOOKING_DB_JDBC_URL}
+      - POSTGRES_USER=${BOOKING_DB_USER}
+      - POSTGRES_PASSWORD=${BOOKING_DB_PASSWORD}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - SPRING_PROFILES_ACTIVE=default
+    volumes:
+      - maven-cache:/root/.m2
     depends_on:
-      - kafka
-      - postgres-db
+      eureka-server:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      postgres-db:
+        condition: service_healthy
     networks:
       - cab-network
 
+volumes:
+  maven-cache:
+    driver: local
+
 networks:
   cab-network:
-    external: true
+    driver: bridge

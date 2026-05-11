@@ -23,8 +23,9 @@ spring:
   # Cấu hình Redis
   data:
     redis:
-      host: ${SPRING_DATA_REDIS_HOST:localhost}
-      port: ${SPRING_DATA_REDIS_PORT:6379}
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 
   # Cấu hình chuẩn cho KAFKA
   kafka:
@@ -60,10 +61,19 @@ resilience4j:
         max-attempts: 3
         wait-duration: 3s
 
+# Cấu hình bảo mật — đọc bởi iuh.fit.common.config.SecurityConfig
+# JWT được decode bằng RSA public key (từ certs/ hoặc biến môi trường JWT_PRIVATE_KEY)
 app:
   security:
-    jwt:
-      secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    # Các endpoint không cần xác thực JWT (phân cách bằng dấu phẩy)
+    public-endpoints: >-
+      /actuator/health,
+      /actuator/info,
+      /v3/api-docs/**,
+      /swagger-ui/**,
+      /swagger-ui.html,
+      /api/v1/bookings/ping,
+      /api/v1/bookings/demo/**
 
 # ==========================================================
 # CẤU HÌNH DISTRIBUTED TRACING (ZIPKIN & MICROMETER)
@@ -90,3 +100,7 @@ springdoc:
     path: /swagger-ui.html
     operationsSorter: method
     tagsSorter: alpha
+logging:
+  level:
+    org.springframework.security: TRACE
+    org.springframework.security.oauth2: TRACE

@@ -120,13 +120,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleHandlerValidationException(
             HandlerMethodValidationException ex) {
 
-        String message = ex.getAllValidationResults().stream()
-                .flatMap(result -> result.getResolvableErrors().stream())
+        String message = ex.getAllErrors().stream()
                 .map(error -> error.getDefaultMessage())
                 .collect(Collectors.joining("; "));
 
         log.warn("[HandlerValidation] errors={}, message={}",
-                ex.getAllValidationResults().size(), message);
+                ex.getAllErrors().size(), message);
 
         ApiResponse<Void> response = ApiResponse.error(
                 message.isBlank() ? "Tham số request không hợp lệ" : message,

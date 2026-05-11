@@ -113,8 +113,8 @@ public class BookingServiceImpl implements BookingService {
                     .orElseThrow(() -> new IllegalStateException("Lỗi tranh chấp dữ liệu IdempotencyKey."));
             return BookingResponse.fromEntity(existing);
         }
-        booking.setStatus(BookingStatus.MATCHING);
-        booking = bookingRepository.save(booking);
+        // Đã xóa dòng đổi status thành MATCHING ở đây theo yêu cầu.
+        // Booking sẽ giữ trạng thái CREATED cho đến khi Matching Service gửi lại sự kiện.
 
         // BƯỚC 5: Gửi Kafka event
         RideCreatedEvent event = RideCreatedEvent.builder()
@@ -242,7 +242,7 @@ public class BookingServiceImpl implements BookingService {
                 .paymentMethod(booking.getPaymentMethod())
                 .timestamp(Instant.now().toString())
                 .build();
-        kafkaTemplate.send("booking-events", booking.getId().toString(), event);
+        kafkaTemplate.send("ride.finished", booking.getId().toString(), event);
         log.info("✅ RideCompleted & ride.finished → Kafka | bookingId={} | finalFare={} | payment={}",
                 booking.getId(), booking.getEstimatedFare(), booking.getPaymentMethod());
 
@@ -259,9 +259,10 @@ public class BookingServiceImpl implements BookingService {
         if (request.getQuoteToken() != null && !request.getQuoteToken().isBlank()) {
             log.debug("🔐 Verify quoteToken: {}", request.getQuoteToken());
         }
-        return request.getEstimatedFare() != null
-                ? request.getEstimatedFare()
-                : BigDecimal.valueOf(50000);
+        if (request.getEstimatedFare() == null) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
+        return request.getEstimatedFare();
     }
 
     private Double extractLat(Map<String, Double> coords) {
@@ -350,21 +351,4 @@ public class BookingServiceImpl implements BookingService {
                 .collect(java.util.stream.Collectors.toList());
     }
 
-    @Override
-    @Transactional
-    public BookingResponse processPaymentCallback(UUID bookingId, String transactionId) {
-        Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
-
-        if (booking.getStatus() != BookingStatus.COMPLETED) {
-            throw new AppException(ErrorCode.INVALID_STATE);
-        }
-
-        bookingStateMachine.transitionTo(booking, BookingStatus.PAID);
-        booking = bookingRepository.save(booking);
-        redisTemplate.opsForValue().set("booking:" + bookingId, booking, Duration.ofHours(2));
-
-        log.info("✅ Payment successful for bookingId={}, transactionId={}", bookingId, transactionId);
-        return BookingResponse.fromEntity(booking);
-    }
 }

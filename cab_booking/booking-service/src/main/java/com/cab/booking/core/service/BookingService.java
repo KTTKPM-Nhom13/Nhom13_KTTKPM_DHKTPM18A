@@ -30,6 +30,4 @@ public interface BookingService {
     org.springframework.data.domain.Page<BookingResponse> getDriverHistory(String driverId, int page, int size);
 
     java.util.List<BookingResponse> getNearbyMatchingBookings(double lat, double lng, double radiusKm);
-
-    BookingResponse processPaymentCallback(UUID bookingId, String transactionId);
 }
