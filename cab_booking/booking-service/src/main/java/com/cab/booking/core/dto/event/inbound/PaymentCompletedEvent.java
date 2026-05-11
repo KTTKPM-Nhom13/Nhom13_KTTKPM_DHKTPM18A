@@ -1,4 +1,4 @@
-package com.cab.booking.core.dto.event;
+package com.cab.booking.core.dto.event.inbound;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

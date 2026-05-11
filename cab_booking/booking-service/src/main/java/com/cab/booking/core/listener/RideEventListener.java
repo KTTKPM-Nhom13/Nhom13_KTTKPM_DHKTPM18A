@@ -1,8 +1,8 @@
 package com.cab.booking.core.listener;
 
 import com.cab.booking.core.dto.event.DriverStatusEvent;
-import com.cab.booking.core.dto.event.PaymentCompletedEvent;
-import com.cab.booking.core.dto.event.RideAssignedEvent;
+import com.cab.booking.core.dto.event.inbound.PaymentCompletedEvent;
+import com.cab.booking.core.dto.event.outbound.RideAssignedEvent;
 import com.cab.booking.core.entity.Booking;
 import com.cab.booking.core.enums.BookingStatus;
 import com.cab.booking.core.repository.BookingRepository;
@@ -89,5 +89,27 @@ public class RideEventListener {
                 booking.getId(),
                 booking.getCustomerId(),
                 booking.getEstimatedFare());
+    }
+
+    @KafkaListener(topics = "payment.failed", groupId = "booking-service-group")
+    public void handlePaymentFailed(com.cab.booking.core.dto.event.inbound.PaymentFailedEvent event) {
+        log.info("[payment.failed] rideId={} | reason={}", event.getRideId(), event.getReason());
+
+        UUID rideId;
+        try {
+            rideId = UUID.fromString(event.getRideId());
+        } catch (IllegalArgumentException ex) {
+            log.error("Invalid rideId '{}', skipping event.", event.getRideId());
+            return;
+        }
+
+        Booking booking = bookingRepository.findById(rideId).orElse(null);
+        if (booking == null) {
+            log.error("Booking not found: {}", rideId);
+            return;
+        }
+
+        // TODO: Xử lý logic nghiệp vụ khi thanh toán lỗi (ví dụ: đòi nợ sau, gửi thông báo)
+        log.warn("Payment failed for booking {} (status: {}). Reason: {}", booking.getId(), booking.getStatus(), event.getReason());
     }
 }

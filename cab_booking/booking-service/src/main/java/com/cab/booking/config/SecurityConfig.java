@@ -1,28 +1,23 @@
 package com.cab.booking.config;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.SecurityFilterChain;
-
-@Configuration
-@EnableWebSecurity
-@EnableMethodSecurity
-public class SecurityConfig {
-
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .anyRequest().permitAll()
-            );
-
-        return http.build();
-    }
-}
-
+// FILE NÀY ĐÃ ĐƯỢC DỌN DẸP — Không còn cần thiết nữa.
+//
+// Cấu hình bảo mật của booking-service được kế thừa HOÀN TOÀN
+// từ module common (iuh.fit.common.config.SecurityConfig).
+//
+// Module common cung cấp:
+//   - SecurityFilterChain với oauth2ResourceServer (RSA JWT — khớp với auth-service)
+//   - JwtDecoder (NimbusJwtDecoder với RSA public key)
+//   - Public endpoints: có thể tùy chỉnh qua app.security.public-endpoints trong application.yaml
+//
+// Để tùy chỉnh public endpoints, thêm vào application.yaml:
+//   app:
+//     security:
+//       public-endpoints: /actuator/health, /swagger-ui/**, /v3/api-docs/**
+//
+// XEM: iuh.fit.common.config.SecurityConfig để biết chi tiết cấu hình.
+//
+// ĐÃ XÓA:
+//   - SecurityConfig (filter chain tùy chỉnh gây xung đột anyRequest)
+//   - JwtAuthFilter (dùng HMAC secret — SAI loại key với auth-service dùng RSA)
+//   - JwtTokenProvider (dùng HMAC — không tương thích với token được phát hành bởi auth-service)

@@ -23,4 +23,12 @@ public class ApiResponse<T> {
 
     @Builder.Default
     LocalDateTime timestamp = LocalDateTime.now();
+
+    public static <T> ApiResponse<T> success(T result) {
+        return ApiResponse.<T>builder().result(result).build();
+    }
+
+    public static <T> ApiResponse<T> success(String message, T result) {
+        return ApiResponse.<T>builder().message(message).result(result).build();
+    }
 }

@@ -1,4 +1,4 @@
-package com.cab.booking.core.dto.event;
+package com.cab.booking.core.dto.event.inbound;
 
 import java.time.Instant;
 import java.util.UUID;

@@ -8,7 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 
@@ -34,8 +34,8 @@ public class BookingResponse {
     private String promoCode;
 
     private BookingStatus status;
-    private Instant createdAt;
-    private Instant updatedAt;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     public static BookingResponse fromEntity(Booking booking) {
         return BookingResponse.builder()

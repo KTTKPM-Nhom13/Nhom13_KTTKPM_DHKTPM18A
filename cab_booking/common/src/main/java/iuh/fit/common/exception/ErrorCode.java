@@ -30,7 +30,10 @@ public enum ErrorCode {
     EMAIL_DELIVERY_FAILED(502, "Email delivery failed", HttpStatus.BAD_GATEWAY),
     REGISTRATION_EMAIL_NOT_VERIFIED(400, "Email is not verified for registration", HttpStatus.BAD_REQUEST),
     REGISTRATION_OTP_INVALID(400, "Registration OTP is invalid", HttpStatus.BAD_REQUEST),
-    REGISTRATION_OTP_EXPIRED(400, "Registration OTP has expired", HttpStatus.BAD_REQUEST);
+    REGISTRATION_OTP_EXPIRED(400, "Registration OTP has expired", HttpStatus.BAD_REQUEST),
+    BOOKING_NOT_FOUND(404, "Booking not found", HttpStatus.NOT_FOUND),
+    BOOKING_ALREADY_ACCEPTED(409, "Booking already accepted by another driver", HttpStatus.CONFLICT),
+    INVALID_STATE(400, "Invalid state transition", HttpStatus.BAD_REQUEST);
 
     int code;
     String message;

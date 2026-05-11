@@ -1,4 +1,4 @@
-package com.cab.booking.core.dto.event;
+package com.cab.booking.core.dto.event.outbound;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,7 +24,7 @@ public class RideFinishedEvent {
     private String type;
     private String rideId;
     private String customerId;
-    private BigDecimal estimatedFare;
+    private BigDecimal finalFare;
     private String paymentMethod;
     private String timestamp;
 }
