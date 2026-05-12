@@ -14,6 +14,9 @@ public class MoMoChargeRequest {
     @JsonProperty("partnerCode")
     private String partnerCode;
 
+    @JsonProperty("accessKey")
+    private String accessKey;
+
     @JsonProperty("partnerName")
     private String partnerName;
 

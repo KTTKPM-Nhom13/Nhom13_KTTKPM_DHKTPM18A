@@ -16,7 +16,6 @@ import iuh.fit.payment_service.exception.ErrorCode;
 import iuh.fit.payment_service.exception.IdempotencyConflictException;
 import iuh.fit.payment_service.exception.PaymentException;
 import iuh.fit.payment_service.exception.PaymentGatewayException;
-import iuh.fit.payment_service.producer.PaymentEventProducer;
 import iuh.fit.payment_service.repository.PaymentTransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,12 +31,11 @@ public class PaymentSagaService {
     private final IdempotencyRedisService idempotencyRedisService;
     private final MockPaymentGatewayService gatewayService;
     private final MoMoPaymentService moMoPaymentService;
-    private final PaymentEventProducer paymentEventProducer;
+    private final OutboxService outboxService;
     private final ObjectMapper objectMapper;
 
     private static final int MAX_RETRY = 3;
 
-    @Transactional
     public PaymentResponse startPaymentSaga(ChargePaymentRequest request) {
         String idempotencyKey = request.getIdempotencyKey();
 
@@ -52,7 +50,8 @@ public class PaymentSagaService {
         return executePayment(transaction);
     }
 
-    private PaymentResponse handleIdempotency(String idempotencyKey, ChargePaymentRequest request) {
+    @Transactional
+    public PaymentResponse handleIdempotency(String idempotencyKey, ChargePaymentRequest request) {
         String cachedTxnId = idempotencyRedisService.get(idempotencyKey);
 
         if (cachedTxnId != null) {
@@ -85,7 +84,8 @@ public class PaymentSagaService {
         }
     }
 
-    private PaymentTransaction createAndSaveTransaction(ChargePaymentRequest request) {
+    @Transactional
+    public PaymentTransaction createAndSaveTransaction(ChargePaymentRequest request) {
         PaymentTransaction transaction = PaymentTransaction.builder()
                 .transactionId("txn_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12))
                 .bookingId(request.getBookingId())
@@ -104,34 +104,27 @@ public class PaymentSagaService {
         return transaction;
     }
 
-    private PaymentResponse executePayment(PaymentTransaction transaction) {
+    public PaymentResponse executePayment(PaymentTransaction transaction) {
         int attempt = 0;
         Exception lastException = null;
 
         while (attempt < MAX_RETRY) {
             attempt++;
-            transaction.setRetryCount(attempt - 1);
+            updateRetryCount(transaction, attempt - 1);
             log.info("[Saga] Payment attempt {}/{} - txnId={}", attempt, MAX_RETRY, transaction.getTransactionId());
 
             try {
                 GatewayChargeResponse gatewayResponse = callPaymentGateway(transaction);
 
                 if (gatewayResponse.isSuccess()) {
-                    transaction.markSuccess(gatewayResponse.getGatewayTransactionId(),
-                            objectMapper.writeValueAsString(gatewayResponse));
-                    transaction = paymentRepository.save(transaction);
-                    log.info("[Saga] Payment SUCCESS - txnId={}, gatewayTxnId={}",
-                            transaction.getTransactionId(), gatewayResponse.getGatewayTransactionId());
-
-                    publishPaymentCompletedEvent(transaction);
+                    markAndPublishSuccess(transaction, gatewayResponse);
                     return PaymentResponse.fromEntity(transaction, "Payment completed successfully");
                 }
 
                 if (gatewayResponse.isPending()) {
                     log.info("[Saga] MoMo payment PENDING - txnId={}, awaiting IPN callback",
                             transaction.getTransactionId());
-                    transaction.setStatus(PaymentStatus.PENDING);
-                    transaction = paymentRepository.save(transaction);
+                    updateStatus(transaction, PaymentStatus.PENDING);
                     PaymentResponse resp = PaymentResponse.fromEntity(transaction,
                             "MoMo payment initiated, awaiting customer confirmation");
                     resp.setPayUrl(gatewayResponse.getPayUrl());
@@ -149,18 +142,11 @@ public class PaymentSagaService {
                         transaction.getTransactionId(), reason);
 
                 if (attempt >= MAX_RETRY) {
-                    transaction.markFailed(reason, false);
-                    transaction = paymentRepository.save(transaction);
-                    log.error("[Saga] Payment FAILED_FINAL after {} attempts - txnId={}",
-                            attempt, transaction.getTransactionId());
-                    publishPaymentFailedEvent(transaction);
+                    markAndPublishFailed(transaction, reason, false);
                     return PaymentResponse.fromEntity(transaction, "Payment failed: " + reason);
                 }
 
-                transaction.markFailed(reason, true);
-                transaction = paymentRepository.save(transaction);
-                log.warn("[Saga] Payment failed, scheduling retry - txnId={}, retryCount={}",
-                        transaction.getTransactionId(), transaction.getRetryCount());
+                markForRetry(transaction, reason);
                 waitBeforeRetry(attempt);
 
             } catch (PaymentGatewayException e) {
@@ -169,14 +155,11 @@ public class PaymentSagaService {
                         attempt, transaction.getTransactionId(), e.getMessage());
 
                 if (attempt >= MAX_RETRY) {
-                    transaction.markFailed(e.getGatewayMessage(), false);
-                    transaction = paymentRepository.save(transaction);
-                    publishPaymentFailedEvent(transaction);
+                    markAndPublishFailed(transaction, e.getGatewayMessage(), false);
                     return PaymentResponse.fromEntity(transaction, "Payment failed: " + e.getGatewayMessage());
                 }
 
-                transaction.markFailed(e.getGatewayMessage(), true);
-                paymentRepository.save(transaction);
+                markForRetry(transaction, e.getGatewayMessage());
                 waitBeforeRetry(attempt);
 
             } catch (Exception e) {
@@ -184,22 +167,84 @@ public class PaymentSagaService {
                 log.error("[Saga] Unexpected exception on attempt {} - txnId={}", attempt, transaction.getTransactionId(), e);
 
                 if (attempt >= MAX_RETRY) {
-                    transaction.markFailed("Unexpected error: " + e.getMessage(), false);
-                    transaction = paymentRepository.save(transaction);
-                    publishPaymentFailedEvent(transaction);
+                    markAndPublishFailed(transaction, "Unexpected error: " + e.getMessage(), false);
                     return PaymentResponse.fromEntity(transaction, "Payment failed: " + e.getMessage());
                 }
 
-                transaction.markFailed("Unexpected error: " + e.getMessage(), true);
-                paymentRepository.save(transaction);
+                markForRetry(transaction, "Unexpected error: " + e.getMessage());
                 waitBeforeRetry(attempt);
             }
         }
 
-        transaction.setStatus(PaymentStatus.FAILED_FINAL);
-        transaction = paymentRepository.save(transaction);
-        publishPaymentFailedEvent(transaction);
+        markAndPublishFailed(transaction, "Payment failed after max retries", false);
         return PaymentResponse.fromEntity(transaction, "Payment failed after max retries");
+    }
+
+    @Transactional
+    public void updateRetryCount(PaymentTransaction transaction, int count) {
+        transaction.setRetryCount(count);
+        paymentRepository.save(transaction);
+    }
+
+    @Transactional
+    public void updateStatus(PaymentTransaction transaction, PaymentStatus status) {
+        transaction.setStatus(status);
+        paymentRepository.save(transaction);
+    }
+
+    @Transactional
+    public void markAndPublishSuccess(PaymentTransaction transaction, GatewayChargeResponse gatewayResponse) {
+        try {
+            transaction.markSuccess(gatewayResponse.getGatewayTransactionId(),
+                    objectMapper.writeValueAsString(gatewayResponse));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.warn("[Saga] Failed to serialize gateway response for txnId={}: {}",
+                    transaction.getTransactionId(), e.getMessage());
+            transaction.markSuccess(gatewayResponse.getGatewayTransactionId(), null);
+        }
+        paymentRepository.save(transaction);
+        log.info("[Saga] Payment SUCCESS - txnId={}, gatewayTxnId={}",
+                transaction.getTransactionId(), gatewayResponse.getGatewayTransactionId());
+        outboxService.saveOutboxEventInTx(
+                "PaymentTransaction",
+                transaction.getTransactionId(),
+                "PAYMENT_COMPLETED",
+                PaymentCompletedEvent.fromTransaction(
+                        transaction.getBookingId(),
+                        transaction.getAmount(),
+                        transaction.getCurrency(),
+                        transaction.getGatewayTransactionId(),
+                        transaction.getPaymentMethod().name()
+                )
+        );
+    }
+
+    @Transactional
+    public void markAndPublishFailed(PaymentTransaction transaction, String reason, boolean isRetry) {
+        transaction.markFailed(reason, isRetry);
+        paymentRepository.save(transaction);
+        log.error("[Saga] Payment FAILED - txnId={}, reason={}, isRetry={}",
+                transaction.getTransactionId(), reason, isRetry);
+        outboxService.saveOutboxEventInTx(
+                "PaymentTransaction",
+                transaction.getTransactionId(),
+                "PAYMENT_FAILED",
+                PaymentFailedEvent.fromTransaction(
+                        transaction.getBookingId(),
+                        transaction.getAmount(),
+                        transaction.getCurrency(),
+                        reason,
+                        transaction.getRetryCount()
+                )
+        );
+    }
+
+    @Transactional
+    public void markForRetry(PaymentTransaction transaction, String reason) {
+        transaction.markFailed(reason, true);
+        paymentRepository.save(transaction);
+        log.warn("[Saga] Payment failed, scheduling retry - txnId={}, retryCount={}",
+                transaction.getTransactionId(), transaction.getRetryCount());
     }
 
     private GatewayChargeResponse callPaymentGateway(PaymentTransaction transaction) {
@@ -227,44 +272,6 @@ public class PaymentSagaService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("[Saga] Retry wait interrupted");
-        }
-    }
-
-    private void publishPaymentCompletedEvent(PaymentTransaction transaction) {
-        try {
-            PaymentCompletedEvent event = PaymentCompletedEvent.fromTransaction(
-                    transaction.getBookingId(),
-                    transaction.getAmount(),
-                    transaction.getCurrency(),
-                    transaction.getGatewayTransactionId(),
-                    transaction.getPaymentMethod().name()
-            );
-
-            paymentEventProducer.sendPaymentCompleted(event);
-            log.info("[Saga] Published payment.completed - txnId={}, bookingId={}",
-                    transaction.getTransactionId(), transaction.getBookingId());
-        } catch (Exception e) {
-            log.error("[Saga] Error publishing payment.completed event - txnId={}",
-                    transaction.getTransactionId(), e);
-        }
-    }
-
-    private void publishPaymentFailedEvent(PaymentTransaction transaction) {
-        try {
-            PaymentFailedEvent event = PaymentFailedEvent.fromTransaction(
-                    transaction.getBookingId(),
-                    transaction.getAmount(),
-                    transaction.getCurrency(),
-                    transaction.getFailureReason(),
-                    transaction.getRetryCount()
-            );
-
-            paymentEventProducer.sendPaymentFailed(event);
-            log.info("[Saga] Published payment.failed - txnId={}, bookingId={}",
-                    transaction.getTransactionId(), transaction.getBookingId());
-        } catch (Exception e) {
-            log.error("[Saga] Error publishing payment.failed event - txnId={}",
-                    transaction.getTransactionId(), e);
         }
     }
 
@@ -305,17 +312,39 @@ public class PaymentSagaService {
                     ipnResult.getTransactionId(),
                     "MoMo IPN: resultCode=" + ipnResult.getResultCode() + ", message=" + ipnResult.getMessage()
             );
-            transaction = paymentRepository.save(transaction);
+            paymentRepository.save(transaction);
             log.info("[Saga] MoMo payment SUCCESS from IPN - txnId={}, gatewayTxnId={}",
                     transaction.getTransactionId(), ipnResult.getTransactionId());
-            publishPaymentCompletedEvent(transaction);
+            outboxService.saveOutboxEventInTx(
+                    "PaymentTransaction",
+                    transaction.getTransactionId(),
+                    "PAYMENT_COMPLETED",
+                    PaymentCompletedEvent.fromTransaction(
+                            transaction.getBookingId(),
+                            transaction.getAmount(),
+                            transaction.getCurrency(),
+                            transaction.getGatewayTransactionId(),
+                            transaction.getPaymentMethod().name()
+                    )
+            );
         } else {
             String reason = "MoMo resultCode=" + ipnResult.getResultCode() + ": " + ipnResult.getMessage();
             transaction.markFailed(reason, false);
-            transaction = paymentRepository.save(transaction);
+            paymentRepository.save(transaction);
             log.warn("[Saga] MoMo payment FAILED from IPN - txnId={}, reason={}",
                     transaction.getTransactionId(), reason);
-            publishPaymentFailedEvent(transaction);
+            outboxService.saveOutboxEventInTx(
+                    "PaymentTransaction",
+                    transaction.getTransactionId(),
+                    "PAYMENT_FAILED",
+                    PaymentFailedEvent.fromTransaction(
+                            transaction.getBookingId(),
+                            transaction.getAmount(),
+                            transaction.getCurrency(),
+                            reason,
+                            transaction.getRetryCount()
+                    )
+            );
         }
     }
 }

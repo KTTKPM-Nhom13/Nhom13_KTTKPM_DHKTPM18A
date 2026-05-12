@@ -14,11 +14,8 @@ public class MoMoRefundRequest {
     @JsonProperty("partnerCode")
     private String partnerCode;
 
-    @JsonProperty("partnerName")
-    private String partnerName;
-
-    @JsonProperty("storeId")
-    private String storeId;
+    @JsonProperty("accessKey")
+    private String accessKey;
 
     @JsonProperty("requestId")
     private String requestId;
@@ -32,11 +29,8 @@ public class MoMoRefundRequest {
     @JsonProperty("orderId")
     private String orderId;
 
-    @JsonProperty("lang")
-    private String lang;
-
-    @JsonProperty("description")
-    private String description;
+    @JsonProperty("requestType")
+    private String requestType = "refundMoMoWallet";
 
     @JsonProperty("signature")
     private String signature;

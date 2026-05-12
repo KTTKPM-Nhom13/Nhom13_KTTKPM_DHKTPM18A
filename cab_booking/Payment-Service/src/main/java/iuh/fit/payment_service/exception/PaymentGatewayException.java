@@ -20,6 +20,12 @@ public class PaymentGatewayException extends RuntimeException {
         this.gatewayMessage = message;
     }
 
+    public PaymentGatewayException(String message, Throwable cause) {
+        super(message, cause);
+        this.gatewayCode = "GATEWAY_ERROR";
+        this.gatewayMessage = message;
+    }
+
     public PaymentGatewayException(String gatewayCode, String message, Throwable cause) {
         super(message, cause);
         this.gatewayCode = gatewayCode;

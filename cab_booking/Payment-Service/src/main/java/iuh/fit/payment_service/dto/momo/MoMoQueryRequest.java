@@ -14,14 +14,17 @@ public class MoMoQueryRequest {
     @JsonProperty("partnerCode")
     private String partnerCode;
 
+    @JsonProperty("accessKey")
+    private String accessKey;
+
     @JsonProperty("requestId")
     private String requestId;
 
     @JsonProperty("orderId")
     private String orderId;
 
-    @JsonProperty("lang")
-    private String lang;
+    @JsonProperty("requestType")
+    private String requestType;
 
     @JsonProperty("signature")
     private String signature;

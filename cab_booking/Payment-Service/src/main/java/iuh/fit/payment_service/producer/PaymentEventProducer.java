@@ -3,6 +3,7 @@ package iuh.fit.payment_service.producer;
 import iuh.fit.payment_service.config.KafkaConfig;
 import iuh.fit.payment_service.dto.event.PaymentCompletedEvent;
 import iuh.fit.payment_service.dto.event.PaymentFailedEvent;
+import iuh.fit.payment_service.dto.event.PaymentRefundedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -57,6 +58,29 @@ public class PaymentEventProducer {
                         event.getBookingId(), ex.getMessage());
             } else {
                 log.info("[Producer] payment.failed sent - bookingId={}, partition={}, offset={}",
+                        event.getBookingId(),
+                        result.getRecordMetadata().partition(),
+                        result.getRecordMetadata().offset());
+            }
+        });
+    }
+
+    public void sendPaymentRefunded(PaymentRefundedEvent event) {
+        log.info("[Producer] Sending payment.refunded - bookingId={}, amount={}",
+                event.getBookingId(), event.getAmount());
+
+        CompletableFuture<SendResult<String, Object>> future = kafkaTemplate.send(
+                KafkaConfig.TOPIC_PAYMENT_REFUNDED,
+                event.getBookingId(),
+                event
+        );
+
+        future.whenComplete((result, ex) -> {
+            if (ex != null) {
+                log.error("[Producer] Failed to send payment.refunded - bookingId={}: {}",
+                        event.getBookingId(), ex.getMessage());
+            } else {
+                log.info("[Producer] payment.refunded sent - bookingId={}, partition={}, offset={}",
                         event.getBookingId(),
                         result.getRecordMetadata().partition(),
                         result.getRecordMetadata().offset());

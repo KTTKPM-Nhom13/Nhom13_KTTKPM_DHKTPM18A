@@ -72,21 +72,36 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,info,metrics,prometheus,circuitbreakers,circuitbreakerevents
   endpoint:
     health:
       show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
 
 resilience4j:
+  circuitbreaker:
+    instances:
+      paymentGateway:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
   retry:
     instances:
       paymentGateway:
-        max-attempts: 4
-        wait-duration: 2s
+        max-attempts: 3
+        wait-duration: 1s
         retryExceptions:
           - iuh.fit.payment_service.exception.PaymentGatewayException
           - org.springframework.web.client.ResourceAccessException
           - java.net.SocketTimeoutException
+          - java.io.IOException
         ignoreExceptions:
           - iuh.fit.payment_service.exception.IdempotencyConflictException
 
@@ -102,10 +117,18 @@ app:
       max-attempts: 3
       backoff-multiplier: 2.0
       initial-interval-ms: 1000
+    polling:
+      interval-ms: 120000
+      initial-delay-ms: 60000
+  outbox:
+    publish-interval-ms: 1000
+    publish-initial-delay-ms: 5000
+    cleanup-cron: "0 0 3 * * ?"
 
 logging:
   level:
     iuh.fit.payment_service: DEBUG
+    iuh.fit.payment_service.service.MoMoPaymentService: DEBUG
     org.springframework.kafka: INFO
     org.hibernate.SQL: WARN
   pattern:
