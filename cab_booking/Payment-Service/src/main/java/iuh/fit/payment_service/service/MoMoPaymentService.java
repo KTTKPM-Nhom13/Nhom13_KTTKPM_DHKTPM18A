@@ -2,25 +2,31 @@ package iuh.fit.payment_service.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mservice.config.Environment;
+import com.mservice.processor.QueryTransactionStatus;
+import com.mservice.processor.RefundTransaction;
 import iuh.fit.payment_service.config.MoMoProperties;
 import iuh.fit.payment_service.dto.momo.*;
 import iuh.fit.payment_service.dto.request.GatewayChargeRequest;
 import iuh.fit.payment_service.dto.response.GatewayChargeResponse;
+import iuh.fit.payment_service.exception.ErrorCode;
+import iuh.fit.payment_service.exception.PaymentException;
+import iuh.fit.payment_service.exception.PaymentGatewayException;
 import iuh.fit.payment_service.util.MoMoSignatureUtil;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
-import iuh.fit.payment_service.exception.PaymentGatewayException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.*;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -29,22 +35,12 @@ import java.util.concurrent.TimeUnit;
 public class MoMoPaymentService {
 
     private final MoMoProperties momoProperties;
+    private final Environment momoEnvironment;
     private final ObjectMapper objectMapper;
 
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private static final int MOMO_SUCCESS_CODE = 0;
-
-    private static final String SIGNATURE_FIELDS_CREATE =
-            "partnerCode=%s&accessKey=%s&requestId=%s&amount=%s&orderId=%s&orderInfo=%s&returnUrl=%s&notifyUrl=%s&extraData=%s";
-
-    private static final String SIGNATURE_FIELDS_QUERY =
-            "partnerCode=%s&accessKey=%s&requestId=%s&orderId=%s";
-
-    private static final String SIGNATURE_FIELDS_REFUND =
-            "partnerCode=%s&accessKey=%s&requestId=%s&amount=%s&orderId=%s&transId=%s&requestType=refundMoMoWallet";
-
-    private static final String SIGNATURE_FIELDS_IPN =
-            "partnerCode=%s&accessKey=%s&requestId=%s&amount=%s&orderId=%s&orderInfo=%s&resultCode=%s&extraData=%s";
+    private static final String REQUEST_TYPE_CAPTURE_WALLET = "captureWallet";
 
     private final OkHttpClient httpClient = new OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
@@ -55,22 +51,21 @@ public class MoMoPaymentService {
     @Retry(name = "paymentGateway")
     @CircuitBreaker(name = "paymentGateway", fallbackMethod = "chargeFallback")
     public GatewayChargeResponse charge(GatewayChargeRequest request) {
-        log.info("[MoMo] Creating payment - txnId={}, amount={}, orderId={}",
-                request.getTransactionId(), request.getAmount(), request.getTransactionId());
-
-        MoMoChargeRequest momoRequest = buildChargeRequest(request);
+        log.info("[MoMo] Creating payment - txnId={}, amount={}, bookingId={}",
+                request.getTransactionId(), request.getAmount(), request.getBookingId());
 
         try {
+            MoMoChargeRequest momoRequest = buildChargeRequest(request);
             String payload = objectMapper.writeValueAsString(momoRequest);
             String responseBody = sendPost(momoProperties.getEndpoint() + momoProperties.getCreateUrl(), payload);
-
             MoMoChargeResponse momoResponse = objectMapper.readValue(responseBody, MoMoChargeResponse.class);
+
             log.info("[MoMo] Response - resultCode={}, message={}, payUrl={}",
                     momoResponse.getResultCode(), momoResponse.getMessage(), momoResponse.getPayUrl());
 
             return mapChargeResponse(momoResponse, request);
-        } catch (IOException e) {
-            log.error("[MoMo] HTTP call failed for txnId={}: {}", request.getTransactionId(), e.getMessage());
+        } catch (Exception e) {
+            log.error("[MoMo] Payment creation failed for txnId={}: {}", request.getTransactionId(), e.getMessage());
             throw new PaymentGatewayException("MoMo API call failed: " + e.getMessage(), e);
         }
     }
@@ -95,30 +90,8 @@ public class MoMoPaymentService {
                 ipnRequest.getOrderId(), ipnRequest.getResultCode(),
                 ipnRequest.getTransId(), ipnRequest.getAmount());
 
-        String extraData = ipnRequest.getExtraData() != null ? ipnRequest.getExtraData() : "";
-        String amountStr = String.valueOf(ipnRequest.getAmount());
-        String resultCodeStr = String.valueOf(ipnRequest.getResultCode() != null ? ipnRequest.getResultCode() : 0);
-
-        String rawData = String.format(SIGNATURE_FIELDS_IPN,
-                ipnRequest.getPartnerCode(),
-                momoProperties.getAccessKey(),
-                ipnRequest.getRequestId(),
-                amountStr,
-                ipnRequest.getOrderId(),
-                ipnRequest.getOrderInfo(),
-                resultCodeStr,
-                extraData
-        );
-
-        boolean valid = MoMoSignatureUtil.verify(rawData, ipnRequest.getSignature(), momoProperties.getSecretKey());
-        if (!valid) {
-            log.warn("[MoMo IPN] Invalid signature for orderId={}", ipnRequest.getOrderId());
-            return MoMoIpnResult.builder()
-                    .success(false)
-                    .resultCode(1001)
-                    .message("Invalid signature")
-                    .build();
-        }
+        validatePartnerCode(ipnRequest);
+        verifyIpnSignature(ipnRequest);
 
         boolean paymentSuccess = ipnRequest.getResultCode() != null && ipnRequest.getResultCode() == MOMO_SUCCESS_CODE;
         return MoMoIpnResult.builder()
@@ -131,32 +104,62 @@ public class MoMoPaymentService {
                 .build();
     }
 
+    private void validatePartnerCode(MoMoIpnRequest ipnRequest) {
+        if (!valueOrEmpty(momoProperties.getPartnerCode()).equals(ipnRequest.getPartnerCode())) {
+            log.error("[MoMo IPN] Partner code mismatch for orderId={}, expected={}, actual={}",
+                    ipnRequest.getOrderId(), momoProperties.getPartnerCode(), ipnRequest.getPartnerCode());
+            throw new PaymentException(ErrorCode.MOMO_SIGNATURE_INVALID,
+                    "Invalid MoMo partnerCode for orderId: " + ipnRequest.getOrderId());
+        }
+    }
+
+    private void verifyIpnSignature(MoMoIpnRequest ipnRequest) {
+        String rawData = buildIpnRawData(ipnRequest);
+        boolean validSignature = MoMoSignatureUtil.verify(rawData, ipnRequest.getSignature(), momoProperties.getSecretKey());
+        if (!validSignature) {
+            log.error("[MoMo IPN] Invalid signature for orderId={}", ipnRequest.getOrderId());
+            throw new PaymentException(ErrorCode.MOMO_SIGNATURE_INVALID,
+                    "Invalid MoMo IPN signature for orderId: " + ipnRequest.getOrderId());
+        }
+    }
+
+    private String buildIpnRawData(MoMoIpnRequest ipnRequest) {
+        return "accessKey=" + valueOrEmpty(momoProperties.getAccessKey()) +
+                "&amount=" + valueOrEmpty(ipnRequest.getAmount()) +
+                "&extraData=" + valueOrEmpty(ipnRequest.getExtraData()) +
+                "&message=" + valueOrEmpty(ipnRequest.getMessage()) +
+                "&orderId=" + valueOrEmpty(ipnRequest.getOrderId()) +
+                "&orderInfo=" + valueOrEmpty(ipnRequest.getOrderInfo()) +
+                "&orderType=" + valueOrEmpty(ipnRequest.getOrderType()) +
+                "&partnerCode=" + valueOrEmpty(ipnRequest.getPartnerCode()) +
+                "&payType=" + valueOrEmpty(ipnRequest.getPayType()) +
+                "&requestId=" + valueOrEmpty(ipnRequest.getRequestId()) +
+                "&responseTime=" + valueOrEmpty(ipnRequest.getResponseTime()) +
+                "&resultCode=" + valueOrEmpty(ipnRequest.getResultCode()) +
+                "&transId=" + valueOrEmpty(ipnRequest.getTransId());
+    }
+
+    private String valueOrEmpty(Object value) {
+        return value != null ? String.valueOf(value) : "";
+    }
+
     @Retry(name = "paymentGateway")
     public MoMoQueryResponse queryTransaction(String orderId, String requestId) {
         log.info("[MoMo] Querying transaction - orderId={}, requestId={}", orderId, requestId);
 
-        String rawSignature = String.format(SIGNATURE_FIELDS_QUERY,
-                momoProperties.getPartnerCode(),
-                momoProperties.getAccessKey(),
-                requestId,
-                orderId
-        );
-        String signature = MoMoSignatureUtil.signHmacSHA256(rawSignature, momoProperties.getSecretKey());
-
-        MoMoQueryRequest queryRequest = MoMoQueryRequest.builder()
-                .partnerCode(momoProperties.getPartnerCode())
-                .accessKey(momoProperties.getAccessKey())
-                .requestId(requestId)
-                .orderId(orderId)
-                .requestType("transactionStatus")
-                .signature(signature)
-                .build();
-
         try {
-            String payload = objectMapper.writeValueAsString(queryRequest);
-            String responseBody = sendPost(momoProperties.getEndpoint() + momoProperties.getQueryUrl(), payload);
-            return objectMapper.readValue(responseBody, MoMoQueryResponse.class);
-        } catch (IOException e) {
+            com.mservice.models.QueryStatusTransactionResponse momoResponse = 
+                    QueryTransactionStatus.process(momoEnvironment, orderId, requestId);
+
+            return MoMoQueryResponse.builder()
+                    .partnerCode(momoResponse.getPartnerCode())
+                    .orderId(momoResponse.getOrderId())
+                    .requestId(momoResponse.getRequestId())
+                    .resultCode(momoResponse.getResultCode())
+                    .message(momoResponse.getMessage())
+                    .responseTime(momoResponse.getResponseTime())
+                    .build();
+        } catch (Exception e) {
             log.error("[MoMo] Query failed for orderId={}: {}", orderId, e.getMessage());
             throw new RuntimeException("MoMo query failed: " + e.getMessage(), e);
         }
@@ -166,34 +169,27 @@ public class MoMoPaymentService {
     public MoMoRefundResponse refund(Long transId, String orderId, long amount, String requestId, String description) {
         log.info("[MoMo] Refunding - transId={}, orderId={}, amount={}", transId, orderId, amount);
 
-        String amountStr = String.valueOf(amount);
-        String transIdStr = String.valueOf(transId);
-
-        String rawSignature = String.format(SIGNATURE_FIELDS_REFUND,
-                momoProperties.getPartnerCode(),
-                momoProperties.getAccessKey(),
-                requestId,
-                amountStr,
-                orderId,
-                transIdStr
-        );
-        String signature = MoMoSignatureUtil.signHmacSHA256(rawSignature, momoProperties.getSecretKey());
-
-        MoMoRefundRequest refundRequest = MoMoRefundRequest.builder()
-                .partnerCode(momoProperties.getPartnerCode())
-                .accessKey(momoProperties.getAccessKey())
-                .requestId(requestId)
-                .transId(transId)
-                .amount(amount)
-                .orderId(orderId)
-                .signature(signature)
-                .build();
-
         try {
-            String payload = objectMapper.writeValueAsString(refundRequest);
-            String responseBody = sendPost(momoProperties.getEndpoint() + momoProperties.getRefundUrl(), payload);
-            return objectMapper.readValue(responseBody, MoMoRefundResponse.class);
-        } catch (IOException e) {
+            com.mservice.models.RefundMoMoResponse momoResponse = RefundTransaction.process(
+                    momoEnvironment,
+                    orderId,
+                    requestId,
+                    String.valueOf(amount),
+                    transId,
+                    description != null ? description : ""
+            );
+
+            return MoMoRefundResponse.builder()
+                    .partnerCode(momoResponse.getPartnerCode())
+                    .orderId(momoResponse.getOrderId())
+                    .requestId(momoResponse.getRequestId())
+                    .resultCode(momoResponse.getResultCode())
+                    .message(momoResponse.getMessage())
+                    .responseTime(momoResponse.getResponseTime())
+                    .refundId(momoResponse.getRefundId())
+                    .transId(momoResponse.getTransId())
+                    .build();
+        } catch (Exception e) {
             log.error("[MoMo] Refund failed for transId={}: {}", transId, e.getMessage());
             throw new RuntimeException("MoMo refund failed: " + e.getMessage(), e);
         }
@@ -202,75 +198,70 @@ public class MoMoPaymentService {
     private MoMoChargeRequest buildChargeRequest(GatewayChargeRequest request) {
         String orderId = request.getTransactionId();
         String requestId = request.getTransactionId();
-        String orderInfo = "Thanh toan don hang " + orderId;
-        String amountStr = String.valueOf(request.getAmount().longValue());
+        String amount = String.valueOf(request.getAmount().longValue());
+        String orderInfo = "Pay_for_booking_" + request.getBookingId();
+        String redirectUrl = valueOrEmpty(momoProperties.getReturnUrl());
+        String ipnUrl = valueOrEmpty(momoProperties.getNotifyUrl());
+        String extraData = buildExtraDataBase64(request);
 
-        long startTime = System.currentTimeMillis();
+        String rawData = "accessKey=" + valueOrEmpty(momoProperties.getAccessKey()) +
+                "&amount=" + amount +
+                "&extraData=" + extraData +
+                "&ipnUrl=" + ipnUrl +
+                "&orderId=" + orderId +
+                "&orderInfo=" + orderInfo +
+                "&partnerCode=" + valueOrEmpty(momoProperties.getPartnerCode()) +
+                "&redirectUrl=" + redirectUrl +
+                "&requestId=" + requestId +
+                "&requestType=" + REQUEST_TYPE_CAPTURE_WALLET;
 
-        // Build extraData as base64-encoded JSON (same value used in signature AND body)
-        String extraDataBase64 = buildExtraDataBase64(request);
-
-        // Signature format: partnerCode, accessKey, requestId, amount, orderId, orderInfo, returnUrl, notifyUrl, extraData
-        String rawSignature = String.format(SIGNATURE_FIELDS_CREATE,
-                momoProperties.getPartnerCode(),
-                momoProperties.getAccessKey(),
-                requestId,
-                amountStr,
-                orderId,
-                orderInfo,
-                momoProperties.getReturnUrl(),
-                momoProperties.getNotifyUrl(),
-                extraDataBase64
-        );
-        log.info("[MoMo] Raw signature data: {}", rawSignature);
-        String signature = MoMoSignatureUtil.signHmacSHA256(rawSignature, momoProperties.getSecretKey());
-        log.info("[MoMo] Computed signature: {}", signature);
+        String signature = MoMoSignatureUtil.signHmacSHA256(rawData, momoProperties.getSecretKey());
+        log.debug("[MoMo] Create payment rawData={}", rawData);
 
         return MoMoChargeRequest.builder()
                 .partnerCode(momoProperties.getPartnerCode())
-                .accessKey(momoProperties.getAccessKey())
                 .partnerName(momoProperties.getPartnerName())
                 .storeId(momoProperties.getStoreId())
                 .requestId(requestId)
                 .amount(request.getAmount().longValue())
                 .orderId(orderId)
                 .orderInfo(orderInfo)
-                .redirectUrl(momoProperties.getReturnUrl())
-                .ipnUrl(momoProperties.getNotifyUrl())
+                .redirectUrl(redirectUrl)
+                .ipnUrl(ipnUrl)
                 .lang(momoProperties.getLang())
-                .extraData(extraDataBase64)
-                .requestType("captureMoMoWallet")
+                .extraData(extraData)
+                .requestType(REQUEST_TYPE_CAPTURE_WALLET)
                 .autoCapture(true)
                 .signature(signature)
-                .startTime(startTime)
+                .startTime(System.currentTimeMillis())
                 .build();
     }
 
     private String buildExtraDataBase64(GatewayChargeRequest request) {
-        Map<String, String> extraDataMap = new LinkedHashMap<>();
-        extraDataMap.put("customerId", request.getCustomerId() != null ? request.getCustomerId() : "");
-        extraDataMap.put("bookingId", request.getBookingId() != null ? request.getBookingId() : "");
-        extraDataMap.put("transactionId", request.getTransactionId() != null ? request.getTransactionId() : "");
-
         try {
+            java.util.LinkedHashMap<String, String> extraDataMap = new java.util.LinkedHashMap<>();
+            extraDataMap.put("customerId", request.getCustomerId() != null ? request.getCustomerId() : "");
+            extraDataMap.put("bookingId", request.getBookingId() != null ? request.getBookingId() : "");
+            extraDataMap.put("transactionId", request.getTransactionId() != null ? request.getTransactionId() : "");
+
             String jsonExtra = objectMapper.writeValueAsString(extraDataMap);
-            return Base64.getEncoder().encodeToString(jsonExtra.getBytes(StandardCharsets.UTF_8));
+            return java.util.Base64.getEncoder().encodeToString(jsonExtra.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         } catch (JsonProcessingException e) {
             log.error("[MoMo] Failed to serialize extraData: {}", e.getMessage());
-            throw new RuntimeException("Failed to build extraData for MoMo request", e);
+            return "";
         }
     }
 
     private GatewayChargeResponse mapChargeResponse(MoMoChargeResponse momoResponse, GatewayChargeRequest request) {
-        boolean success = momoResponse.getResultCode() != null && momoResponse.getResultCode() == MOMO_SUCCESS_CODE;
+        boolean created = momoResponse.getResultCode() != null && momoResponse.getResultCode() == MOMO_SUCCESS_CODE;
 
         return GatewayChargeResponse.builder()
-                .success(success)
-                .pending(success)
+                .success(false)
+                .pending(created)
                 .gatewayTransactionId(momoResponse.getTransId() != null ? String.valueOf(momoResponse.getTransId()) : null)
-                .status(success ? "PENDING" : "FAILED")
+                .status(created ? "PENDING" : "FAILED")
                 .message(momoResponse.getMessage())
-                .errorCode(success ? null : String.valueOf(momoResponse.getResultCode()))
+                .errorCode(created ? null : String.valueOf(momoResponse.getResultCode()))
                 .amount(request.getAmount())
                 .currency(request.getCurrency() != null ? request.getCurrency() : "VND")
                 .paymentMethod(request.getPaymentMethod())
@@ -285,31 +276,29 @@ public class MoMoPaymentService {
     }
 
     private String sendPost(String url, String payload) throws IOException {
-        log.debug("[MoMo] POST {} - payload: {}", url, payload);
+        log.debug("[MoMo] POST {} - payload={}", url, payload);
 
         RequestBody body = RequestBody.create(payload, JSON);
         Request request = new Request.Builder()
                 .url(url)
                 .post(body)
                 .addHeader("Content-Type", "application/json")
-                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                 .build();
 
         try (Response response = httpClient.newCall(request).execute()) {
-            int statusCode = response.code();
             ResponseBody responseBody = response.body();
-            String responseStr = responseBody != null ? responseBody.string() : "empty";
-
-            log.debug("[MoMo] Response - status={}, body={}", statusCode, responseStr);
+            String responseText = responseBody != null ? responseBody.string() : "";
+            log.debug("[MoMo] Response - status={}, body={}", response.code(), responseText);
 
             if (!response.isSuccessful()) {
-                throw new IOException("Unexpected HTTP status: " + statusCode + " - body: " + responseStr);
+                throw new IOException("MoMo HTTP " + response.code() + ": " + responseText);
             }
-            if (responseBody == null) {
-                throw new IOException("Empty response body");
+
+            if (responseText.isBlank()) {
+                throw new IOException("MoMo returned empty response body");
             }
-            return responseStr;
+
+            return responseText;
         }
     }
-
 }

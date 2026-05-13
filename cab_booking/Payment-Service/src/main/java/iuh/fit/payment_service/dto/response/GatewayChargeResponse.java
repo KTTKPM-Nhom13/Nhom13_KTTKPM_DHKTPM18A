@@ -27,4 +27,6 @@ public class GatewayChargeResponse {
     private String deeplinkWallet;
     private String momoOrderId;
     private String momoRequestId;
+    private String zaloPayAppTransId;
+    private String zaloPayOrderToken;
 }

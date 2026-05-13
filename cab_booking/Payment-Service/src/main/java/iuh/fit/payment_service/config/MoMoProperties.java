@@ -11,17 +11,18 @@ import org.springframework.stereotype.Component;
 @Setter
 public class MoMoProperties {
 
+    private String environment = "dev";
     private String endpoint;
-    private String createUrl;
-    private String refundUrl;
-    private String queryUrl;
-    private String confirmUrl;
+    private String createUrl = "/create";
+    private String refundUrl = "/refund";
+    private String queryUrl = "/query";
+    private String confirmUrl = "/confirm";
     private String partnerCode;
     private String accessKey;
     private String secretKey;
     private String notifyUrl;
     private String returnUrl;
-    private String lang = "en";
+    private String lang = "vi";
     private String partnerName = "CAB Booking";
     private String storeId = "CAB_BOOKING";
 }

@@ -84,6 +84,10 @@ public class PaymentCompensationService {
     }
 
     private void executeRefund(PaymentTransaction transaction, String reason) {
+        if (transaction.getPaymentMethod() == PaymentMethod.ZALOPAY) {
+            throw new UnsupportedOperationException("ZaloPay refund is not implemented yet");
+        }
+
         Long gatewayTransId;
         try {
             gatewayTransId = Long.parseLong(transaction.getGatewayTransactionId());

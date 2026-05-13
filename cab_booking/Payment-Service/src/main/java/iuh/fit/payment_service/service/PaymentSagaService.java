@@ -9,6 +9,7 @@ import iuh.fit.payment_service.dto.request.ChargePaymentRequest;
 import iuh.fit.payment_service.dto.request.GatewayChargeRequest;
 import iuh.fit.payment_service.dto.response.GatewayChargeResponse;
 import iuh.fit.payment_service.dto.response.PaymentResponse;
+import iuh.fit.payment_service.dto.zalopay.ZaloPayCallbackResult;
 import iuh.fit.payment_service.entity.PaymentTransaction;
 import iuh.fit.payment_service.enums.PaymentStatus;
 import iuh.fit.payment_service.enums.PaymentMethod;
@@ -31,6 +32,7 @@ public class PaymentSagaService {
     private final IdempotencyRedisService idempotencyRedisService;
     private final MockPaymentGatewayService gatewayService;
     private final MoMoPaymentService moMoPaymentService;
+    private final ZaloPayPaymentService zaloPayPaymentService;
     private final OutboxService outboxService;
     private final ObjectMapper objectMapper;
 
@@ -96,7 +98,7 @@ public class PaymentSagaService {
                 .status(PaymentStatus.PENDING)
                 .idempotencyKey(request.getIdempotencyKey())
                 .retryCount(0)
-                .paymentGatewayName(request.getPaymentMethod() == PaymentMethod.MOMO ? "MOMO" : "MOCK_GATEWAY")
+                .paymentGatewayName(resolveGatewayName(request.getPaymentMethod()))
                 .build();
 
         transaction = paymentRepository.save(transaction);
@@ -122,17 +124,20 @@ public class PaymentSagaService {
                 }
 
                 if (gatewayResponse.isPending()) {
-                    log.info("[Saga] MoMo payment PENDING - txnId={}, awaiting IPN callback",
+                    log.info("[Saga] {} payment PENDING - txnId={}, awaiting callback",
+                            transaction.getPaymentMethod(),
                             transaction.getTransactionId());
                     updateStatus(transaction, PaymentStatus.PENDING);
                     PaymentResponse resp = PaymentResponse.fromEntity(transaction,
-                            "MoMo payment initiated, awaiting customer confirmation");
+                            transaction.getPaymentMethod() + " payment initiated, awaiting customer confirmation");
                     resp.setPayUrl(gatewayResponse.getPayUrl());
                     resp.setQrCodeUrl(gatewayResponse.getQrCodeUrl());
                     resp.setDeeplink(gatewayResponse.getDeeplink());
                     resp.setDeeplinkWallet(gatewayResponse.getDeeplinkWallet());
                     resp.setMomoOrderId(gatewayResponse.getMomoOrderId());
                     resp.setMomoRequestId(gatewayResponse.getMomoRequestId());
+                    resp.setZaloPayAppTransId(gatewayResponse.getZaloPayAppTransId());
+                    resp.setZaloPayOrderToken(gatewayResponse.getZaloPayOrderToken());
                     return resp;
                 }
 
@@ -261,7 +266,20 @@ public class PaymentSagaService {
         if (transaction.getPaymentMethod() == PaymentMethod.MOMO) {
             return moMoPaymentService.charge(gatewayRequest);
         }
+        if (transaction.getPaymentMethod() == PaymentMethod.ZALOPAY) {
+            return zaloPayPaymentService.charge(gatewayRequest);
+        }
         return gatewayService.charge(gatewayRequest);
+    }
+
+    private String resolveGatewayName(PaymentMethod paymentMethod) {
+        if (paymentMethod == PaymentMethod.MOMO) {
+            return "MOMO";
+        }
+        if (paymentMethod == PaymentMethod.ZALOPAY) {
+            return "ZALOPAY";
+        }
+        return "MOCK_GATEWAY";
     }
 
     private void waitBeforeRetry(int attempt) {
@@ -302,9 +320,17 @@ public class PaymentSagaService {
                 .orElseThrow(() -> new PaymentException(ErrorCode.PAYMENT_NOT_FOUND,
                         "Transaction not found: " + ipnResult.getOrderId()));
 
-        if (transaction.getStatus() == PaymentStatus.SUCCESS) {
-            log.info("[Saga] Transaction already SUCCESS - txnId={}", transaction.getTransactionId());
+        if (transaction.getStatus() != PaymentStatus.PENDING) {
+            log.info("[Saga] Ignoring MoMo IPN for non-pending transaction - txnId={}, status={}",
+                    transaction.getTransactionId(), transaction.getStatus());
             return;
+        }
+
+        if (ipnResult.getAmount() == null || transaction.getAmount().compareTo(ipnResult.getAmount()) != 0) {
+            log.error("[Saga] MoMo IPN amount mismatch - txnId={}, expected={}, actual={}",
+                    transaction.getTransactionId(), transaction.getAmount(), ipnResult.getAmount());
+            throw new PaymentException(ErrorCode.VALIDATION_ERROR,
+                    "MoMo IPN amount mismatch for transaction: " + transaction.getTransactionId());
         }
 
         if (ipnResult.isSuccess()) {
@@ -346,5 +372,49 @@ public class PaymentSagaService {
                     )
             );
         }
+    }
+
+    @Transactional
+    public void completePaymentFromZaloPayCallback(ZaloPayCallbackResult callbackResult) {
+        log.info("[Saga] Processing ZaloPay callback completion - appTransId={}, txnId={}, zpTransId={}",
+                callbackResult.getAppTransId(), callbackResult.getTransactionId(), callbackResult.getZpTransId());
+
+        PaymentTransaction transaction = paymentRepository.findByTransactionId(callbackResult.getTransactionId())
+                .orElseThrow(() -> new PaymentException(ErrorCode.PAYMENT_NOT_FOUND,
+                        "Transaction not found: " + callbackResult.getTransactionId()));
+
+        if (transaction.getStatus() != PaymentStatus.PENDING) {
+            log.info("[Saga] Ignoring ZaloPay callback for non-pending transaction - txnId={}, status={}",
+                    transaction.getTransactionId(), transaction.getStatus());
+            return;
+        }
+
+        if (callbackResult.getAmount() == null || transaction.getAmount().compareTo(callbackResult.getAmount()) != 0) {
+            log.error("[Saga] ZaloPay callback amount mismatch - txnId={}, expected={}, actual={}",
+                    transaction.getTransactionId(), transaction.getAmount(), callbackResult.getAmount());
+            throw new PaymentException(ErrorCode.VALIDATION_ERROR,
+                    "ZaloPay callback amount mismatch for transaction: " + transaction.getTransactionId());
+        }
+
+        transaction.markSuccess(
+                callbackResult.getZpTransId(),
+                "ZaloPay callback: appTransId=" + callbackResult.getAppTransId()
+        );
+        paymentRepository.save(transaction);
+        log.info("[Saga] ZaloPay payment SUCCESS from callback - txnId={}, gatewayTxnId={}",
+                transaction.getTransactionId(), callbackResult.getZpTransId());
+
+        outboxService.saveOutboxEventInTx(
+                "PaymentTransaction",
+                transaction.getTransactionId(),
+                "PAYMENT_COMPLETED",
+                PaymentCompletedEvent.fromTransaction(
+                        transaction.getBookingId(),
+                        transaction.getAmount(),
+                        transaction.getCurrency(),
+                        transaction.getGatewayTransactionId(),
+                        transaction.getPaymentMethod().name()
+                )
+        );
     }
 }

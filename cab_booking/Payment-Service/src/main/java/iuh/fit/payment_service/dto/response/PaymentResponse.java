@@ -34,6 +34,8 @@ public class PaymentResponse {
     private String deeplinkWallet;
     private String momoOrderId;
     private String momoRequestId;
+    private String zaloPayAppTransId;
+    private String zaloPayOrderToken;
 
     public static PaymentResponse fromEntity(PaymentTransaction entity) {
         return PaymentResponse.builder()

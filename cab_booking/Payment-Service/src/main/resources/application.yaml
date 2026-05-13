@@ -129,21 +129,31 @@ logging:
   level:
     iuh.fit.payment_service: DEBUG
     iuh.fit.payment_service.service.MoMoPaymentService: DEBUG
+    com.mservice: DEBUG
     org.springframework.kafka: INFO
     org.hibernate.SQL: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
 
 momo:
-  endpoint: https://test-payment.momo.vn/v2/gateway/api
-  createUrl: /create
-  refundUrl: /refund
-  queryUrl: /query
-  partnerCode: ${MOMO_PARTNER_CODE:MOMOLRJZ20181206}
-  accessKey: ${MOMO_ACCESS_KEY:MTCKt9W3eU1m39TW}
-  secretKey: ${MOMO_SECRET_KEY:SetA5RDnLHvt51AULf51DyauxUo3kDU6}
-  notifyUrl: ${MOMO_NOTIFY_URL:https://example.com/api/payments/momo/ipn}
-  returnUrl: ${MOMO_RETURN_URL:https://example.com/payment-result}
-  lang: vi
-  partnerName: CAB Booking
-  storeId: CAB_BOOKING
+  environment: ${MOMO_ENVIRONMENT:dev}
+  endpoint: ${MOMO_ENDPOINT:https://test-payment.momo.vn/v2/gateway/api}
+  partner-code: ${MOMO_PARTNER_CODE:MOMOLRJZ20181206}
+  access-key: ${MOMO_ACCESS_KEY:MTCKt9W3eU1m39TW}
+  secret-key: ${MOMO_SECRET_KEY:SetA5RDnLHvt51AULf51DyauxUo3kDU6}
+  notify-url: ${MOMO_NOTIFY_URL:https://example.com/api/payments/momo/ipn}
+  return-url: ${MOMO_RETURN_URL:https://example.com/payment-result}
+  lang: ${MOMO_LANG:vi}
+  partner-name: CAB Booking
+  store-id: CAB_BOOKING
+
+zalopay:
+  endpoint: ${ZALOPAY_ENDPOINT:https://sb-openapi.zalopay.vn/v2}
+  create-url: ${ZALOPAY_CREATE_URL:/create}
+  app-id: ${ZALOPAY_APP_ID:2553}
+  key1: ${ZALOPAY_KEY1:PcY4iZIKFCIdgZvA6ueMcMHHUbRLYjPL}
+  key2: ${ZALOPAY_KEY2:kLtgPl8HHhfvMuDHPwKfgfsY4Ydm9eIz}
+  callback-url: ${ZALOPAY_CALLBACK_URL:https://example.com/api/payments/zalopay/callback}
+  redirect-url: ${ZALOPAY_REDIRECT_URL:https://example.com/payment-result}
+  bank-code: ${ZALOPAY_BANK_CODE:}
+  expire-duration-seconds: ${ZALOPAY_EXPIRE_DURATION_SECONDS:900}
