@@ -61,3 +61,5 @@ jvm.ini
 
 # Spring Boot
 spring-shell.log
+# Local environment variables
+.env

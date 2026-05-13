@@ -40,14 +40,15 @@ public class PricingService {
 
         String vehicleType = normalizeVehicleType(request.getVehicleType());
 
-        double distance = distanceCalculator.calculateDistance(
+        DistanceCalculatorService.EtaResult eta = distanceCalculator.calculateEta(
                 request.getPickupLat(), request.getPickupLng(),
                 request.getDropoffLat(), request.getDropoffLng()
         );
+        double distance = eta.distanceKm();
 
         int duration = request.getEstimatedDurationMinutes() != null
                 ? request.getEstimatedDurationMinutes()
-                : distanceCalculator.estimateDurationMinutesByDistance(distance);
+                : eta.durationMinutes();
 
         String pickupZone = determineZone(request.getPickupLat(), request.getPickupLng());
         String dropoffZone = determineZone(request.getDropoffLat(), request.getDropoffLng());
