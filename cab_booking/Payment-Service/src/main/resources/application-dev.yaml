@@ -1,0 +1,12 @@
+momo:
+  environment: dev
+  notifyUrl: ${MOMO_NOTIFY_URL:https://example.com/api/payments/momo/ipn}
+  returnUrl: ${MOMO_RETURN_URL:https://example.com/payment-result}
+  lang: vi
+  partnerName: CAB Booking
+  storeId: CAB_BOOKING
+
+zalopay:
+  endpoint: ${ZALOPAY_ENDPOINT:https://sb-openapi.zalopay.vn/v2}
+  callbackUrl: ${ZALOPAY_CALLBACK_URL:https://example.com/api/payments/zalopay/callback}
+  redirectUrl: ${ZALOPAY_REDIRECT_URL:https://example.com/payment-result}

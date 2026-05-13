@@ -5,8 +5,12 @@ import iuh.fit.payment_service.dto.momo.MoMoIpnRequest;
 import iuh.fit.payment_service.dto.momo.MoMoIpnResult;
 import iuh.fit.payment_service.dto.request.ChargePaymentRequest;
 import iuh.fit.payment_service.dto.response.PaymentResponse;
+import iuh.fit.payment_service.dto.zalopay.ZaloPayCallbackRequest;
+import iuh.fit.payment_service.dto.zalopay.ZaloPayCallbackResponse;
+import iuh.fit.payment_service.dto.zalopay.ZaloPayCallbackResult;
 import iuh.fit.payment_service.service.MoMoPaymentService;
 import iuh.fit.payment_service.service.PaymentSagaService;
+import iuh.fit.payment_service.service.ZaloPayPaymentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -28,6 +32,7 @@ public class PaymentController {
 
     private final PaymentSagaService paymentSagaService;
     private final MoMoPaymentService moMoPaymentService;
+    private final ZaloPayPaymentService zaloPayPaymentService;
 
     @PostMapping("/charge")
     @Operation(
@@ -120,36 +125,41 @@ public class PaymentController {
             description = "Receives payment confirmation callbacks from MoMo after customer completes payment"
     )
     @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "IPN processed"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "IPN processed"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid signature")
     })
-    public ResponseEntity<java.util.Map<String, Object>> handleMoMoIpn(
+    public ResponseEntity<Void> handleMoMoIpn(
             @RequestBody MoMoIpnRequest ipnRequest
     ) {
         log.info("[Controller] POST /api/payments/momo/ipn - orderId={}, resultCode={}, amount={}",
                 ipnRequest.getOrderId(), ipnRequest.getResultCode(), ipnRequest.getAmount());
 
         MoMoIpnResult result = moMoPaymentService.processIpn(ipnRequest);
+        paymentSagaService.completePaymentFromMoMoIpn(result);
 
-        java.util.Map<String, Object> response = new java.util.LinkedHashMap<>();
-        response.put("partnerCode", result.getResultCode() != null ? ipnRequest.getPartnerCode() : "");
-        response.put("orderId", result.getOrderId());
-        response.put("requestId", ipnRequest.getRequestId());
-        response.put("resultCode", result.getResultCode());
-        response.put("message", result.getMessage());
+        return ResponseEntity.noContent().build();
+    }
 
-        if (!result.isSuccess()) {
-            return ResponseEntity.ok(response);
-        }
+    @PostMapping("/zalopay/callback")
+    @Operation(
+            summary = "ZaloPay callback webhook",
+            description = "Receives payment confirmation callbacks from ZaloPay after customer completes payment"
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Callback acknowledged")
+    })
+    public ResponseEntity<ZaloPayCallbackResponse> handleZaloPayCallback(
+            @RequestBody ZaloPayCallbackRequest callbackRequest
+    ) {
+        log.info("[Controller] POST /api/payments/zalopay/callback - type={}", callbackRequest.getType());
 
         try {
-            paymentSagaService.completePaymentFromMoMoIpn(result);
+            ZaloPayCallbackResult result = zaloPayPaymentService.processCallback(callbackRequest);
+            paymentSagaService.completePaymentFromZaloPayCallback(result);
+            return ResponseEntity.ok(ZaloPayCallbackResponse.success());
         } catch (Exception e) {
-            log.error("[Controller] Failed to complete MoMo payment - orderId={}", ipnRequest.getOrderId(), e);
-            response.put("resultCode", 99);
-            response.put("message", "Internal error: " + e.getMessage());
+            log.error("[Controller] ZaloPay callback processing failed: {}", e.getMessage(), e);
+            return ResponseEntity.ok(ZaloPayCallbackResponse.invalid(e.getMessage()));
         }
-
-        return ResponseEntity.ok(response);
     }
 }

@@ -37,6 +37,9 @@ public class MoMoRefundResponse {
     @JsonProperty("responseTime")
     private Long responseTime;
 
+    @JsonProperty("refundId")
+    private Long refundId;
+
     @JsonProperty("signature")
     private String signature;
 }

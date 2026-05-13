@@ -52,6 +52,12 @@ public class MoMoIpnRequest {
     @JsonProperty("orderInfo")
     private String orderInfo;
 
+    @JsonProperty("orderType")
+    private String orderType;
+
+    @JsonProperty("payType")
+    private String payType;
+
     @JsonProperty("extraData")
     private String extraData;
 }

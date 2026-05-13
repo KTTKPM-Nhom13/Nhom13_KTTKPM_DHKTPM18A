@@ -22,6 +22,8 @@ public enum ErrorCode {
     MOMO_ORDER_NOT_FOUND("PAYMENT_013", "MoMo order not found", 404),
     MOMO_DUPLICATE_REQUEST("PAYMENT_014", "Duplicate MoMo request", 409),
     MOMO_GATEWAY_ERROR("PAYMENT_015", "MoMo gateway error", 502),
+    ZALOPAY_SIGNATURE_INVALID("PAYMENT_016", "ZaloPay signature verification failed", 400),
+    ZALOPAY_GATEWAY_ERROR("PAYMENT_017", "ZaloPay gateway error", 502),
     UNCATEGORIZED_ERROR("PAYMENT_999", "Uncategorized error", 500);
 
     private final String code;
