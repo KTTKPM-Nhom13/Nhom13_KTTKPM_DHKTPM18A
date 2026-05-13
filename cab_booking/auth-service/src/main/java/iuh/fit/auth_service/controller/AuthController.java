@@ -6,14 +6,11 @@ import iuh.fit.auth_service.dto.request.LogoutRequest;
 import iuh.fit.auth_service.dto.request.RefreshTokenRequest;
 import iuh.fit.auth_service.dto.request.RequestForgotPasswordOtpRequest;
 import iuh.fit.auth_service.dto.request.RegisterRequest;
-import iuh.fit.auth_service.dto.request.RequestRegisterOtpRequest;
 import iuh.fit.auth_service.dto.request.ResetForgotPasswordRequest;
-import iuh.fit.auth_service.dto.request.VerifyRegisterOtpRequest;
 import iuh.fit.auth_service.dto.request.VerifyTokenRequest;
 import iuh.fit.auth_service.dto.response.AuthTokenResponse;
 import iuh.fit.auth_service.dto.response.ChangePasswordResponse;
 import iuh.fit.auth_service.dto.response.RegisterOtpResponse;
-import iuh.fit.auth_service.dto.response.VerifyRegisterOtpResponse;
 import iuh.fit.auth_service.service.AuthService;
 import iuh.fit.common.dto.response.ApiResponse;
 import iuh.fit.common.security.JwtTokenService;
@@ -41,6 +38,8 @@ public class AuthController {
     AuthService authService;
     JwtTokenService jwtTokenService;
 
+    /*
+    Old registration flow kept here for reference while dev uses a single-step register endpoint.
     @PostMapping("/register/request-otp")
     public ApiResponse<RegisterOtpResponse> requestRegisterOtp(@Valid @RequestBody RequestRegisterOtpRequest request) {
         return ApiResponse.<RegisterOtpResponse>builder()
@@ -57,6 +56,7 @@ public class AuthController {
                 .result(authService.verifyRegisterOtp(request))
                 .build();
     }
+    */
 
     @PostMapping("/register")
     public ApiResponse<AuthTokenResponse> register(@Valid @RequestBody RegisterRequest request) {
@@ -66,6 +66,8 @@ public class AuthController {
                 .build();
     }
 
+    /*
+    Old alias for registration OTP flow.
     @PostMapping("/register/email")
     public ApiResponse<RegisterOtpResponse> registerByEmail(@Valid @RequestBody RequestRegisterOtpRequest request) {
         return ApiResponse.<RegisterOtpResponse>builder()
@@ -73,6 +75,7 @@ public class AuthController {
                 .result(authService.requestRegisterOtp(request))
                 .build();
     }
+    */
 
     @PostMapping("/login")
     public ApiResponse<AuthTokenResponse> login(@Valid @RequestBody LoginRequest request) {

@@ -25,6 +25,9 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,15 +56,23 @@ public class DriverProfileService {
     public DriverProfileResponse upsertProfile(String externalUserId, UpsertDriverProfileRequest request) {
         DriverProfile profile = getOrCreateProfileEntity(externalUserId);
         profile.setFullName(request.getFullName());
-        profile.setEmail(request.getEmail());
-        profile.setPhoneNumber(request.getPhoneNumber());
-        profile.setAvatarUrl(request.getAvatarUrl());
+        if (hasText(request.getEmail())) {
+            profile.setEmail(request.getEmail().trim());
+        }
+        if (hasText(request.getPhoneNumber())) {
+            profile.setPhoneNumber(request.getPhoneNumber().trim());
+        }
+        if (hasText(request.getAvatarUrl())) {
+            profile.setAvatarUrl(request.getAvatarUrl().trim());
+        }
         profile.setLicenseNumber(request.getLicenseNumber());
         profile.setVehicleType(request.getVehicleType());
         profile.setVehiclePlate(request.getVehiclePlate());
         profile.setVehicleModel(request.getVehicleModel());
         profile.setVehicleColor(request.getVehicleColor());
-        profile.setServiceArea(request.getServiceArea());
+        if (request.getServiceArea() != null) {
+            profile.setServiceArea(request.getServiceArea().trim());
+        }
 
         if (profile.getVerificationStatus() != DriverVerificationStatus.APPROVED) {
             profile.setVerificationStatus(DriverVerificationStatus.APPROVED);
@@ -136,7 +147,9 @@ public class DriverProfileService {
         DriverProfile profile = getRequiredProfile(externalUserId);
         ensureCurrentRideExists(profile);
 
-        profile.setCurrentRideStatus(DriverRideStatus.valueOf(request.getRideStatus().trim().toUpperCase()));
+        DriverRideStatus nextStatus = DriverRideStatus.valueOf(request.getRideStatus().trim().toUpperCase());
+        validateRideStatusTransition(profile.getCurrentRideStatus(), nextStatus);
+        profile.setCurrentRideStatus(nextStatus);
         if (request.getCurrentLatitude() != null) {
             profile.setCurrentLatitude(request.getCurrentLatitude());
         }
@@ -197,15 +210,20 @@ public class DriverProfileService {
 
     @Transactional
     public DriverProfile getOrCreateProfileEntity(String externalUserId) {
-        return driverProfileRepository.findByExternalUserId(externalUserId)
+        DriverProfile profile = driverProfileRepository.findByExternalUserId(externalUserId)
                 .orElseGet(() -> {
-                    DriverProfile profile = new DriverProfile();
-                    profile.setExternalUserId(externalUserId);
-                    profile.setFullName("Driver " + externalUserId);
-                    profile.setAverageRating(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
-                    profile.setTotalEarnings(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
-                    return driverProfileRepository.save(profile);
+                    DriverProfile created = new DriverProfile();
+                    created.setExternalUserId(externalUserId);
+                    created.setFullName(resolveCurrentUserClaim("fullName", "Driver " + externalUserId));
+                    created.setEmail(resolveCurrentUserClaim("email", null));
+                    created.setPhoneNumber(resolveCurrentUserClaim("phoneNumber", null));
+                    created.setAvatarUrl(resolveCurrentUserClaim("avatarUrl", null));
+                    created.setAverageRating(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+                    created.setTotalEarnings(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+                    return driverProfileRepository.save(created);
                 });
+        syncMissingAuthSnapshot(profile);
+        return profile;
     }
 
     private DriverProfile getRequiredProfile(String externalUserId) {
@@ -226,6 +244,23 @@ public class DriverProfileService {
         profile.setCurrentRideDestination(null);
         profile.setCurrentRideRequestedAt(null);
         profile.setAvailabilityStatus(nextAvailabilityStatus);
+    }
+
+    private void validateRideStatusTransition(DriverRideStatus currentStatus, DriverRideStatus nextStatus) {
+        if (currentStatus == null) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
+        if (currentStatus == DriverRideStatus.ACCEPTED && nextStatus == DriverRideStatus.EN_ROUTE_PICKUP) {
+            return;
+        }
+        if (currentStatus == DriverRideStatus.EN_ROUTE_PICKUP
+                && (nextStatus == DriverRideStatus.ARRIVED_PICKUP || nextStatus == DriverRideStatus.IN_PROGRESS)) {
+            return;
+        }
+        if (currentStatus == DriverRideStatus.ARRIVED_PICKUP && nextStatus == DriverRideStatus.IN_PROGRESS) {
+            return;
+        }
+        throw new AppException(ErrorCode.VALIDATION_ERROR);
     }
 
     private DriverAvailabilityStatus parseAvailabilityStatus(String rawStatus) {
@@ -331,7 +366,8 @@ public class DriverProfileService {
 
     private boolean isActiveForBooking(DriverProfile profile) {
         return profile.getVerificationStatus() == DriverVerificationStatus.APPROVED
-                && profile.getAvailabilityStatus() != DriverAvailabilityStatus.OFFLINE;
+                && profile.getAvailabilityStatus() == DriverAvailabilityStatus.ONLINE
+                && currentRideStatusName(profile) == null;
     }
 
     private String currentRideStatusName(DriverProfile profile) {
@@ -343,5 +379,62 @@ public class DriverProfileService {
                 .lat(profile.getCurrentLatitude())
                 .lng(profile.getCurrentLongitude())
                 .build();
+    }
+
+    private void syncMissingAuthSnapshot(DriverProfile profile) {
+        boolean dirty = false;
+
+        if (!hasText(profile.getFullName())) {
+            profile.setFullName(resolveCurrentUserClaim("fullName", "Driver " + profile.getExternalUserId()));
+            dirty = true;
+        }
+        if (!hasText(profile.getEmail())) {
+            String email = resolveCurrentUserClaim("email", null);
+            if (hasText(email)) {
+                profile.setEmail(email);
+                dirty = true;
+            }
+        }
+        if (!hasText(profile.getPhoneNumber())) {
+            String phoneNumber = normalizeNullableClaim(resolveCurrentUserClaim("phoneNumber", null));
+            if (hasText(phoneNumber)) {
+                profile.setPhoneNumber(phoneNumber);
+                dirty = true;
+            }
+        }
+        if (!hasText(profile.getAvatarUrl())) {
+            String avatarUrl = normalizeNullableClaim(resolveCurrentUserClaim("avatarUrl", null));
+            if (hasText(avatarUrl)) {
+                profile.setAvatarUrl(avatarUrl);
+                dirty = true;
+            }
+        }
+
+        if (dirty) {
+            driverProfileRepository.save(profile);
+        }
+    }
+
+    private String resolveCurrentUserClaim(String claimName, String fallbackValue) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
+            return normalizeNullableClaim(jwt.getClaimAsString(claimName), fallbackValue);
+        }
+        return fallbackValue;
+    }
+
+    private String normalizeNullableClaim(String value) {
+        return normalizeNullableClaim(value, null);
+    }
+
+    private String normalizeNullableClaim(String value, String fallbackValue) {
+        if (!hasText(value)) {
+            return fallbackValue;
+        }
+        return value.trim();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 }

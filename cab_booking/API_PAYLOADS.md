@@ -8,29 +8,10 @@ Phan `Auth Service`, `User Service` va `Driver Service` da duoc test end-to-end 
 
 Base path qua gateway: `http://localhost:8080/api/auth`
 
-### 1.1 Request Register OTP
-`POST /api/auth/register/request-otp`
-
-```json
-{
-  "email": "vana@example.com"
-}
-```
-
-### 1.2 Verify Register OTP
-`POST /api/auth/register/verify-otp`
-
-```json
-{
-  "email": "vana@example.com",
-  "otpCode": "123456"
-}
-```
-
-### 1.3 Register
+### 1.1 Register
 `POST /api/auth/register`
 
-Chi tao tai khoan sau khi email da verify OTP thanh cong.
+Luong dev hien tai cho phep tao tai khoan truc tiep qua mot endpoint duy nhat, khong can verify email hay OTP.
 
 ```json
 {
@@ -47,7 +28,7 @@ Chi tao tai khoan sau khi email da verify OTP thanh cong.
 }
 ```
 
-### 1.4 Register By Email
+### 1.2 Register By Email
 `POST /api/auth/register/email`
 
 Endpoint nay hien la alias de gui OTP dang ky:
@@ -58,7 +39,7 @@ Endpoint nay hien la alias de gui OTP dang ky:
 }
 ```
 
-### 1.5 Login
+### 1.3 Login
 `POST /api/auth/login`
 
 Payload duoi day da duoc test pass qua gateway:
@@ -74,7 +55,7 @@ Payload duoi day da duoc test pass qua gateway:
 }
 ```
 
-### 1.6 Change Password
+### 1.4 Change Password
 `POST /api/auth/password/change`
 
 Can Bearer token:
@@ -90,7 +71,7 @@ Authorization: Bearer <access_token>
 }
 ```
 
-### 1.7 Forgot Password - Request OTP
+### 1.5 Forgot Password - Request OTP
 `POST /api/auth/password/forgot/request-otp`
 
 ```json
@@ -99,7 +80,7 @@ Authorization: Bearer <access_token>
 }
 ```
 
-### 1.8 Forgot Password - Reset
+### 1.6 Forgot Password - Reset
 `POST /api/auth/password/forgot/reset`
 
 ```json
@@ -110,7 +91,7 @@ Authorization: Bearer <access_token>
 }
 ```
 
-### 1.9 Refresh Token
+### 1.7 Refresh Token
 `POST /api/auth/refresh`
 
 Payload duoi day da duoc test pass qua gateway sau login:
@@ -121,7 +102,7 @@ Payload duoi day da duoc test pass qua gateway sau login:
 }
 ```
 
-### 1.10 Logout
+### 1.8 Logout
 `POST /api/auth/logout`
 
 ```json
@@ -130,7 +111,7 @@ Payload duoi day da duoc test pass qua gateway sau login:
 }
 ```
 
-### 1.11 Verify Token
+### 1.9 Verify Token
 `POST /api/auth/verify`
 
 Payload duoi day da duoc test pass qua gateway sau login:
@@ -528,7 +509,7 @@ Moi lan check se phat lai event Kafka len topic `driver.status.changed` de servi
 Vi du:
 
 ```text
-GET http://localhost:8084/internal/drivers/driver-3/availability
+GET http://localhost:8089/internal/drivers/driver-3/availability
 ```
 
 Sample response:
@@ -721,17 +702,15 @@ Base URL noi bo: `http://localhost:8087/internal/emails`
 
 ## 7. Quick Test Flow
 
-1. Goi `POST /api/auth/register/request-otp` de gui OTP.
-2. Goi `POST /api/auth/register/verify-otp` de xac minh email.
-3. Goi `POST /api/auth/register` de tao tai khoan.
-4. Hoac dang nhap bang `POST /api/auth/login`.
-5. Neu can doi mat khau khi da dang nhap, goi `POST /api/auth/password/change`.
-6. Neu quen mat khau, goi `POST /api/auth/password/forgot/request-otp` roi `POST /api/auth/password/forgot/reset`.
-7. Lay `accessToken` trong response.
-8. Gan header `Authorization: Bearer <accessToken>` khi goi user APIs.
-9. Test profile voi `GET/PUT /api/users/me/profile`.
-10. Neu can role tai xe, dang ky them tai khoan voi `role = DRIVER`.
-11. Test driver profile va availability qua `GET/PUT /api/drivers/me/profile`, `PATCH /api/drivers/me/availability`.
-12. Test account lifecycle voi `GET /api/users/me/account`, `POST /api/users/me/account/delete-request`, `POST /api/users/me/account/restore`.
-13. Test device session voi `POST /api/users/me/devices`.
-14. Test notification bang `POST /api/notifications/test`.
+1. Goi `POST /api/auth/register` de tao tai khoan truc tiep.
+2. Hoac dang nhap bang `POST /api/auth/login`.
+3. Neu can doi mat khau khi da dang nhap, goi `POST /api/auth/password/change`.
+4. Neu quen mat khau, goi `POST /api/auth/password/forgot/request-otp` roi `POST /api/auth/password/forgot/reset`.
+5. Lay `accessToken` trong response.
+6. Gan header `Authorization: Bearer <accessToken>` khi goi user APIs.
+7. Test profile voi `GET/PUT /api/users/me/profile`.
+8. Neu can role tai xe, dang ky them tai khoan voi `role = DRIVER`.
+9. Test driver profile va availability qua `GET/PUT /api/drivers/me/profile`, `PATCH /api/drivers/me/availability`.
+10. Test account lifecycle voi `GET /api/users/me/account`, `POST /api/users/me/account/delete-request`, `POST /api/users/me/account/restore`.
+11. Test device session voi `POST /api/users/me/devices`.
+12. Test notification bang `POST /api/notifications/test`.

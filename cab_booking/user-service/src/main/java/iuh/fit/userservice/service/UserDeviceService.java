@@ -37,7 +37,7 @@ public class UserDeviceService {
 
     @Transactional
     public UserDeviceResponse registerDevice(String externalUserId, RegisterUserDeviceRequest request) {
-        UserProfile profile = userProfileService.getOrCreateProfileEntity(externalUserId);
+        UserProfile profile = userProfileService.getWritableProfileEntity(externalUserId);
         UserDevice device = userDeviceRepository.findByUserProfileAndDeviceIdentifier(profile, request.getDeviceIdentifier())
                 .orElseGet(UserDevice::new);
 
