@@ -1,0 +1,7 @@
+interface:
+  display_name: "CAB Auth User Driver Validation"
+  short_description: "Smoke test CAB auth, user, and driver flows."
+  default_prompt: "Use $cab-auth-user-driver-validation to validate the CAB Booking auth, user, and driver flows and summarize any failures."
+
+policy:
+  allow_implicit_invocation: true

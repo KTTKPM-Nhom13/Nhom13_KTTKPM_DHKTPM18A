@@ -1,0 +1,694 @@
+{
+  "startedAt": "2026-05-12T16:42:10.046781+00:00",
+  "baseUrl": "http://localhost:8080",
+  "driverInternalUrl": "http://localhost:8089",
+  "passed": true,
+  "totalSteps": 32,
+  "passedSteps": 32,
+  "failedSteps": 0,
+  "steps": [
+    {
+      "name": "auth.register_rider",
+      "method": "POST",
+      "url": "http://localhost:8080/api/auth/register",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Registered successfully",
+        "timestamp": "2026-05-12T16:42:10.391821471",
+        "result": {
+          "user": {
+            "userId": "f723527b-8ee7-450d-a7cc-0b3b1742c94a",
+            "email": "qa.rider.20260512234210@cab.local",
+            "fullName": "QA Rider",
+            "avatarUrl": "https://cdn.example.com/avatars/qa-rider.png",
+            "phoneNumber": "0901234567",
+            "role": "USER",
+            "emailVerified": true,
+            "accountStatus": "ACTIVE",
+            "scheduledDeletionAt": null,
+            "lastLoginAt": "2026-05-12T16:42:10.361944937"
+          }
+        }
+      }
+    },
+    {
+      "name": "auth.login_rider",
+      "method": "POST",
+      "url": "http://localhost:8080/api/auth/login",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Logged in successfully",
+        "timestamp": "2026-05-12T16:42:11.925887671",
+        "result": {
+          "user": {
+            "userId": "f723527b-8ee7-450d-a7cc-0b3b1742c94a",
+            "email": "qa.rider.20260512234210@cab.local",
+            "fullName": "QA Rider",
+            "avatarUrl": "https://cdn.example.com/avatars/qa-rider.png",
+            "phoneNumber": "0901234567",
+            "role": "USER",
+            "emailVerified": true,
+            "accountStatus": "ACTIVE",
+            "scheduledDeletionAt": null,
+            "lastLoginAt": "2026-05-12T16:42:11.892723077"
+          }
+        }
+      }
+    },
+    {
+      "name": "auth.verify_rider_token",
+      "method": "POST",
+      "url": "http://localhost:8080/api/auth/verify",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Verified token successfully",
+        "timestamp": "2026-05-12T16:42:13.265010428",
+        "result": {
+          "userId": "f723527b-8ee7-450d-a7cc-0b3b1742c94a",
+          "status": "success"
+        }
+      }
+    },
+    {
+      "name": "auth.refresh_rider_token",
+      "method": "POST",
+      "url": "http://localhost:8080/api/auth/refresh",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Refreshed token successfully",
+        "timestamp": "2026-05-12T16:42:14.749044847",
+        "result": {
+          "user": {
+            "userId": "f723527b-8ee7-450d-a7cc-0b3b1742c94a",
+            "email": "qa.rider.20260512234210@cab.local",
+            "fullName": "QA Rider",
+            "avatarUrl": "https://cdn.example.com/avatars/qa-rider.png",
+            "phoneNumber": "0901234567",
+            "role": "USER",
+            "emailVerified": true,
+            "accountStatus": "ACTIVE",
+            "scheduledDeletionAt": null,
+            "lastLoginAt": "2026-05-12T16:42:11.892723"
+          }
+        }
+      }
+    },
+    {
+      "name": "user.get_profile_initial",
+      "method": "GET",
+      "url": "http://localhost:8080/api/users/me/profile",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Fetched user profile successfully",
+        "timestamp": "2026-05-12T16:42:16.109899119",
+        "result": {
+          "email": "qa.rider.20260512234210@cab.local",
+          "externalUserId": "f723527b-8ee7-450d-a7cc-0b3b1742c94a",
+          "fullName": "QA Rider",
+          "accountStatus": "ACTIVE",
+          "id": "21128c91-bc23-49f5-98d6-8da2bb7481ef"
+        }
+      }
+    },
+    {
+      "name": "user.upsert_profile",
+      "method": "PUT",
+      "url": "http://localhost:8080/api/users/me/profile",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Saved user profile successfully",
+        "timestamp": "2026-05-12T16:42:16.480808253",
+        "result": {
+          "email": "qa.rider.20260512234210@cab.local",
+          "externalUserId": "f723527b-8ee7-450d-a7cc-0b3b1742c94a",
+          "fullName": "QA Rider Updated",
+          "accountStatus": "ACTIVE",
+          "id": "21128c91-bc23-49f5-98d6-8da2bb7481ef"
+        }
+      }
+    },
+    {
+      "name": "user.get_account_initial",
+      "method": "GET",
+      "url": "http://localhost:8080/api/users/me/account",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Fetched user account successfully",
+        "timestamp": "2026-05-12T16:42:16.83763297",
+        "result": {
+          "email": "qa.rider.20260512234210@cab.local",
+          "externalUserId": "f723527b-8ee7-450d-a7cc-0b3b1742c94a",
+          "fullName": "QA Rider Updated",
+          "accountStatus": "ACTIVE",
+          "restoreEligible": false
+        }
+      }
+    },
+    {
+      "name": "user.register_device",
+      "method": "POST",
+      "url": "http://localhost:8080/api/users/me/devices",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Registered user device successfully",
+        "timestamp": "2026-05-12T16:42:17.205100426",
+        "result": {
+          "status": "ACTIVE",
+          "id": "047dafe5-b898-4e57-a4a7-72ef7936bc2a"
+        }
+      }
+    },
+    {
+      "name": "user.get_devices",
+      "method": "GET",
+      "url": "http://localhost:8080/api/users/me/devices",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Fetched user devices successfully",
+        "timestamp": "2026-05-12T16:42:17.566486338",
+        "result": [
+          {
+            "id": "047dafe5-b898-4e57-a4a7-72ef7936bc2a",
+            "deviceIdentifier": "device-web-20260512234210",
+            "deviceName": "Chrome on Windows",
+            "deviceType": "WEB",
+            "platform": "WEB",
+            "osVersion": "Windows 11",
+            "appVersion": "1.0.1",
+            "pushToken": "push-token-20260512234210",
+            "ipAddress": null,
+            "userAgent": "Codex Validation Browser",
+            "lastLoginAt": "2026-05-12T16:42:17.195976",
+            "lastSeenAt": "2026-05-12T16:42:17.195976",
+            "status": "ACTIVE",
+            "trustedSession": true,
+            "createdAt": "2026-05-12T16:42:17.19832",
+            "updatedAt": "2026-05-12T16:42:17.198354"
+          }
+        ]
+      }
+    },
+    {
+      "name": "user.update_device",
+      "method": "PATCH",
+      "url": "http://localhost:8080/api/users/me/devices/047dafe5-b898-4e57-a4a7-72ef7936bc2a",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Updated user device successfully",
+        "timestamp": "2026-05-12T16:42:17.944762395",
+        "result": {
+          "status": "ACTIVE",
+          "id": "047dafe5-b898-4e57-a4a7-72ef7936bc2a"
+        }
+      }
+    },
+    {
+      "name": "user.device_heartbeat",
+      "method": "POST",
+      "url": "http://localhost:8080/api/users/me/devices/047dafe5-b898-4e57-a4a7-72ef7936bc2a/heartbeat",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Device heartbeat updated successfully",
+        "timestamp": "2026-05-12T16:42:18.304182263",
+        "result": {
+          "status": "ACTIVE",
+          "id": "047dafe5-b898-4e57-a4a7-72ef7936bc2a"
+        }
+      }
+    },
+    {
+      "name": "user.device_revoke",
+      "method": "POST",
+      "url": "http://localhost:8080/api/users/me/devices/047dafe5-b898-4e57-a4a7-72ef7936bc2a/revoke",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Device session revoked successfully",
+        "timestamp": "2026-05-12T16:42:18.660790038",
+        "result": {
+          "status": "REVOKED",
+          "id": "047dafe5-b898-4e57-a4a7-72ef7936bc2a"
+        }
+      }
+    },
+    {
+      "name": "user.request_delete_account",
+      "method": "POST",
+      "url": "http://localhost:8080/api/users/me/account/delete-request",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Requested account deletion successfully",
+        "timestamp": "2026-05-12T16:42:19.046906226",
+        "result": {
+          "email": "qa.rider.20260512234210@cab.local",
+          "externalUserId": "f723527b-8ee7-450d-a7cc-0b3b1742c94a",
+          "fullName": "QA Rider Updated",
+          "accountStatus": "PENDING_DELETION",
+          "restoreEligible": true
+        }
+      }
+    },
+    {
+      "name": "auth.login_blocked_while_pending_deletion",
+      "method": "POST",
+      "url": "http://localhost:8080/api/auth/login",
+      "expected_status": 403,
+      "actual_status": 403,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 403,
+        "message": "Account is pending deletion",
+        "timestamp": "2026-05-12T16:42:19.408237878"
+      }
+    },
+    {
+      "name": "user.restore_account",
+      "method": "POST",
+      "url": "http://localhost:8080/api/users/me/account/restore",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Restored user account successfully",
+        "timestamp": "2026-05-12T16:42:20.801762562",
+        "result": {
+          "email": "qa.rider.20260512234210@cab.local",
+          "externalUserId": "f723527b-8ee7-450d-a7cc-0b3b1742c94a",
+          "fullName": "QA Rider Updated",
+          "accountStatus": "ACTIVE",
+          "restoreEligible": false
+        }
+      }
+    },
+    {
+      "name": "auth.login_rider_after_restore",
+      "method": "POST",
+      "url": "http://localhost:8080/api/auth/login",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Logged in successfully",
+        "timestamp": "2026-05-12T16:42:21.317588378",
+        "result": {
+          "user": {
+            "userId": "f723527b-8ee7-450d-a7cc-0b3b1742c94a",
+            "email": "qa.rider.20260512234210@cab.local",
+            "fullName": "QA Rider",
+            "avatarUrl": "https://cdn.example.com/avatars/qa-rider.png",
+            "phoneNumber": "0901234567",
+            "role": "USER",
+            "emailVerified": true,
+            "accountStatus": "ACTIVE",
+            "scheduledDeletionAt": null,
+            "lastLoginAt": "2026-05-12T16:42:21.290029989"
+          }
+        }
+      }
+    },
+    {
+      "name": "auth.register_driver",
+      "method": "POST",
+      "url": "http://localhost:8080/api/auth/register",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Registered successfully",
+        "timestamp": "2026-05-12T16:42:22.817263562",
+        "result": {
+          "user": {
+            "userId": "74c808e8-3f62-4f99-9481-14fa02e2cdce",
+            "email": "qa.driver.20260512234210@cab.local",
+            "fullName": "QA Driver",
+            "avatarUrl": "https://cdn.example.com/avatars/qa-driver.png",
+            "phoneNumber": "0911222333",
+            "role": "DRIVER",
+            "emailVerified": true,
+            "accountStatus": "ACTIVE",
+            "scheduledDeletionAt": null,
+            "lastLoginAt": "2026-05-12T16:42:22.79412928"
+          }
+        }
+      }
+    },
+    {
+      "name": "auth.login_driver",
+      "method": "POST",
+      "url": "http://localhost:8080/api/auth/login",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Logged in successfully",
+        "timestamp": "2026-05-12T16:42:24.325953272",
+        "result": {
+          "user": {
+            "userId": "74c808e8-3f62-4f99-9481-14fa02e2cdce",
+            "email": "qa.driver.20260512234210@cab.local",
+            "fullName": "QA Driver",
+            "avatarUrl": "https://cdn.example.com/avatars/qa-driver.png",
+            "phoneNumber": "0911222333",
+            "role": "DRIVER",
+            "emailVerified": true,
+            "accountStatus": "ACTIVE",
+            "scheduledDeletionAt": null,
+            "lastLoginAt": "2026-05-12T16:42:24.300853368"
+          }
+        }
+      }
+    },
+    {
+      "name": "auth.verify_driver_token",
+      "method": "POST",
+      "url": "http://localhost:8080/api/auth/verify",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Verified token successfully",
+        "timestamp": "2026-05-12T16:42:25.676367347",
+        "result": {
+          "userId": "74c808e8-3f62-4f99-9481-14fa02e2cdce",
+          "status": "success"
+        }
+      }
+    },
+    {
+      "name": "auth.refresh_driver_token",
+      "method": "POST",
+      "url": "http://localhost:8080/api/auth/refresh",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Refreshed token successfully",
+        "timestamp": "2026-05-12T16:42:27.046117463",
+        "result": {
+          "user": {
+            "userId": "74c808e8-3f62-4f99-9481-14fa02e2cdce",
+            "email": "qa.driver.20260512234210@cab.local",
+            "fullName": "QA Driver",
+            "avatarUrl": "https://cdn.example.com/avatars/qa-driver.png",
+            "phoneNumber": "0911222333",
+            "role": "DRIVER",
+            "emailVerified": true,
+            "accountStatus": "ACTIVE",
+            "scheduledDeletionAt": null,
+            "lastLoginAt": "2026-05-12T16:42:24.300853"
+          }
+        }
+      }
+    },
+    {
+      "name": "driver.get_profile_initial",
+      "method": "GET",
+      "url": "http://localhost:8080/api/drivers/me/profile",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Fetched driver profile successfully",
+        "timestamp": "2026-05-12T16:42:28.409271347",
+        "result": {
+          "email": "qa.driver.20260512234210@cab.local",
+          "externalUserId": "74c808e8-3f62-4f99-9481-14fa02e2cdce",
+          "fullName": "QA Driver",
+          "availabilityStatus": "OFFLINE",
+          "verificationStatus": "PENDING",
+          "id": "ed4d6394-85ed-4790-8b29-11f883e0f079",
+          "totalCompletedRides": 0,
+          "totalEarnings": 0.0
+        }
+      }
+    },
+    {
+      "name": "driver.upsert_profile",
+      "method": "PUT",
+      "url": "http://localhost:8080/api/drivers/me/profile",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Saved driver profile successfully",
+        "timestamp": "2026-05-12T16:42:28.771709685",
+        "result": {
+          "email": "qa.driver.20260512234210@cab.local",
+          "externalUserId": "74c808e8-3f62-4f99-9481-14fa02e2cdce",
+          "fullName": "QA Driver Updated",
+          "availabilityStatus": "OFFLINE",
+          "verificationStatus": "APPROVED",
+          "id": "ed4d6394-85ed-4790-8b29-11f883e0f079",
+          "totalCompletedRides": 0,
+          "totalEarnings": 0.0
+        }
+      }
+    },
+    {
+      "name": "driver.go_online",
+      "method": "PATCH",
+      "url": "http://localhost:8080/api/drivers/me/availability",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Updated driver availability successfully",
+        "timestamp": "2026-05-12T16:42:29.137603147",
+        "result": {
+          "externalUserId": "74c808e8-3f62-4f99-9481-14fa02e2cdce",
+          "availabilityStatus": "ONLINE",
+          "verificationStatus": "APPROVED"
+        }
+      }
+    },
+    {
+      "name": "driver.internal_availability_check",
+      "method": "GET",
+      "url": "http://localhost:8089/internal/drivers/74c808e8-3f62-4f99-9481-14fa02e2cdce/availability",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Checked driver availability successfully",
+        "timestamp": "2026-05-12T16:42:29.480964457",
+        "result": {
+          "externalUserId": "74c808e8-3f62-4f99-9481-14fa02e2cdce",
+          "availabilityStatus": "ONLINE",
+          "verificationStatus": "APPROVED",
+          "currentRideId": null,
+          "activeForBooking": true
+        }
+      }
+    },
+    {
+      "name": "driver.accept_assignment",
+      "method": "POST",
+      "url": "http://localhost:8080/api/drivers/me/rides/assignment",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Handled driver assignment successfully",
+        "timestamp": "2026-05-12T16:42:29.853579331",
+        "result": {
+          "rideId": "RIDE-20260512234210",
+          "rideStatus": "ACCEPTED"
+        }
+      }
+    },
+    {
+      "name": "driver.get_current_ride",
+      "method": "GET",
+      "url": "http://localhost:8080/api/drivers/me/current-ride",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Fetched current ride successfully",
+        "timestamp": "2026-05-12T16:42:30.204857044",
+        "result": {
+          "rideId": "RIDE-20260512234210",
+          "rideStatus": "ACCEPTED"
+        }
+      }
+    },
+    {
+      "name": "driver.progress_en_route",
+      "method": "PATCH",
+      "url": "http://localhost:8080/api/drivers/me/rides/current",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Updated current ride successfully",
+        "timestamp": "2026-05-12T16:42:30.571282923",
+        "result": {
+          "rideId": "RIDE-20260512234210",
+          "rideStatus": "EN_ROUTE_PICKUP"
+        }
+      }
+    },
+    {
+      "name": "driver.progress_in_progress",
+      "method": "PATCH",
+      "url": "http://localhost:8080/api/drivers/me/rides/current",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Updated current ride successfully",
+        "timestamp": "2026-05-12T16:42:30.94169489",
+        "result": {
+          "rideId": "RIDE-20260512234210",
+          "rideStatus": "IN_PROGRESS"
+        }
+      }
+    },
+    {
+      "name": "driver.complete_ride",
+      "method": "POST",
+      "url": "http://localhost:8080/api/drivers/me/rides/current/complete",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Completed current ride successfully",
+        "timestamp": "2026-05-12T16:42:31.307613934",
+        "result": {
+          "rideId": null,
+          "rideStatus": null
+        }
+      }
+    },
+    {
+      "name": "driver.get_earnings_summary",
+      "method": "GET",
+      "url": "http://localhost:8080/api/drivers/me/earnings/summary",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Fetched driver earnings summary successfully",
+        "timestamp": "2026-05-12T16:42:31.651922623",
+        "result": {
+          "externalUserId": "74c808e8-3f62-4f99-9481-14fa02e2cdce",
+          "availabilityStatus": "ONLINE",
+          "totalCompletedRides": 1,
+          "totalEarnings": 132500.0
+        }
+      }
+    },
+    {
+      "name": "auth.logout_rider",
+      "method": "POST",
+      "url": "http://localhost:8080/api/auth/logout",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Logged out successfully",
+        "timestamp": "2026-05-12T16:42:32.010065798"
+      }
+    },
+    {
+      "name": "auth.logout_driver",
+      "method": "POST",
+      "url": "http://localhost:8080/api/auth/logout",
+      "expected_status": 200,
+      "actual_status": 200,
+      "passed": true,
+      "message": "OK",
+      "response_excerpt": {
+        "code": 200,
+        "message": "Logged out successfully",
+        "timestamp": "2026-05-12T16:42:33.356614466"
+      }
+    }
+  ]
+}

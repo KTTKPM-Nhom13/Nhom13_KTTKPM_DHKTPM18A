@@ -1,0 +1,159 @@
+server:
+  port: 8088
+
+spring:
+  application:
+    name: payment-service
+  config:
+    import: "optional:configserver:http://config-server:8888"
+
+  datasource:
+    url: ${PAYMENT_DB_JDBC_URL:jdbc:postgresql://localhost:5432/payment_db}
+    username: ${PAYMENT_DB_USER:postgres}
+    password: ${PAYMENT_DB_PASSWORD:password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      idle-timeout: 30000
+      connection-timeout: 20000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:redis123}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 4
+          min-idle: 1
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: payment-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.value.default.type: java.util.Map
+
+eureka:
+  client:
+    enabled: true
+    serviceUrl:
+      defaultZone: http://eureka-server:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,circuitbreakers,circuitbreakerevents
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentGateway:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 10s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+  retry:
+    instances:
+      paymentGateway:
+        max-attempts: 3
+        wait-duration: 1s
+        retryExceptions:
+          - iuh.fit.payment_service.exception.PaymentGatewayException
+          - org.springframework.web.client.ResourceAccessException
+          - java.net.SocketTimeoutException
+          - java.io.IOException
+        ignoreExceptions:
+          - iuh.fit.payment_service.exception.IdempotencyConflictException
+
+app:
+  payment:
+    gateway:
+      base-url: http://localhost:8088/internal/gateway
+      connect-timeout: 5000
+      read-timeout: 10000
+    idempotency:
+      ttl-hours: 24
+    retry:
+      max-attempts: 3
+      backoff-multiplier: 2.0
+      initial-interval-ms: 1000
+    polling:
+      interval-ms: 120000
+      initial-delay-ms: 60000
+  outbox:
+    publish-interval-ms: 1000
+    publish-initial-delay-ms: 5000
+    cleanup-cron: "0 0 3 * * ?"
+
+logging:
+  level:
+    iuh.fit.payment_service: DEBUG
+    iuh.fit.payment_service.service.MoMoPaymentService: DEBUG
+    com.mservice: DEBUG
+    org.springframework.kafka: INFO
+    org.hibernate.SQL: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+momo:
+  environment: ${MOMO_ENVIRONMENT:dev}
+  endpoint: ${MOMO_ENDPOINT:https://test-payment.momo.vn/v2/gateway/api}
+  partner-code: ${MOMO_PARTNER_CODE:MOMOLRJZ20181206}
+  access-key: ${MOMO_ACCESS_KEY:MTCKt9W3eU1m39TW}
+  secret-key: ${MOMO_SECRET_KEY:SetA5RDnLHvt51AULf51DyauxUo3kDU6}
+  notify-url: ${MOMO_NOTIFY_URL:https://example.com/api/payments/momo/ipn}
+  return-url: ${MOMO_RETURN_URL:https://example.com/payment-result}
+  lang: ${MOMO_LANG:vi}
+  partner-name: CAB Booking
+  store-id: CAB_BOOKING
+
+zalopay:
+  endpoint: ${ZALOPAY_ENDPOINT:https://sb-openapi.zalopay.vn/v2}
+  create-url: ${ZALOPAY_CREATE_URL:/create}
+  app-id: ${ZALOPAY_APP_ID:2553}
+  key1: ${ZALOPAY_KEY1:PcY4iZIKFCIdgZvA6ueMcMHHUbRLYjPL}
+  key2: ${ZALOPAY_KEY2:kLtgPl8HHhfvMuDHPwKfgfsY4Ydm9eIz}
+  callback-url: ${ZALOPAY_CALLBACK_URL:https://example.com/api/payments/zalopay/callback}
+  redirect-url: ${ZALOPAY_REDIRECT_URL:https://example.com/payment-result}
+  bank-code: ${ZALOPAY_BANK_CODE:}
+  expire-duration-seconds: ${ZALOPAY_EXPIRE_DURATION_SECONDS:900}

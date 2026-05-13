@@ -12,6 +12,9 @@ import iuh.fit.userservice.repository.UserProfileRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,12 +39,24 @@ public class UserProfileService {
         ensureProfileWritable(profile);
 
         profile.setFullName(request.getFullName());
-        profile.setEmail(request.getEmail());
-        profile.setPhoneNumber(request.getPhoneNumber());
-        profile.setAvatarUrl(request.getAvatarUrl());
-        profile.setGender(request.getGender());
-        profile.setDateOfBirth(request.getDateOfBirth());
-        profile.setDefaultPickupNote(request.getDefaultPickupNote());
+        if (hasText(request.getEmail())) {
+            profile.setEmail(request.getEmail().trim());
+        }
+        if (hasText(request.getPhoneNumber())) {
+            profile.setPhoneNumber(request.getPhoneNumber().trim());
+        }
+        if (hasText(request.getAvatarUrl())) {
+            profile.setAvatarUrl(request.getAvatarUrl().trim());
+        }
+        if (hasText(request.getGender())) {
+            profile.setGender(request.getGender().trim().toUpperCase());
+        }
+        if (request.getDateOfBirth() != null) {
+            profile.setDateOfBirth(request.getDateOfBirth());
+        }
+        if (request.getDefaultPickupNote() != null) {
+            profile.setDefaultPickupNote(request.getDefaultPickupNote().trim());
+        }
 
         return toResponse(userProfileRepository.save(profile));
     }
@@ -95,10 +110,14 @@ public class UserProfileService {
                 .orElseGet(() -> {
                     UserProfile created = new UserProfile();
                     created.setExternalUserId(externalUserId);
-                    created.setFullName(externalUserId);
+                    created.setFullName(resolveCurrentUserClaim("fullName", externalUserId));
+                    created.setEmail(resolveCurrentUserClaim("email", null));
+                    created.setPhoneNumber(resolveCurrentUserClaim("phoneNumber", null));
+                    created.setAvatarUrl(resolveCurrentUserClaim("avatarUrl", null));
                     created.setAccountStatus(AccountLifecycleStatus.ACTIVE);
                     return userProfileRepository.save(created);
                 });
+        syncMissingAuthSnapshot(profile);
         return transitionDeletedIfExpired(profile);
     }
 
@@ -107,6 +126,13 @@ public class UserProfileService {
         UserProfile profile = userProfileRepository.findByExternalUserId(externalUserId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_PROFILE_NOT_FOUND));
         return transitionDeletedIfExpired(profile);
+    }
+
+    @Transactional
+    public UserProfile getWritableProfileEntity(String externalUserId) {
+        UserProfile profile = getOrCreateProfileEntity(externalUserId);
+        ensureProfileWritable(profile);
+        return profile;
     }
 
     private void ensureProfileWritable(UserProfile profile) {
@@ -128,6 +154,63 @@ public class UserProfileService {
             authAccountSyncClient.syncAccountLifecycle(profile);
         }
         return profile;
+    }
+
+    private void syncMissingAuthSnapshot(UserProfile profile) {
+        boolean dirty = false;
+
+        if (!hasText(profile.getFullName())) {
+            profile.setFullName(resolveCurrentUserClaim("fullName", profile.getExternalUserId()));
+            dirty = true;
+        }
+        if (!hasText(profile.getEmail())) {
+            String email = resolveCurrentUserClaim("email", null);
+            if (hasText(email)) {
+                profile.setEmail(email);
+                dirty = true;
+            }
+        }
+        if (!hasText(profile.getPhoneNumber())) {
+            String phoneNumber = normalizeNullableClaim(resolveCurrentUserClaim("phoneNumber", null));
+            if (hasText(phoneNumber)) {
+                profile.setPhoneNumber(phoneNumber);
+                dirty = true;
+            }
+        }
+        if (!hasText(profile.getAvatarUrl())) {
+            String avatarUrl = normalizeNullableClaim(resolveCurrentUserClaim("avatarUrl", null));
+            if (hasText(avatarUrl)) {
+                profile.setAvatarUrl(avatarUrl);
+                dirty = true;
+            }
+        }
+
+        if (dirty) {
+            userProfileRepository.save(profile);
+        }
+    }
+
+    private String resolveCurrentUserClaim(String claimName, String fallbackValue) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
+            return normalizeNullableClaim(jwt.getClaimAsString(claimName), fallbackValue);
+        }
+        return fallbackValue;
+    }
+
+    private String normalizeNullableClaim(String value) {
+        return normalizeNullableClaim(value, null);
+    }
+
+    private String normalizeNullableClaim(String value, String fallbackValue) {
+        if (!hasText(value)) {
+            return fallbackValue;
+        }
+        return value.trim();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 
     private UserProfileResponse toResponse(UserProfile profile) {

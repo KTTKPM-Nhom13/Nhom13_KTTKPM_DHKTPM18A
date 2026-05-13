@@ -1,36 +1,37 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import DemoPage from './pages/DemoPage';
-import './api/axiosConfig'; // đăng ký interceptor toàn cục
+import { AuthProvider } from './auth/AuthContext';
+import './api/axiosConfig';
 
 function App() {
   return (
-    <BrowserRouter>
-      {/* Toast notification container */}
-      <Toaster
-        position="top-center"
-        toastOptions={{
-          style: {
-            background: '#1e293b',
-            color: '#f8fafc',
-            borderRadius: '8px',
-            fontSize: '14px',
-          },
-          success: {
-            iconTheme: { primary: '#22c55e', secondary: '#fff' },
-          },
-          error: {
-            iconTheme: { primary: '#ef4444', secondary: '#fff' },
-          },
-        }}
-      />
+    <AuthProvider>
+      <BrowserRouter>
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            style: {
+              background: '#132238',
+              color: '#f8fafc',
+              borderRadius: '12px',
+              fontSize: '14px',
+            },
+            success: {
+              iconTheme: { primary: '#22c55e', secondary: '#fff' },
+            },
+            error: {
+              iconTheme: { primary: '#ef4444', secondary: '#fff' },
+            },
+          }}
+        />
 
-      <Routes>
-        <Route path="/" element={<DemoPage />} />
-        {/* Các route khác của app sẽ thêm ở đây */}
-      </Routes>
-    </BrowserRouter>
+        <Routes>
+          <Route path="/" element={<DemoPage />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

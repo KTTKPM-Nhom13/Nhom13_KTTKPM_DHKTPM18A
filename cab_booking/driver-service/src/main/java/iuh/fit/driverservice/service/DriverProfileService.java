@@ -2,6 +2,9 @@ package iuh.fit.driverservice.service;
 
 import iuh.fit.common.exception.AppException;
 import iuh.fit.common.exception.ErrorCode;
+import iuh.fit.driverservice.dto.event.DriverLocationPayload;
+import iuh.fit.driverservice.dto.event.DriverStatusEvent;
+import iuh.fit.driverservice.dto.event.RideAssignedEvent;
 import iuh.fit.driverservice.dto.request.CompleteDriverRideRequest;
 import iuh.fit.driverservice.dto.request.HandleDriverAssignmentRequest;
 import iuh.fit.driverservice.dto.request.UpdateDriverAvailabilityRequest;
@@ -11,6 +14,7 @@ import iuh.fit.driverservice.dto.response.DriverAvailabilityResponse;
 import iuh.fit.driverservice.dto.response.DriverCurrentRideResponse;
 import iuh.fit.driverservice.dto.response.DriverEarningsSummaryResponse;
 import iuh.fit.driverservice.dto.response.DriverProfileResponse;
+import iuh.fit.driverservice.dto.response.DriverStatusCheckResponse;
 import iuh.fit.driverservice.entity.DriverAssignmentAction;
 import iuh.fit.driverservice.entity.DriverAvailabilityStatus;
 import iuh.fit.driverservice.entity.DriverProfile;
@@ -20,18 +24,28 @@ import iuh.fit.driverservice.repository.DriverProfileRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class DriverProfileService {
+    static final String RIDE_ASSIGNED_TOPIC = "ride.assigned";
+    static final String DRIVER_STATUS_CHANGED_TOPIC = "driver.status.changed";
+
     DriverProfileRepository driverProfileRepository;
+    KafkaTemplate<String, Object> kafkaTemplate;
 
     @Transactional
     public DriverProfileResponse getProfile(String externalUserId) {
@@ -42,15 +56,23 @@ public class DriverProfileService {
     public DriverProfileResponse upsertProfile(String externalUserId, UpsertDriverProfileRequest request) {
         DriverProfile profile = getOrCreateProfileEntity(externalUserId);
         profile.setFullName(request.getFullName());
-        profile.setEmail(request.getEmail());
-        profile.setPhoneNumber(request.getPhoneNumber());
-        profile.setAvatarUrl(request.getAvatarUrl());
+        if (hasText(request.getEmail())) {
+            profile.setEmail(request.getEmail().trim());
+        }
+        if (hasText(request.getPhoneNumber())) {
+            profile.setPhoneNumber(request.getPhoneNumber().trim());
+        }
+        if (hasText(request.getAvatarUrl())) {
+            profile.setAvatarUrl(request.getAvatarUrl().trim());
+        }
         profile.setLicenseNumber(request.getLicenseNumber());
         profile.setVehicleType(request.getVehicleType());
         profile.setVehiclePlate(request.getVehiclePlate());
         profile.setVehicleModel(request.getVehicleModel());
         profile.setVehicleColor(request.getVehicleColor());
-        profile.setServiceArea(request.getServiceArea());
+        if (request.getServiceArea() != null) {
+            profile.setServiceArea(request.getServiceArea().trim());
+        }
 
         if (profile.getVerificationStatus() != DriverVerificationStatus.APPROVED) {
             profile.setVerificationStatus(DriverVerificationStatus.APPROVED);
@@ -80,17 +102,22 @@ public class DriverProfileService {
             profile.setLastOnlineAt(LocalDateTime.now());
         }
 
-        return toAvailabilityResponse(driverProfileRepository.save(profile));
+        DriverProfile savedProfile = driverProfileRepository.save(profile);
+        publishDriverStatusChanged(savedProfile, savedProfile.getCurrentRideId(), currentRideStatusName(savedProfile));
+        return toAvailabilityResponse(savedProfile);
     }
 
     @Transactional
     public DriverCurrentRideResponse handleAssignment(String externalUserId, HandleDriverAssignmentRequest request) {
         DriverProfile profile = getOrCreateProfileEntity(externalUserId);
         DriverAssignmentAction action = DriverAssignmentAction.valueOf(request.getAction().trim().toUpperCase());
+        String requestedRideId = request.getRideId();
 
         if (action == DriverAssignmentAction.REJECT) {
             clearCurrentRide(profile, DriverAvailabilityStatus.ONLINE);
-            return toCurrentRideResponse(driverProfileRepository.save(profile));
+            DriverProfile savedProfile = driverProfileRepository.save(profile);
+            publishDriverStatusChanged(savedProfile, requestedRideId, "REJECTED");
+            return toCurrentRideResponse(savedProfile);
         }
 
         if (profile.getVerificationStatus() != DriverVerificationStatus.APPROVED) {
@@ -109,7 +136,10 @@ public class DriverProfileService {
         profile.setAvailabilityStatus(DriverAvailabilityStatus.ON_TRIP);
         profile.setLastOnlineAt(LocalDateTime.now());
 
-        return toCurrentRideResponse(driverProfileRepository.save(profile));
+        DriverProfile savedProfile = driverProfileRepository.save(profile);
+        publishRideAssigned(savedProfile.getCurrentRideId(), savedProfile.getExternalUserId());
+        publishDriverStatusChanged(savedProfile, savedProfile.getCurrentRideId(), currentRideStatusName(savedProfile));
+        return toCurrentRideResponse(savedProfile);
     }
 
     @Transactional
@@ -117,7 +147,9 @@ public class DriverProfileService {
         DriverProfile profile = getRequiredProfile(externalUserId);
         ensureCurrentRideExists(profile);
 
-        profile.setCurrentRideStatus(DriverRideStatus.valueOf(request.getRideStatus().trim().toUpperCase()));
+        DriverRideStatus nextStatus = DriverRideStatus.valueOf(request.getRideStatus().trim().toUpperCase());
+        validateRideStatusTransition(profile.getCurrentRideStatus(), nextStatus);
+        profile.setCurrentRideStatus(nextStatus);
         if (request.getCurrentLatitude() != null) {
             profile.setCurrentLatitude(request.getCurrentLatitude());
         }
@@ -127,13 +159,16 @@ public class DriverProfileService {
         profile.setAvailabilityStatus(DriverAvailabilityStatus.ON_TRIP);
         profile.setLastOnlineAt(LocalDateTime.now());
 
-        return toCurrentRideResponse(driverProfileRepository.save(profile));
+        DriverProfile savedProfile = driverProfileRepository.save(profile);
+        publishDriverStatusChanged(savedProfile, savedProfile.getCurrentRideId(), currentRideStatusName(savedProfile));
+        return toCurrentRideResponse(savedProfile);
     }
 
     @Transactional
     public DriverCurrentRideResponse completeCurrentRide(String externalUserId, CompleteDriverRideRequest request) {
         DriverProfile profile = getRequiredProfile(externalUserId);
         ensureCurrentRideExists(profile);
+        String completedRideId = profile.getCurrentRideId();
 
         profile.setTotalCompletedRides(profile.getTotalCompletedRides() + 1);
         profile.setTotalEarnings(profile.getTotalEarnings().add(request.getFareAmount()));
@@ -141,7 +176,9 @@ public class DriverProfileService {
         profile.setLastOnlineAt(request.getCompletedAt() == null ? LocalDateTime.now() : request.getCompletedAt());
 
         clearCurrentRide(profile, DriverAvailabilityStatus.ONLINE);
-        return toCurrentRideResponse(driverProfileRepository.save(profile));
+        DriverProfile savedProfile = driverProfileRepository.save(profile);
+        publishDriverStatusChanged(savedProfile, completedRideId, DriverRideStatus.COMPLETED.name());
+        return toCurrentRideResponse(savedProfile);
     }
 
     @Transactional(readOnly = true)
@@ -165,16 +202,28 @@ public class DriverProfileService {
     }
 
     @Transactional
+    public DriverStatusCheckResponse checkAvailability(String externalUserId) {
+        DriverProfile profile = getRequiredProfile(externalUserId);
+        publishDriverStatusChanged(profile, profile.getCurrentRideId(), currentRideStatusName(profile));
+        return toStatusCheckResponse(profile);
+    }
+
+    @Transactional
     public DriverProfile getOrCreateProfileEntity(String externalUserId) {
-        return driverProfileRepository.findByExternalUserId(externalUserId)
+        DriverProfile profile = driverProfileRepository.findByExternalUserId(externalUserId)
                 .orElseGet(() -> {
-                    DriverProfile profile = new DriverProfile();
-                    profile.setExternalUserId(externalUserId);
-                    profile.setFullName("Driver " + externalUserId);
-                    profile.setAverageRating(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
-                    profile.setTotalEarnings(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
-                    return driverProfileRepository.save(profile);
+                    DriverProfile created = new DriverProfile();
+                    created.setExternalUserId(externalUserId);
+                    created.setFullName(resolveCurrentUserClaim("fullName", "Driver " + externalUserId));
+                    created.setEmail(resolveCurrentUserClaim("email", null));
+                    created.setPhoneNumber(resolveCurrentUserClaim("phoneNumber", null));
+                    created.setAvatarUrl(resolveCurrentUserClaim("avatarUrl", null));
+                    created.setAverageRating(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+                    created.setTotalEarnings(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+                    return driverProfileRepository.save(created);
                 });
+        syncMissingAuthSnapshot(profile);
+        return profile;
     }
 
     private DriverProfile getRequiredProfile(String externalUserId) {
@@ -195,6 +244,23 @@ public class DriverProfileService {
         profile.setCurrentRideDestination(null);
         profile.setCurrentRideRequestedAt(null);
         profile.setAvailabilityStatus(nextAvailabilityStatus);
+    }
+
+    private void validateRideStatusTransition(DriverRideStatus currentStatus, DriverRideStatus nextStatus) {
+        if (currentStatus == null) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
+        if (currentStatus == DriverRideStatus.ACCEPTED && nextStatus == DriverRideStatus.EN_ROUTE_PICKUP) {
+            return;
+        }
+        if (currentStatus == DriverRideStatus.EN_ROUTE_PICKUP
+                && (nextStatus == DriverRideStatus.ARRIVED_PICKUP || nextStatus == DriverRideStatus.IN_PROGRESS)) {
+            return;
+        }
+        if (currentStatus == DriverRideStatus.ARRIVED_PICKUP && nextStatus == DriverRideStatus.IN_PROGRESS) {
+            return;
+        }
+        throw new AppException(ErrorCode.VALIDATION_ERROR);
     }
 
     private DriverAvailabilityStatus parseAvailabilityStatus(String rawStatus) {
@@ -240,6 +306,24 @@ public class DriverProfileService {
                 .build();
     }
 
+    private DriverStatusCheckResponse toStatusCheckResponse(DriverProfile profile) {
+        DriverAvailabilityStatus availabilityStatus = profile.getAvailabilityStatus();
+        return DriverStatusCheckResponse.builder()
+                .externalUserId(profile.getExternalUserId())
+                .availabilityStatus(availabilityStatus.name())
+                .online(availabilityStatus == DriverAvailabilityStatus.ONLINE
+                        || availabilityStatus == DriverAvailabilityStatus.ON_TRIP)
+                .offline(availabilityStatus == DriverAvailabilityStatus.OFFLINE)
+                .activeForBooking(isActiveForBooking(profile))
+                .verificationStatus(profile.getVerificationStatus().name())
+                .currentRideId(profile.getCurrentRideId())
+                .currentRideStatus(currentRideStatusName(profile))
+                .currentLatitude(profile.getCurrentLatitude())
+                .currentLongitude(profile.getCurrentLongitude())
+                .lastOnlineAt(profile.getLastOnlineAt())
+                .build();
+    }
+
     private DriverCurrentRideResponse toCurrentRideResponse(DriverProfile profile) {
         return DriverCurrentRideResponse.builder()
                 .rideId(profile.getCurrentRideId())
@@ -248,6 +332,109 @@ public class DriverProfileService {
                 .destinationAddress(profile.getCurrentRideDestination())
                 .requestedAt(profile.getCurrentRideRequestedAt())
                 .driverAvailabilityStatus(profile.getAvailabilityStatus().name())
+                .currentLocation(toLocationPayload(profile))
                 .build();
+    }
+
+    private void publishRideAssigned(String rideId, String driverId) {
+        kafkaTemplate.send(
+                RIDE_ASSIGNED_TOPIC,
+                RideAssignedEvent.builder()
+                        .eventId(UUID.randomUUID().toString())
+                        .type(RideAssignedEvent.EVENT_TYPE)
+                        .rideId(rideId)
+                        .driverId(driverId)
+                        .timestamp(Instant.now().toString())
+                        .build());
+    }
+
+    private void publishDriverStatusChanged(DriverProfile profile, String rideId, String rideStatus) {
+        kafkaTemplate.send(
+                DRIVER_STATUS_CHANGED_TOPIC,
+                DriverStatusEvent.builder()
+                        .eventId(UUID.randomUUID().toString())
+                        .type(DriverStatusEvent.EVENT_TYPE)
+                        .driverId(profile.getExternalUserId())
+                        .availabilityStatus(profile.getAvailabilityStatus().name())
+                        .activeForBooking(isActiveForBooking(profile))
+                        .rideId(rideId)
+                        .rideStatus(rideStatus)
+                        .currentLocation(toLocationPayload(profile))
+                        .timestamp(Instant.now().toString())
+                        .build());
+    }
+
+    private boolean isActiveForBooking(DriverProfile profile) {
+        return profile.getVerificationStatus() == DriverVerificationStatus.APPROVED
+                && profile.getAvailabilityStatus() == DriverAvailabilityStatus.ONLINE
+                && currentRideStatusName(profile) == null;
+    }
+
+    private String currentRideStatusName(DriverProfile profile) {
+        return profile.getCurrentRideStatus() == null ? null : profile.getCurrentRideStatus().name();
+    }
+
+    private DriverLocationPayload toLocationPayload(DriverProfile profile) {
+        return DriverLocationPayload.builder()
+                .lat(profile.getCurrentLatitude())
+                .lng(profile.getCurrentLongitude())
+                .build();
+    }
+
+    private void syncMissingAuthSnapshot(DriverProfile profile) {
+        boolean dirty = false;
+
+        if (!hasText(profile.getFullName())) {
+            profile.setFullName(resolveCurrentUserClaim("fullName", "Driver " + profile.getExternalUserId()));
+            dirty = true;
+        }
+        if (!hasText(profile.getEmail())) {
+            String email = resolveCurrentUserClaim("email", null);
+            if (hasText(email)) {
+                profile.setEmail(email);
+                dirty = true;
+            }
+        }
+        if (!hasText(profile.getPhoneNumber())) {
+            String phoneNumber = normalizeNullableClaim(resolveCurrentUserClaim("phoneNumber", null));
+            if (hasText(phoneNumber)) {
+                profile.setPhoneNumber(phoneNumber);
+                dirty = true;
+            }
+        }
+        if (!hasText(profile.getAvatarUrl())) {
+            String avatarUrl = normalizeNullableClaim(resolveCurrentUserClaim("avatarUrl", null));
+            if (hasText(avatarUrl)) {
+                profile.setAvatarUrl(avatarUrl);
+                dirty = true;
+            }
+        }
+
+        if (dirty) {
+            driverProfileRepository.save(profile);
+        }
+    }
+
+    private String resolveCurrentUserClaim(String claimName, String fallbackValue) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
+            return normalizeNullableClaim(jwt.getClaimAsString(claimName), fallbackValue);
+        }
+        return fallbackValue;
+    }
+
+    private String normalizeNullableClaim(String value) {
+        return normalizeNullableClaim(value, null);
+    }
+
+    private String normalizeNullableClaim(String value, String fallbackValue) {
+        if (!hasText(value)) {
+            return fallbackValue;
+        }
+        return value.trim();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 }

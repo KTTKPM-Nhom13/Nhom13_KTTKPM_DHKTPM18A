@@ -1,0 +1,50 @@
+services:
+  pricing-service:
+    build:
+      context: ..
+      dockerfile: ./Pricing-Service/Dockerfile
+    container_name: pricing-service
+    ports:
+      - "8088:8088"
+    env_file:
+      - ../Pricing-Service/.env
+    environment:
+      - SPRING_PROFILES_ACTIVE=default
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/pricing_db
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_DATA_REDIS_PASSWORD=redis123
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka
+    volumes:
+      - maven-cache:/root/.m2
+    networks:
+      - cab-network
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+      kafka:
+        condition: service_started
+      redis:
+        condition: service_started
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8084/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  maven-cache:
+    driver: local
+
+networks:
+  cab-network:
+    driver: bridge
+    external: false

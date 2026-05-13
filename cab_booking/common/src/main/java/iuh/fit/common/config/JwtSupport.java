@@ -45,7 +45,8 @@ public final class JwtSupport {
 
     private static RSAPublicKey derivePublicKey(String privateKeyPem) throws Exception {
         RSAPrivateKey privateKey = JWK.parseFromPEMEncodedObjects(privateKeyPem).toRSAKey().toRSAPrivateKey();
-        if (privateKey instanceof RSAPrivateCrtKey crtKey) {
+        if (privateKey instanceof RSAPrivateCrtKey) {
+            RSAPrivateCrtKey crtKey = (RSAPrivateCrtKey) privateKey;
             RSAPublicKeySpec publicKeySpec = new RSAPublicKeySpec(
                     crtKey.getModulus(),
                     crtKey.getPublicExponent()

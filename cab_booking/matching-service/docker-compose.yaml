@@ -1,0 +1,39 @@
+services:
+  matching-service:
+    build:
+      context: ..
+      dockerfile: ./matching-service/Dockerfile
+    container_name: cab-matching-service
+    restart: unless-stopped
+    ports:
+      - "${MATCHING_SERVICE_PORT}:8086"
+    environment:
+      - EUREKA_SERVER_URL=${EUREKA_DEFAULT_ZONE}
+      - KAFKA_URL=${KAFKA_BOOTSTRAP_SERVERS}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - SERVICES_AI_SCORING_URL=${AI_SCORING_SERVICE_URL}
+      - TZ=Asia/Ho_Chi_Minh
+      - SPRING_PROFILES_ACTIVE=default
+    volumes:
+      - maven-cache:/root/.m2
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ai-scoring-service:
+        condition: service_healthy
+    networks:
+      - cab-network
+
+volumes:
+  maven-cache:
+    driver: local
+
+networks:
+  cab-network:
+    driver: bridge

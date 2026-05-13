@@ -1,20 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 
-/**
- * RateLimitButton – Nút bấm thông minh có xử lý Rate Limit (429).
- *
- * Props:
- *  - onClick      : async function gọi API (nhận axios instance)
- *  - label        : text hiển thị khi bình thường
- *  - loadingLabel : text khi đang loading (mặc định: "Đang xử lý...")
- *  - variant      : 'primary' | 'secondary' (mặc định: 'primary')
- *  - className    : class CSS tùy chỉnh
- *  - axiosInstance: instance axios đã cấu hình interceptor (mặc định: axios mặc định)
- */
 const RateLimitButton = ({
   onClick,
-  label = 'Thực hiện',
-  loadingLabel = 'Đang xử lý...',
+  label = 'Thuc hien',
+  loadingLabel = 'Dang xu ly...',
   variant = 'primary',
   className = '',
   axiosInstance = null,
@@ -23,9 +12,10 @@ const RateLimitButton = ({
   const [isCountingDown, setIsCountingDown] = useState(false);
   const [countdown, setCountdown] = useState(0);
 
-  // ── Countdown timer ──────────────────────────────────────────────────────
   useEffect(() => {
-    if (!isCountingDown || countdown <= 0) return;
+    if (!isCountingDown || countdown <= 0) {
+      return undefined;
+    }
 
     const timer = setInterval(() => {
       setCountdown((prev) => {
@@ -41,10 +31,8 @@ const RateLimitButton = ({
     return () => clearInterval(timer);
   }, [isCountingDown, countdown]);
 
-  // ── Lắng nghe event từ Axios Interceptor ────────────────────────────────
   useEffect(() => {
     const handleRateLimit = (event) => {
-      // event.detail chứa { retrySeconds, url, method }
       setCountdown(event.detail.retrySeconds);
       setIsCountingDown(true);
       setIsLoading(false);
@@ -54,16 +42,15 @@ const RateLimitButton = ({
     return () => window.removeEventListener('rate-limit-triggered', handleRateLimit);
   }, []);
 
-  // ── Xử lý khi user click ────────────────────────────────────────────────
   const handleClick = async () => {
-    if (isLoading || isCountingDown) return;
+    if (isLoading || isCountingDown) {
+      return;
+    }
 
     setIsLoading(true);
     try {
       await onClick(axiosInstance);
     } catch (error) {
-      // The Axios interceptor already handles 429; this prevents uncaught
-      // runtime errors for network failures or any caller-side rejection.
       if (error?.code !== 'RATE_LIMIT_EXCEEDED') {
         console.error('Button request failed:', error);
       }
@@ -74,10 +61,9 @@ const RateLimitButton = ({
 
   const isDisabled = isLoading || isCountingDown;
 
-  // ── Kiểu variant CSS inline ─────────────────────────────────────────────
   const baseStyle = {
     padding: '10px 20px',
-    borderRadius: '8px',
+    borderRadius: '10px',
     border: 'none',
     fontSize: '15px',
     fontWeight: '600',
@@ -105,7 +91,6 @@ const RateLimitButton = ({
 
   const style = { ...baseStyle, ...variants[variant] };
 
-  // ── Render nội dung nút ──────────────────────────────────────────────────
   const renderContent = () => {
     if (isCountingDown) {
       return (
@@ -114,16 +99,21 @@ const RateLimitButton = ({
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
           </svg>
-          Thử lại sau {countdown}s...
+          Thu lai sau {countdown}s...
         </>
       );
     }
+
     if (isLoading) {
       return (
         <>
           <svg
-            width="16" height="16" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor" strokeWidth="2"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
             style={{ animation: 'spin 1s linear infinite' }}
           >
             <path d="M21 12a9 9 0 11-6.219-8.56" />
@@ -132,6 +122,7 @@ const RateLimitButton = ({
         </>
       );
     }
+
     return label;
   };
 
@@ -152,7 +143,7 @@ const RateLimitButton = ({
         style={style}
         onClick={handleClick}
         disabled={isDisabled}
-        aria-label={isCountingDown ? `Thử lại sau ${countdown} giây` : label}
+        aria-label={isCountingDown ? `Thu lai sau ${countdown} giay` : label}
       >
         {renderContent()}
       </button>

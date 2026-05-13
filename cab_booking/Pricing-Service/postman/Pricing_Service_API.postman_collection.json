@@ -1,0 +1,854 @@
+{
+  "info": {
+    "name": "Pricing Service API",
+    "description": "Postman collection for testing the Pricing Service (Spring Boot microservice on port 8087). Covers all 6 REST endpoints: fare estimate, confirm estimate, surge management, and demand-supply metrics.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8087/api/pricing",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Fare Estimate",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response has estimateId', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('estimateId');",
+              "    pm.expect(jsonData.estimateId).to.not.be.empty;",
+              "    // Store estimateId for confirm request",
+              "    pm.collectionVariables.set('estimateId', jsonData.estimateId);",
+              "});",
+              "",
+              "pm.test('Response has required fields', function () {",
+              "    var jsonData = pm.response.json();",
+              "    var requiredFields = [",
+              "        'pickupZone', 'dropoffZone', 'vehicleType',",
+              "        'distanceKm', 'durationMinutes',",
+              "        'baseFare', 'distanceFare', 'timeFare',",
+              "        'surgeMultiplier', 'totalFare', 'currency',",
+              "        'expiresAt', 'message'",
+              "    ];",
+              "    requiredFields.forEach(function(field) {",
+              "        pm.expect(jsonData).to.have.property(field);",
+              "    });",
+              "});",
+              "",
+              "pm.test('Total fare is calculated correctly', function () {",
+              "    var jsonData = pm.response.json();",
+              "    var total = parseFloat(jsonData.totalFare);",
+              "    var base = parseFloat(jsonData.baseFare);",
+              "    var dist = parseFloat(jsonData.distanceFare);",
+              "    var time = parseFloat(jsonData.timeFare);",
+              "    var surge = parseFloat(jsonData.surgeMultiplier);",
+              "    var expected = (base + dist + time) * surge;",
+              "    pm.expect(total).to.be.closeTo(expected, 0.01);",
+              "});",
+              "",
+              "pm.test('Currency is USD', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.currency).to.eq('USD');",
+              "});",
+              "",
+              "pm.test('Estimate has not expired yet', function () {",
+              "    var jsonData = pm.response.json();",
+              "    var expiresAt = new Date(jsonData.expiresAt);",
+              "    var now = new Date();",
+              "    pm.expect(expiresAt.getTime()).to.be.above(now.getTime());",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/estimate?pickupLat=10.7629&pickupLng=106.6825&dropoffLat=10.8231&dropoffLng=106.6297&vehicleType=ECONOMY&estimatedDurationMinutes=30",
+          "host": ["{{baseUrl}}"],
+          "path": ["estimate"],
+          "query": [
+            {
+              "key": "pickupLat",
+              "value": "10.7629",
+              "description": "Pickup latitude (Ho Chi Minh City area)"
+            },
+            {
+              "key": "pickupLng",
+              "value": "106.6825",
+              "description": "Pickup longitude"
+            },
+            {
+              "key": "dropoffLat",
+              "value": "10.8231",
+              "description": "Dropoff latitude"
+            },
+            {
+              "key": "dropoffLng",
+              "value": "106.6297",
+              "description": "Dropoff longitude"
+            },
+            {
+              "key": "vehicleType",
+              "value": "ECONOMY",
+              "description": "Vehicle type: ECONOMY | COMFORT | PREMIUM",
+              "enabled": true
+            },
+            {
+              "key": "estimatedDurationMinutes",
+              "value": "30",
+              "description": "Optional estimated duration in minutes",
+              "enabled": true
+            }
+          ]
+        },
+        "description": "Calculate a fare estimate between two locations for a given vehicle type. Returns a detailed breakdown of the fare including base fare, distance fare, time fare, surge multiplier, and total. The estimate expires 15 minutes after creation."
+      }
+    },
+    {
+      "name": "1b. Fare Estimate - COMFORT",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('COMFORT fare is higher than ECONOMY (1.5x multiplier)', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.vehicleType).to.eq('COMFORT');",
+              "    pm.expect(jsonData.totalFare).to.not.be.empty;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/estimate?pickupLat=10.7629&pickupLng=106.6825&dropoffLat=10.8231&dropoffLng=106.6297&vehicleType=COMFORT&estimatedDurationMinutes=30",
+          "host": ["{{baseUrl}}"],
+          "path": ["estimate"],
+          "query": [
+            {
+              "key": "pickupLat",
+              "value": "10.7629"
+            },
+            {
+              "key": "pickupLng",
+              "value": "106.6825"
+            },
+            {
+              "key": "dropoffLat",
+              "value": "10.8231"
+            },
+            {
+              "key": "dropoffLng",
+              "value": "106.6297"
+            },
+            {
+              "key": "vehicleType",
+              "value": "COMFORT"
+            },
+            {
+              "key": "estimatedDurationMinutes",
+              "value": "30"
+            }
+          ]
+        },
+        "description": "Fare estimate for COMFORT vehicle type (1.5x multiplier)"
+      }
+    },
+    {
+      "name": "1c. Fare Estimate - PREMIUM",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('PREMIUM fare is highest (2.0x multiplier)', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.vehicleType).to.eq('PREMIUM');",
+              "    pm.expect(jsonData.totalFare).to.not.be.empty;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/estimate?pickupLat=10.7629&pickupLng=106.6825&dropoffLat=10.8231&dropoffLng=106.6297&vehicleType=PREMIUM&estimatedDurationMinutes=30",
+          "host": ["{{baseUrl}}"],
+          "path": ["estimate"],
+          "query": [
+            {
+              "key": "pickupLat",
+              "value": "10.7629"
+            },
+            {
+              "key": "pickupLng",
+              "value": "106.6825"
+            },
+            {
+              "key": "dropoffLat",
+              "value": "10.8231"
+            },
+            {
+              "key": "dropoffLng",
+              "value": "106.6297"
+            },
+            {
+              "key": "vehicleType",
+              "value": "PREMIUM"
+            },
+            {
+              "key": "estimatedDurationMinutes",
+              "value": "30"
+            }
+          ]
+        },
+        "description": "Fare estimate for PREMIUM vehicle type (2.0x multiplier)"
+      }
+    },
+    {
+      "name": "1d. Fare Estimate - Validation Error (missing params)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 400 for missing required params', function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "",
+              "pm.test('Response has error message', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.message || jsonData.error).to.be.a('string');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/estimate?pickupLat=10.7629",
+          "host": ["{{baseUrl}}"],
+          "path": ["estimate"],
+          "query": [
+            {
+              "key": "pickupLat",
+              "value": "10.7629"
+            }
+          ]
+        },
+        "description": "Should return 400 Bad Request when required parameters are missing"
+      }
+    },
+    {
+      "name": "2. Confirm Fare Estimate",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response is a FareEstimate object', function () {",
+              "    var jsonData = pm.response.json();",
+              "    var requiredFields = [",
+              "        'id', 'pickupZone', 'dropoffZone', 'vehicleType',",
+              "        'distanceKm', 'durationMinutes',",
+              "        'baseFare', 'distanceFare', 'timeFare',",
+              "        'surgeMultiplier', 'totalFare', 'currency',",
+              "        'status', 'createdAt', 'expiresAt'",
+              "    ];",
+              "    requiredFields.forEach(function(field) {",
+              "        pm.expect(jsonData).to.have.property(field);",
+              "    });",
+              "});",
+              "",
+              "pm.test('Status is CONFIRMED', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.status).to.eq('CONFIRMED');",
+              "});",
+              "",
+              "pm.test('EstimateId in path matches response id', function () {",
+              "    var jsonData = pm.response.json();",
+              "    var pathParts = pm.request.url.split('/');",
+              "    var pathEstimateId = pathParts[pathParts.length - 1];",
+              "    pm.expect(jsonData.id).to.eq(pathEstimateId);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/confirm/{{estimateId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["confirm", "{{estimateId}}"]
+        },
+        "description": "Confirm a previously generated fare estimate by its ID to lock in the price. The estimate must not be expired. Note: Run '1. Fare Estimate' first to populate the {{estimateId}} variable."
+      }
+    },
+    {
+      "name": "2b. Confirm Fare Estimate - Not Found (invalid ID)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 400 or 404 for invalid estimate ID', function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([400, 404]);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/confirm/00000000-0000-0000-0000-000000000000",
+          "host": ["{{baseUrl}}"],
+          "path": ["confirm", "00000000-0000-0000-0000-000000000000"]
+        },
+        "description": "Should return 400 or 404 when confirming a non-existent estimate ID"
+      }
+    },
+    {
+      "name": "3. Get Surge Multiplier for Zone",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response has zone_id and surge_multiplier', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('zone_id');",
+              "    pm.expect(jsonData).to.have.property('surge_multiplier');",
+              "});",
+              "",
+              "pm.test('Surge multiplier is a number >= 1.0', function () {",
+              "    var jsonData = pm.response.json();",
+              "    var surge = parseFloat(jsonData.surge_multiplier);",
+              "    pm.expect(surge).to.be.at.least(1.0);",
+              "    pm.expect(surge).to.be.at.most(3.0);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/surge/Z0056_0102",
+          "host": ["{{baseUrl}}"],
+          "path": ["surge", "Z0056_0102"]
+        },
+        "description": "Retrieve the current surge multiplier for a specific zone. Returns 1.0 (no surge) if the zone exists but has no active surge pricing."
+      }
+    },
+    {
+      "name": "3b. Get Surge Multiplier for Zone - Different Zone",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response has surge multiplier', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('surge_multiplier');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/surge/Z0089_0301",
+          "host": ["{{baseUrl}}"],
+          "path": ["surge", "Z0089_0301"]
+        },
+        "description": "Retrieve surge multiplier for a different zone"
+      }
+    },
+    {
+      "name": "4. Update Surge Multiplier for Zone",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Surge multiplier updated successfully', function () {",
+              "    var jsonData = pm.response.json();",
+              "    var requestedSurge = parseFloat(pm.variables.get('surgeValue') || '1.5');",
+              "    var returnedSurge = parseFloat(jsonData.surge_multiplier);",
+              "    pm.expect(returnedSurge).to.eq(requestedSurge);",
+              "});",
+              "",
+              "pm.test('Message confirms update', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.message).to.include('updated');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/surge/Z0056_0102?multiplier=1.5",
+          "host": ["{{baseUrl}}"],
+          "path": ["surge", "Z0056_0102"],
+          "query": [
+            {
+              "key": "multiplier",
+              "value": "1.5",
+              "description": "New surge multiplier value (min: 1.0, max: 3.0)"
+            }
+          ]
+        },
+        "description": "Manually update the surge multiplier for a specific zone. This publishes a Kafka event for downstream consumers to react to the change."
+      }
+    },
+    {
+      "name": "4b. Update Surge - Set to 2.5x",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Surge multiplier is 2.5', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(parseFloat(jsonData.surge_multiplier)).to.eq(2.5);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/surge/Z0056_0102?multiplier=2.5",
+          "host": ["{{baseUrl}}"],
+          "path": ["surge", "Z0056_0102"],
+          "query": [
+            {
+              "key": "multiplier",
+              "value": "2.5"
+            }
+          ]
+        },
+        "description": "Set surge multiplier to 2.5x for a busy zone"
+      }
+    },
+    {
+      "name": "4c. Update Surge - Validation Error (multiplier < 1.0)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 400 for invalid multiplier', function () {",
+              "    pm.response.to.have.status(400);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/surge/Z0056_0102?multiplier=0.5",
+          "host": ["{{baseUrl}}"],
+          "path": ["surge", "Z0056_0102"],
+          "query": [
+            {
+              "key": "multiplier",
+              "value": "0.5",
+              "description": "Invalid: below minimum of 1.0"
+            }
+          ]
+        },
+        "description": "Should return 400 Bad Request when multiplier is below 1.0"
+      }
+    },
+    {
+      "name": "4d. Update Surge - Validation Error (multiplier > 3.0)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 400 for multiplier above max', function () {",
+              "    pm.response.to.have.status(400);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/surge/Z0056_0102?multiplier=5.0",
+          "host": ["{{baseUrl}}"],
+          "path": ["surge", "Z0056_0102"],
+          "query": [
+            {
+              "key": "multiplier",
+              "value": "5.0",
+              "description": "Invalid: above maximum of 3.0"
+            }
+          ]
+        },
+        "description": "Should return 400 Bad Request when multiplier exceeds 3.0"
+      }
+    },
+    {
+      "name": "5. Get All Surge Multipliers",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response is a JSON object with zone IDs as keys', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.be.an('object');",
+              "    pm.expect(Object.keys(jsonData).length).to.be.at.least(0);",
+              "});",
+              "",
+              "pm.test('All surge values are >= 1.0', function () {",
+              "    var jsonData = pm.response.json();",
+              "    Object.values(jsonData).forEach(function(val) {",
+              "        pm.expect(parseFloat(val)).to.be.at.least(1.0);",
+              "    });",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/surge/all",
+          "host": ["{{baseUrl}}"],
+          "path": ["surge", "all"]
+        },
+        "description": "Retrieve all current surge multipliers for all zones. Returns a map of zone IDs to their surge multiplier values."
+      }
+    },
+    {
+      "name": "6. Update Demand and Supply Metrics",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response confirms metrics processed', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.zone_id).to.eq('Z0056_0102');",
+              "    pm.expect(jsonData.active_drivers).to.eq(10);",
+              "    pm.expect(jsonData.pending_rides).to.eq(25);",
+              "});",
+              "",
+              "pm.test('Message confirms processing', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.message).to.be.a('string');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/demand-supply?zoneId=Z0056_0102&activeDrivers=10&pendingRides=25",
+          "host": ["{{baseUrl}}"],
+          "path": ["demand-supply"],
+          "query": [
+            {
+              "key": "zoneId",
+              "value": "Z0056_0102",
+              "description": "Zone identifier"
+            },
+            {
+              "key": "activeDrivers",
+              "value": "10",
+              "description": "Number of active drivers in the zone"
+            },
+            {
+              "key": "pendingRides",
+              "value": "25",
+              "description": "Number of pending rides in the zone (ratio = 25/10 = 2.5 → surge 2.5x)"
+            }
+          ]
+        },
+        "description": "Update demand and supply metrics to trigger dynamic surge pricing calculation. Ratio = pendingRides / activeDrivers. With ratio=2.5, surge should be set to 2.5x."
+      }
+    },
+    {
+      "name": "6b. Demand-Supply - High Demand (ratio 3.0+ → 3.0x surge)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Pending rides are recorded', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.pending_rides).to.eq(30);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/demand-supply?zoneId=Z0056_0102&activeDrivers=10&pendingRides=30",
+          "host": ["{{baseUrl}}"],
+          "path": ["demand-supply"],
+          "query": [
+            {
+              "key": "zoneId",
+              "value": "Z0056_0102"
+            },
+            {
+              "key": "activeDrivers",
+              "value": "10"
+            },
+            {
+              "key": "pendingRides",
+              "value": "30"
+            }
+          ]
+        },
+        "description": "High demand scenario: 30 pending rides / 10 drivers = ratio 3.0 → max surge of 3.0x"
+      }
+    },
+    {
+      "name": "6c. Demand-Supply - Low Demand (ratio 0.5 → 1.0x surge)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Low ratio returns minimal surge', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.pending_rides).to.eq(5);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/demand-supply?zoneId=Z0056_0102&activeDrivers=10&pendingRides=5",
+          "host": ["{{baseUrl}}"],
+          "path": ["demand-supply"],
+          "query": [
+            {
+              "key": "zoneId",
+              "value": "Z0056_0102"
+            },
+            {
+              "key": "activeDrivers",
+              "value": "10"
+            },
+            {
+              "key": "pendingRides",
+              "value": "5"
+            }
+          ]
+        },
+        "description": "Low demand scenario: 5 pending rides / 10 drivers = ratio 0.5 → surge 1.0x (no surge)"
+      }
+    },
+    {
+      "name": "6d. Demand-Supply - Validation Error (missing params)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 400 for missing required params', function () {",
+              "    pm.response.to.have.status(400);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/demand-supply?zoneId=Z0056_0102",
+          "host": ["{{baseUrl}}"],
+          "path": ["demand-supply"],
+          "query": [
+            {
+              "key": "zoneId",
+              "value": "Z0056_0102"
+            }
+          ]
+        },
+        "description": "Should return 400 Bad Request when activeDrivers or pendingRides are missing"
+      }
+    }
+  ]
+}

@@ -124,7 +124,6 @@ public class AuthService {
     public AuthTokenResponse register(RegisterRequest request) {
         String email = normalizeEmail(request.getEmail());
         ensureEmailAvailable(email);
-        RegistrationEmailOtp verifiedOtp = getVerifiedOtpForRegistration(email);
 
         AuthUser user = new AuthUser();
         user.setEmail(email);
@@ -140,12 +139,18 @@ public class AuthService {
         user.setLastLoginAt(LocalDateTime.now());
 
         AuthUser savedUser = authUserRepository.save(user);
-        consumeOtp(verifiedOtp);
         AuthTokenResponse response = createSessionResponse(savedUser, request.getDeviceId(), request.getPlatform(),
                 request.getUserAgent(), request.getAppVersion());
-        emailServiceClient.sendWelcomeEmail(savedUser.getEmail(), savedUser.getFullName());
         return response;
     }
+
+    /*
+    Old OTP-guarded register flow kept for reference:
+    RegistrationEmailOtp verifiedOtp = getVerifiedOtpForRegistration(email);
+    ...
+    consumeOtp(verifiedOtp);
+    emailServiceClient.sendWelcomeEmail(savedUser.getEmail(), savedUser.getFullName());
+    */
 
     @Transactional
     public AuthTokenResponse login(LoginRequest request) {

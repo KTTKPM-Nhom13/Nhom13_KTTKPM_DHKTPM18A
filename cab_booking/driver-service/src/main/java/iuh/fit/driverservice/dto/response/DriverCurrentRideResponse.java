@@ -1,5 +1,6 @@
 package iuh.fit.driverservice.dto.response;
 
+import iuh.fit.driverservice.dto.event.DriverLocationPayload;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,4 +18,5 @@ public class DriverCurrentRideResponse {
     String destinationAddress;
     LocalDateTime requestedAt;
     String driverAvailabilityStatus;
+    DriverLocationPayload currentLocation;
 }

@@ -1,0 +1,123 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: pricing-service
+
+  config:
+    import: optional:configserver:http://localhost:8888
+
+  data:
+    mongodb:
+      uri: mongodb://cab-mongo:27017/pricing_db
+      auto-index-creation: true
+
+    redis:
+      host: cab-redis
+      port: 6379
+      password: redis123
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 5
+          min-idle: 1
+
+  kafka:
+    bootstrap-servers: cab-kafka:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 3
+      properties:
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: pricing-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.value.default.type: java.util.Map
+    listener:
+      ack-mode: MANUAL_IMMEDIATE
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka
+    fetch-registry: true
+    register-with-eureka: true
+    instance-info-replication-interval-seconds: 10
+    registry-fetch-interval-seconds: 10
+  instance:
+    instance-id: ${spring.application.name}:${server.port}
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+google:
+  maps:
+    api-key: ${GOOGLE_MAPS_API_KEY:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  health:
+    mongo:
+      enabled: true
+    redis:
+      enabled: true
+
+logging:
+  level:
+    root: INFO
+    iuh.fit.pricing_service: DEBUG
+    org.springframework.kafka: INFO
+    org.springframework.data.mongodb: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+pricing:
+  calculation:
+    base-fare: 2.50
+    per-km-rate: 1.50
+    per-minute-rate: 0.25
+    minimum-fare: 5.00
+  vehicle:
+    economy:
+      multiplier: 1.0
+      base-fare: 2.50
+      per-km: 1.50
+      per-minute: 0.20
+    comfort:
+      multiplier: 1.5
+      base-fare: 5.00
+      per-km: 2.50
+      per-minute: 0.40
+    premium:
+      multiplier: 2.0
+      base-fare: 10.00
+      per-km: 4.00
+      per-minute: 0.75
+  surge:
+    default-multiplier: 1.0
+    min-multiplier: 1.0
+    max-multiplier: 3.0
+    update-threshold: 0.1
+    cache-ttl-seconds: 60

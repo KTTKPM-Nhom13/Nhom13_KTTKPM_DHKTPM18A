@@ -5,13 +5,14 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import iuh.fit.common.model.BaseEntity;
 
 import java.math.BigDecimal;
-import java.time.Instant;
-import java.util.UUID;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -21,11 +22,10 @@ import java.util.UUID;
         @Index(name = "idx_status", columnList = "status"),
         @Index(name = "idx_idempotency_key", columnList = "idempotencyKey", unique = true)
 })
-public class Booking {
+public class Booking extends BaseEntity {
 
-    @Id
-    @Column(nullable = false, updatable = false)
-    private UUID id;
+    @Version
+    private Integer version;
 
     @Column(nullable = false)
     private String customerId;
@@ -73,21 +73,6 @@ public class Booking {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private BookingStatus status;
-
-    private Instant createdAt;
-    private Instant updatedAt;
-
-    @PrePersist
-    public void prePersist() {
-        if (id == null) id = UUID.randomUUID();
-        if (status == null) status = BookingStatus.CREATED;
-        if (createdAt == null) createdAt = Instant.now();
-        updatedAt = createdAt;
-    }
-
-    @PreUpdate
-    public void preUpdate() {
-        updatedAt = Instant.now();
-    }
+    @Builder.Default
+    private BookingStatus status = BookingStatus.CREATED;
 }

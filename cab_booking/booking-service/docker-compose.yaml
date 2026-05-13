@@ -1,114 +1,57 @@
-version: '3.8'
-
 services:
-  # 1. PostgreSQL với PGVector
+  # 1. PostgreSQL với PGVector cho Booking
   postgres-db:
     image: pgvector/pgvector:pg15
     container_name: booking-postgres
     environment:
-      POSTGRES_DB: booking_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ${BOOKING_DB_NAME}
+      POSTGRES_USER: ${BOOKING_DB_USER}
+      POSTGRES_PASSWORD: ${BOOKING_DB_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${BOOKING_DB_PORT}:5432"
     networks:
-      - booking-net
+      - cab-network
     command: postgres -c "shared_preload_libraries=vector"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U ${BOOKING_DB_USER} -d ${BOOKING_DB_NAME}" ]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # 2. Redis
-  redis:
-    image: redis:7-alpine
-    container_name: booking-redis
+  # 2. Booking Service
+  booking-service:
+    build:
+      context: ..
+      dockerfile: ./booking-service/Dockerfile
+    container_name: cab-booking-service
     ports:
-      - "6379:6379"
-    networks:
-      - booking-net
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  # 3. Kafka KRaft
-  kafka:
-    image: confluentinc/cp-kafka:7.7.8
-    container_name: booking-kafka
-    ports:
-      - "9092:9092"
+      - "${BOOKING_SERVICE_PORT}:8081"
     environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
-      
-      # Cấu hình Listeners: 
-      # 9093 cho liên kết nội bộ Docker (Controller & Inter-broker)
-      # 9092 cho các ứng dụng khách (Service nội bộ và Máy Host)
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    healthcheck:
-      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-    networks:
-      - booking-net
-
-  # 4. Kafka UI
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: booking-kafka-ui
-    ports:
-      - "8989:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: booking-cluster
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      - EUREKA_SERVER_URL=${EUREKA_DEFAULT_ZONE}
+      - KAFKA_URL=${KAFKA_BOOTSTRAP_SERVERS}
+      - POSTGRES_URL=${BOOKING_DB_JDBC_URL}
+      - POSTGRES_USER=${BOOKING_DB_USER}
+      - POSTGRES_PASSWORD=${BOOKING_DB_PASSWORD}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - SPRING_PROFILES_ACTIVE=default
+    volumes:
+      - maven-cache:/root/.m2
     depends_on:
+      eureka-server:
+        condition: service_healthy
       kafka:
         condition: service_healthy
-    networks:
-      - booking-net
-
-  # 5. Booking Service
-  booking-service:
-    build: .
-    container_name: booking-app
-    ports:
-      - "8081:8081"
-    environment:
-      # Sử dụng tên service làm host để Docker tự resolve IP
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-db:5432/booking_db
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
-      - SPRING_DATA_REDIS_HOST=redis
-      - SPRING_DATA_REDIS_PORT=6379
-      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      # Nếu chưa có Eureka Server, tốt nhất nên disable để tránh log lỗi spam
-      - EUREKA_CLIENT_ENABLED=false 
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-    depends_on:
       postgres-db:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
     networks:
-      - booking-net
+      - cab-network
+
+volumes:
+  maven-cache:
+    driver: local
 
 networks:
-  booking-net:
+  cab-network:
     driver: bridge
