@@ -1,0 +1,20 @@
+services:
+  ai-scoring-service:
+    build:
+      context: ..
+      dockerfile: ./ai-scoring-service/Dockerfile
+    container_name: cab-ai-scoring-service
+    restart: unless-stopped
+    ports:
+      - "${AI_SCORING_SERVICE_PORT}:8000"
+    networks:
+      - cab-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ping', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  cab-network:
+    driver: bridge

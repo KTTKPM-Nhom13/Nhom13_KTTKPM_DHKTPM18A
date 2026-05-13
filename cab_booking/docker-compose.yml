@@ -13,6 +13,10 @@ include:
   - booking-service/docker-compose.yaml
   - Pricing-Service/docker-compose.yaml
   - Payment-Service/docker-compose.yaml
+  - matching-service/docker-compose.yaml
+  - ai-scoring-service/docker-compose.yaml
+  - ride-service/docker-compose.yaml
+  # - Payment-Service/docker-compose.yaml
 
 services:
   redis:

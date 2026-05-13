@@ -1,0 +1,1193 @@
+{
+  "info": {
+    "name": "Cab Booking - Full Flow Test",
+    "description": "Postman collection test luồng: Đăng ký (3 bước OTP) → Đăng nhập → Tài xế online → Đặt xe → Matching thành công. Tất cả request đi qua API Gateway (port 8080).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variables": [
+    {
+      "key": "gateway_baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "auth_baseUrl",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
+      "key": "driverAccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "passengerAccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "driverUserId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "passengerUserId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "bookingId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{passengerAccessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "1. Registration (via Gateway)",
+      "item": [
+        {
+          "name": "1.1 - Request OTP (Driver)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('OTP sent to email', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result?.email).to.be.a('string');",
+                  "});",
+                  "",
+                  "pm.test('Response wraps in ApiResponse', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('result');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/auth/register/request-otp",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["auth", "register", "request-otp"]
+            },
+            "description": "Bước 1/3: Gửi yêu cầu OTP đến email của tài xế. OTP 6 chữ số sẽ được gửi qua email (Brevo).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"driver_test_{{timestamp}}@gmail.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "1.2 - Verify OTP (Driver)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Email verified', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result?.verified).to.equal(true);",
+                  "    pm.expect(jsonData.result?.canRegister).to.equal(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/auth/register/verify-otp",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["auth", "register", "verify-otp"]
+            },
+            "description": "Bước 2/3: Xác thực OTP 6 chữ số. Sau bước này email được đánh dấu verified=true, cho phép đăng ký.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"driver_test_{{timestamp}}@gmail.com\",\n    \"otpCode\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "1.3 - Complete Registration (Driver)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('driverAccessToken', jsonData.result?.accessToken);",
+                  "    const userId = jsonData.result?.user?.userId || jsonData.result?.user?.id;",
+                  "    pm.collectionVariables.set('driverUserId', userId);",
+                  "}",
+                  "",
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Registration returns tokens', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result?.accessToken).to.be.a('string');",
+                  "    pm.expect(jsonData.result?.refreshToken).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/auth/register",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Bước 3/3: Hoàn tất đăng ký tài xế. Tạo tài khoản với role='DRIVER', deviceId và platform.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"fullName\": \"Nguyen Van Driver\",\n    \"email\": \"driver_test_{{timestamp}}@gmail.com\",\n    \"password\": \"Driver@123456\",\n    \"phoneNumber\": \"+84912345601\",\n    \"role\": \"DRIVER\",\n    \"deviceId\": \"driver-device-{{timestamp}}\",\n    \"platform\": \"android\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "1.4 - Request OTP (Passenger)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/auth/register/request-otp",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["auth", "register", "request-otp"]
+            },
+            "description": "Bước 1/3: Gửi OTP đến email hành khách.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"passenger_test_{{timestamp}}@gmail.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "1.5 - Verify OTP (Passenger)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/auth/register/verify-otp",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["auth", "register", "verify-otp"]
+            },
+            "description": "Bước 2/3: Xác thực OTP hành khách.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"passenger_test_{{timestamp}}@gmail.com\",\n    \"otpCode\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "1.6 - Complete Registration (Passenger)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('passengerAccessToken', jsonData.result?.accessToken);",
+                  "    const userId = jsonData.result?.user?.userId || jsonData.result?.user?.id;",
+                  "    pm.collectionVariables.set('passengerUserId', userId);",
+                  "}",
+                  "",
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Registration returns tokens', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result?.accessToken).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/auth/register",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Bước 3/3: Hoàn tất đăng ký hành khách. Role='CUSTOMER'.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"fullName\": \"Tran Thi Passenger\",\n    \"email\": \"passenger_test_{{timestamp}}@gmail.com\",\n    \"password\": \"Passenger@123456\",\n    \"phoneNumber\": \"+84912345602\",\n    \"role\": \"CUSTOMER\",\n    \"deviceId\": \"passenger-device-{{timestamp}}\",\n    \"platform\": \"ios\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Login (via Gateway)",
+      "item": [
+        {
+          "name": "2.1 - DRIVER Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('driverAccessToken', jsonData.result?.accessToken);",
+                  "    const userId = jsonData.result?.user?.userId || jsonData.result?.user?.id;",
+                  "    pm.collectionVariables.set('driverUserId', userId);",
+                  "}",
+                  "",
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Login returns accessToken', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result?.accessToken).to.be.a('string');",
+                  "});",
+                  "",
+                  "pm.test('Token type is Bearer', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result?.tokenType).to.equal('Bearer');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/auth/login",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Đăng nhập tài xế. Dùng deviceId và platform đã đăng ký ở bước 1.3.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"driver_test_{{timestamp}}@gmail.com\",\n    \"password\": \"Driver@123456\",\n    \"deviceId\": \"driver-device-{{timestamp}}\",\n    \"platform\": \"android\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "2.2 - PASSENGER Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('passengerAccessToken', jsonData.result?.accessToken);",
+                  "    const userId = jsonData.result?.user?.userId || jsonData.result?.user?.id;",
+                  "    pm.collectionVariables.set('passengerUserId', userId);",
+                  "}",
+                  "",
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Login returns accessToken', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result?.accessToken).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/auth/login",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Đăng nhập hành khách.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"passenger_test_{{timestamp}}@gmail.com\",\n    \"password\": \"Passenger@123456\",\n    \"deviceId\": \"passenger-device-{{timestamp}}\",\n    \"platform\": \"ios\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Driver Online",
+      "item": [
+        {
+          "name": "3.1 - Driver upsert PROFILE",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Profile saved', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('result');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/api/drivers/me/profile",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["api", "drivers", "me", "profile"]
+            },
+            "description": "Tạo/cập nhật profile tài xế (licensePlate, vehicleType). Cần token DRIVER.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"licensePlate\": \"51A-12345\",\n    \"vehicleType\": \"SEDAN\",\n    \"vehicleModel\": \"Toyota Camry 2023\",\n    \"vehicleColor\": \"Trắng\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "3.2 - Driver go ONLINE (set AVAILABLE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Driver availability updated', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('result');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/api/drivers/me/availability",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["api", "drivers", "me", "availability"]
+            },
+            "description": "Cập nhật trạng thái tài xế thành AVAILABLE. Tài xế sẵn sàng nhận chuyến. Gửi kèm vị trí GPS hiện tại.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"availabilityStatus\": \"AVAILABLE\",\n    \"currentLatitude\": 10.762917,\n    \"currentLongitude\": 106.660172\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "3.3 - Driver get PROFILE",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Profile fetched', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('result');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/api/drivers/me/profile",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["api", "drivers", "me", "profile"]
+            },
+            "description": "Lấy thông tin profile tài xế hiện tại. Xác nhận trạng thái AVAILABLE."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Book Ride (Passenger)",
+      "item": [
+        {
+          "name": "4.1 - Create BOOKING (create ride)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const jsonData = pm.response.json();",
+                  "    const bookingId = jsonData.result?.bookingId || jsonData.result?.id;",
+                  "    pm.collectionVariables.set('bookingId', bookingId);",
+                  "}",
+                  "",
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Booking created with rideCode or bookingId', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    const hasId = !!(jsonData.result?.bookingId || jsonData.result?.id);",
+                  "    pm.expect(hasId).to.equal(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/booking/api/v1/bookings",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["booking", "api", "v1", "bookings"]
+            },
+            "description": "Hành khách tạo yêu cầu đặt xe. Hệ thống (Kafka) sẽ tự động tìm tài xế phù hợp. JWT token chứa customerId từ auth-service.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"pickupLocation\": \"123 Nguyen Hue, District 1, Ho Chi Minh City\",\n    \"dropoffLocation\": \"456 Le Duan, Go Vap, Ho Chi Minh City\",\n    \"pickupCoordinates\": {\n        \"latitude\": 10.762917,\n        \"longitude\": 106.660172\n    },\n    \"dropoffCoordinates\": {\n        \"latitude\": 10.791919,\n        \"longitude\": 106.699154\n    },\n    \"vehicleType\": \"SEDAN\",\n    \"paymentMethod\": \"CASH\",\n    \"customerNote\": \"Xin chào, tôi cần đặt xe\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "4.2 - Get ACTIVE booking (passenger)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Active booking retrieved', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    const result = jsonData.result;",
+                  "    if (result) {",
+                  "        pm.expect(result).to.have.property('bookingId') || pm.expect(result).to.have.property('id');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/booking/api/v1/bookings/customer/{{passengerUserId}}/active",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["booking", "api", "v1", "bookings", "customer", "{{passengerUserId}}", "active"]
+            },
+            "description": "Lấy booking đang active (chờ tài xế) của hành khách. Kiểm tra trạng thái: PENDING, SEARCHING, hoặc ASSIGNED."
+          }
+        },
+        {
+          "name": "4.3 - Cancel BOOKING (if needed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{passengerAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/booking/api/v1/bookings/{{bookingId}}/cancel",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["booking", "api", "v1", "bookings", "{{bookingId}}", "cancel"]
+            },
+            "description": "Hủy booking. Chạy request này chỉ khi muốn hủy chuyến (không bắt buộc trong luồng matching thành công)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Driver Handle Assignment & Ride",
+      "item": [
+        {
+          "name": "5.1 - Driver get CURRENT RIDE",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/api/drivers/me/current-ride",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["api", "drivers", "me", "current-ride"]
+            },
+            "description": "Tài xế kiểm tra chuyến xe hiện tại được assign. Khi matching thành công, booking sẽ xuất hiện ở đây."
+          }
+        },
+        {
+          "name": "5.2 - Driver ACCEPT assignment (ACCEPTED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/api/drivers/me/rides/assignment",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["api", "drivers", "me", "rides", "assignment"]
+            },
+            "description": "Tài xế xác nhận (ACCEPT) chuyến được assign. Action: ACCEPT, REJECT, hoặc IGNORE.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"rideId\": \"{{bookingId}}\",\n    \"action\": \"ACCEPT\",\n    \"pickupAddress\": \"123 Nguyen Hue, District 1, Ho Chi Minh City\",\n    \"destinationAddress\": \"456 Le Duan, Go Vap, Ho Chi Minh City\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "5.3 - Driver ARRIVE at pickup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/booking/api/v1/bookings/{{bookingId}}/arrive",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["booking", "api", "v1", "bookings", "{{bookingId}}", "arrive"]
+            },
+            "description": "Tài xế báo đã đến điểm đón. Trạng thái booking chuyển: SEARCHING/ASSIGNED → PICKUP."
+          }
+        },
+        {
+          "name": "5.4 - Start RIDE",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Ride started', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    const status = jsonData.result?.status;",
+                  "    pm.expect(status).to.be.oneOf(['IN_PROGRESS', 'PICKUP', 'STARTED']);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/booking/api/v1/bookings/{{bookingId}}/start",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["booking", "api", "v1", "bookings", "{{bookingId}}", "start"]
+            },
+            "description": "Bắt đầu chuyến đi. Hành khách đã lên xe, tài xế bắt đầu di chuyển đến điểm trả."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Complete Ride",
+      "item": [
+        {
+          "name": "6.1 - Complete RIDE (Driver)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Ride completed', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    const status = jsonData.result?.status || jsonData.result?.rideStatus;",
+                  "    pm.expect(status).to.be.oneOf(['COMPLETED', 'FINISHED']);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/api/drivers/me/rides/current/complete",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["api", "drivers", "me", "rides", "current", "complete"]
+            },
+            "description": "Tài xế hoàn thành chuyến. Fare được tính (Pricing Service) và booking chuyển COMPLETED.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"fareAmount\": 50000,\n    \"distanceKm\": 5.5,\n    \"completedAt\": \"{{$isoTimestamp}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "6.2 - Complete via Booking Service (alternative)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/booking/api/v1/bookings/{{bookingId}}/complete",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["booking", "api", "v1", "bookings", "{{bookingId}}", "complete"]
+            },
+            "description": "Hoàn thành chuyến qua booking-service (endpoint trực tiếp, không qua driver-service)."
+          }
+        },
+        {
+          "name": "6.3 - Driver go OFFLINE (AVAILABLE → OFFLINE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverAccessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/api/drivers/me/availability",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["api", "drivers", "me", "availability"]
+            },
+            "description": "Tài xế set trạng thái OFFLINE sau khi hoàn thành chuyến.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"availabilityStatus\": \"OFFLINE\",\n    \"currentLatitude\": 10.791919,\n    \"currentLongitude\": 106.699154\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Token Management",
+      "item": [
+        {
+          "name": "7.1 - Refresh ACCESS TOKEN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/auth/refresh",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["auth", "refresh"]
+            },
+            "description": "Làm mới access token bằng refresh token. Dùng refreshToken từ response login/register.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refreshToken\": \"{{passengerAccessToken-refresh}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "7.2 - Verify TOKEN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Token verified successfully', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.result?.status).to.equal('success');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/auth/verify",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["auth", "verify"]
+            },
+            "description": "Decode và verify JWT token. Trả về userId (subject), claims, issuer.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"token\": \"{{passengerAccessToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Error / Edge Cases",
+      "item": [
+        {
+          "name": "8.1 - Login with wrong password (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should return 401 Unauthorized', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([401, 400]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/auth/login",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Test bảo mật: đăng nhập sai mật khẩu -> phải trả 401/400.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"driver_test_{{timestamp}}@gmail.com\",\n    \"password\": \"WrongPassword123\",\n    \"deviceId\": \"driver-device-{{timestamp}}\",\n    \"platform\": \"android\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "8.2 - Verify wrong OTP (should fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should return 400 Bad Request for wrong OTP', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 404]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/auth/register/verify-otp",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["auth", "register", "verify-otp"]
+            },
+            "description": "Test: OTP sai hoặc hết hạn -> phải trả 400.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"driver_test_{{timestamp}}@gmail.com\",\n    \"otpCode\": \"000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "8.3 - Booking without auth (should fail 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should return 401/403 Unauthorized', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([401, 403]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_baseUrl}}/booking/api/v1/bookings",
+              "host": ["{{gateway_baseUrl}}"],
+              "path": ["booking", "api", "v1", "bookings"]
+            },
+            "description": "Test bảo mật: tạo booking không có JWT token -> phải trả 401/403 qua gateway.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"pickupLocation\": \"123 Nguyen Hue, District 1, HCMC\",\n    \"dropoffLocation\": \"456 Le Duan, Go Vap, HCMC\",\n    \"vehicleType\": \"SEDAN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -5,7 +5,7 @@ services:
       dockerfile: ./Pricing-Service/Dockerfile
     container_name: pricing-service
     ports:
-      - "8084:8084"
+      - "8088:8088"
     env_file:
       - ../Pricing-Service/.env
     environment:
