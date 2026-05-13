@@ -22,5 +22,7 @@ public class Notification {
     private String message;
     private String type; // PUSH, SMS, EMAIL
     private String status; // PENDING, SENT, FAILED
+    private boolean isRead;
+    private LocalDateTime readAt;
     private LocalDateTime createdAt;
 }

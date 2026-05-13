@@ -8,5 +8,6 @@ import java.util.List;
 
 @Repository
 public interface NotificationRepository extends MongoRepository<Notification, String> {
-    List<Notification> findByUserId(String userId);
+    org.springframework.data.domain.Page<Notification> findByUserIdOrderByCreatedAtDesc(String userId, org.springframework.data.domain.Pageable pageable);
+    List<Notification> findByUserIdAndIsReadFalse(String userId);
 }

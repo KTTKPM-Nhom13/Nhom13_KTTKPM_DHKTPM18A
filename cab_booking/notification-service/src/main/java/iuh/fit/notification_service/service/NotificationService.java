@@ -30,11 +30,39 @@ public class NotificationService {
         // Here we could integrate with Firebase (FCM) or Twilio (SMS)
     }
 
-    public List<Notification> getNotificationsByUserId(String userId) {
-        return notificationRepository.findByUserId(userId);
+    public org.springframework.data.domain.Page<Notification> getNotificationsByUserId(String userId, org.springframework.data.domain.Pageable pageable) {
+        return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+    }
+
+    public Notification getNotificationById(String id) {
+        return notificationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
+    }
+
+    public void markAsRead(String id) {
+        Notification notification = getNotificationById(id);
+        notification.setRead(true);
+        notification.setReadAt(LocalDateTime.now());
+        notificationRepository.save(notification);
+    }
+
+    public void markAllAsRead(String userId) {
+        List<Notification> unread = notificationRepository.findByUserIdAndIsReadFalse(userId);
+        unread.forEach(n -> {
+            n.setRead(true);
+            n.setReadAt(LocalDateTime.now());
+        });
+        notificationRepository.saveAll(unread);
+    }
+
+    public void deleteNotification(String id) {
+        notificationRepository.deleteById(id);
     }
 
     public Notification saveNotification(Notification notification) {
+        if (notification.getCreatedAt() == null) {
+            notification.setCreatedAt(LocalDateTime.now());
+        }
         return notificationRepository.save(notification);
     }
 }

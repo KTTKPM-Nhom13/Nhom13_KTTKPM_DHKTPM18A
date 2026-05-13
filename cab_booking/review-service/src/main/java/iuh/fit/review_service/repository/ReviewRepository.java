@@ -10,4 +10,5 @@ import java.util.List;
 public interface ReviewRepository extends MongoRepository<Review, String> {
     List<Review> findByDriverId(String driverId);
     List<Review> findByUserId(String userId);
+    java.util.Optional<Review> findByRideId(String rideId);
 }
