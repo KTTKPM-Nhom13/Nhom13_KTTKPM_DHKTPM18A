@@ -1,5 +1,5 @@
 server:
-  port: 8083
+  port: 8084
 
 spring:
   application:
@@ -65,6 +65,10 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
+
+google:
+  maps:
+    api-key: ${GOOGLE_MAPS_API_KEY:}
 
 management:
   endpoints:
