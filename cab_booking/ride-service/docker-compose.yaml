@@ -1,0 +1,57 @@
+services:
+  # 1. PostgreSQL cho Ride Service
+  ride-db:
+    image: pgvector/pgvector:pg15
+    container_name: ride-postgres
+    environment:
+      POSTGRES_DB: ${RIDE_DB_NAME}
+      POSTGRES_USER: ${RIDE_DB_USER}
+      POSTGRES_PASSWORD: ${RIDE_DB_PASSWORD}
+    ports:
+      - "${RIDE_DB_PORT}:5432"
+    networks:
+      - cab-network
+    command: postgres -c "shared_preload_libraries=vector"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${RIDE_DB_USER} -d ${RIDE_DB_NAME}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. Ride Service
+  ride-service:
+    build:
+      context: ..
+      dockerfile: ./ride-service/Dockerfile
+    container_name: cab-ride-service
+    ports:
+      - "${RIDE_SERVICE_PORT}:8089"
+    environment:
+      - EUREKA_SERVER_URL=${EUREKA_DEFAULT_ZONE}
+      - KAFKA_URL=${KAFKA_BOOTSTRAP_SERVERS}
+      - POSTGRES_URL=${RIDE_DB_JDBC_URL}
+      - POSTGRES_USER=${RIDE_DB_USER}
+      - POSTGRES_PASSWORD=${RIDE_DB_PASSWORD}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - SPRING_PROFILES_ACTIVE=default
+    volumes:
+      - maven-cache:/root/.m2
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      ride-db:
+        condition: service_healthy
+    networks:
+      - cab-network
+
+volumes:
+  maven-cache:
+    driver: local
+
+networks:
+  cab-network:
+    driver: bridge

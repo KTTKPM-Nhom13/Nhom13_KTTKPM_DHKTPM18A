@@ -1,19 +1,23 @@
-# Sử dụng Java 21 bản JRE Alpine siêu nhẹ làm base image
-FROM eclipse-temurin:21-jre-alpine
+# Stage 1: Build stage
+FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
+WORKDIR /app
 
-# Cài đặt timezone (Tùy chọn nhưng rất quan trọng cho các sự kiện thời gian)
+# --- Step 1: Resolve dependencies ---
+COPY matching-service/pom.xml ./matching-service/
+RUN mvn -f ./matching-service/pom.xml dependency:resolve dependency:resolve-plugins -U -B 2>&1
+
+# --- Step 2: Copy source and package ---
+COPY matching-service/src ./matching-service/src
+RUN mvn -f ./matching-service/pom.xml clean package -DskipTests -U -B 2>&1
+
+# Stage 2: Runtime stage
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+
 RUN apk add --no-cache tzdata
 ENV TZ=Asia/Ho_Chi_Minh
 
-# Tạo thư mục làm việc trong container
-WORKDIR /app
+COPY --from=builder /app/matching-service/target/*.jar app.jar
 
-# Copy file JAR đã được build từ target vào container
-# Đảm bảo bạn đã chạy lệnh "mvn clean package" trước khi build Docker
-COPY target/*-SNAPSHOT.jar app.jar
-
-# Mở port 8083
-EXPOSE 8083
-
-# Lệnh chạy ứng dụng
+EXPOSE 8088
 ENTRYPOINT ["java", "-jar", "app.jar"]
