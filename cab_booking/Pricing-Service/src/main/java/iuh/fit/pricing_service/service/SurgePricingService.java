@@ -1,16 +1,21 @@
 package iuh.fit.pricing_service.service;
 
+import iuh.fit.pricing_service.client.SurgePricingAiClient;
 import iuh.fit.pricing_service.config.PricingConfigProperties;
 import iuh.fit.pricing_service.model.SurgeRule;
+import iuh.fit.pricing_service.repository.SurgeRuleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -22,159 +27,248 @@ public class SurgePricingService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final PricingConfigProperties pricingConfig;
-    private final iuh.fit.pricing_service.repository.SurgeRuleRepository surgeRuleRepository;
+    private final SurgeRuleRepository surgeRuleRepository;
+    private final SurgePricingAiClient surgePricingAiClient;
 
-    private static final String SURGE_KEY_PREFIX = "surge:zone:";
-    private static final String DEMAND_KEY_PREFIX = "demand:zone:";
-    private static final String SUPPLY_KEY_PREFIX = "supply:zone:";
+    private static final String SURGE_KEY_PREFIX = "pricing:surge:zone:";
+    private static final String METRICS_KEY_PREFIX = "pricing:metrics:zone:";
+    private static final String FEATURE_KEY_PREFIX = "pricing:features:zone:";
+    private static final String ACTIVE_ZONES_KEY = "pricing:metrics:active-zones";
 
     public BigDecimal getSurgeMultiplier(String zoneId) {
-        String cacheKey = SURGE_KEY_PREFIX + zoneId;
+        String cacheKey = surgeKey(zoneId);
 
         try {
             Object cached = redisTemplate.opsForValue().get(cacheKey);
             if (cached != null) {
-                log.debug("Retrieved surge multiplier from cache for zone {}: {}", zoneId, cached);
-                if (cached instanceof Number) {
-                    return BigDecimal.valueOf(((Number) cached).doubleValue());
-                }
-                return new BigDecimal(cached.toString());
+                return toBigDecimal(cached);
             }
         } catch (Exception e) {
-            log.warn("Failed to get surge from Redis, falling back to DB: {}", e.getMessage());
+            log.warn("Failed to get surge from Redis for zone {}. Falling back to DB. Cause: {}",
+                    zoneId, e.getMessage());
         }
 
         Optional<SurgeRule> surgeRule = surgeRuleRepository.findByZoneId(zoneId);
         if (surgeRule.isPresent()) {
-            BigDecimal multiplier = surgeRule.get().getSurgeMultiplier();
+            BigDecimal multiplier = clampSurge(surgeRule.get().getSurgeMultiplier());
             cacheSurgeMultiplier(zoneId, multiplier);
             return multiplier;
         }
 
-        BigDecimal defaultMultiplier = pricingConfig.getSurge().getDefaultMultiplier();
-        log.debug("No surge rule found for zone {}, using default multiplier: {}", zoneId, defaultMultiplier);
-        return defaultMultiplier;
+        return pricingConfig.getSurge().getDefaultMultiplier();
     }
 
-    public void cacheSurgeMultiplier(String zoneId, BigDecimal multiplier) {
-        String cacheKey = SURGE_KEY_PREFIX + zoneId;
+    public void updateCurrentZoneMetrics(String zoneId, int activeDrivers, int pendingRides) {
+        ZoneMetrics metrics = new ZoneMetrics(zoneId, activeDrivers, pendingRides, Instant.now());
+        Duration ttl = Duration.ofSeconds(pricingConfig.getSurge().getMetricsTtlSeconds());
+
         try {
-            redisTemplate.opsForValue().set(
-                    cacheKey,
-                    multiplier.doubleValue(),
-                    Duration.ofSeconds(pricingConfig.getSurge().getCacheTtlSeconds())
-            );
-            log.debug("Cached surge multiplier for zone {}: {}", zoneId, multiplier);
+            Map<String, Object> values = new HashMap<>();
+            values.put("zoneId", metrics.zoneId());
+            values.put("activeDrivers", metrics.activeDrivers());
+            values.put("pendingRides", metrics.pendingRides());
+            values.put("updatedAt", metrics.updatedAt().toString());
+
+            redisTemplate.opsForHash().putAll(metricsKey(zoneId), values);
+            redisTemplate.expire(metricsKey(zoneId), ttl);
+            redisTemplate.opsForSet().add(ACTIVE_ZONES_KEY, zoneId);
+            log.debug("Updated current zone metrics in Redis: {}", metrics);
         } catch (Exception e) {
-            log.warn("Failed to cache surge multiplier in Redis: {}", e.getMessage());
+            log.warn("Failed to update current zone metrics for zone {}: {}", zoneId, e.getMessage());
         }
     }
 
-    public BigDecimal calculateSurgeBasedOnDemandSupply(String zoneId, int activeDrivers, int pendingRides) {
-        if (activeDrivers == 0) {
-            return pricingConfig.getSurge().getMaxMultiplier();
-        }
-
-        double ratio = (double) pendingRides / activeDrivers;
-        BigDecimal calculatedSurge;
-
-        if (ratio <= 0.5) {
-            calculatedSurge = BigDecimal.ONE;
-        } else if (ratio <= 1.0) {
-            calculatedSurge = new BigDecimal("1.25");
-        } else if (ratio <= 1.5) {
-            calculatedSurge = new BigDecimal("1.5");
-        } else if (ratio <= 2.0) {
-            calculatedSurge = new BigDecimal("1.75");
-        } else if (ratio <= 2.5) {
-            calculatedSurge = new BigDecimal("2.0");
-        } else if (ratio <= 3.0) {
-            calculatedSurge = new BigDecimal("2.5");
-        } else {
-            calculatedSurge = pricingConfig.getSurge().getMaxMultiplier();
-        }
-
-        calculatedSurge = calculatedSurge.min(pricingConfig.getSurge().getMaxMultiplier());
-        calculatedSurge = calculatedSurge.max(pricingConfig.getSurge().getMinMultiplier());
-
-        log.info("Calculated surge for zone {} - drivers: {}, rides: {}, ratio: {:.2f}, surge: {}",
-                zoneId, activeDrivers, pendingRides, ratio, calculatedSurge);
-
-        updateSupplyDemandMetrics(zoneId, activeDrivers, pendingRides, calculatedSurge);
-
-        return calculatedSurge;
-    }
-
-    private void updateSupplyDemandMetrics(String zoneId, int activeDrivers, int pendingRides, BigDecimal surge) {
+    public Optional<ZoneMetrics> getCurrentZoneMetrics(String zoneId) {
         try {
-            Duration ttl = Duration.ofSeconds(pricingConfig.getSurge().getCacheTtlSeconds());
+            Map<Object, Object> values = redisTemplate.opsForHash().entries(metricsKey(zoneId));
+            if (values == null || values.isEmpty()) {
+                return Optional.empty();
+            }
 
-            redisTemplate.opsForValue().set(SUPPLY_KEY_PREFIX + zoneId, activeDrivers, ttl);
-            redisTemplate.opsForValue().set(DEMAND_KEY_PREFIX + zoneId, pendingRides, ttl);
-            redisTemplate.opsForValue().set(SURGE_KEY_PREFIX + zoneId, surge.doubleValue(), ttl);
+            int activeDrivers = toInteger(values.get("activeDrivers"), 0);
+            int pendingRides = toInteger(values.get("pendingRides"), 0);
+            Instant updatedAt = toInstant(values.get("updatedAt"));
 
-            log.debug("Updated Redis metrics for zone {}: drivers={}, rides={}, surge={}",
-                    zoneId, activeDrivers, pendingRides, surge);
+            return Optional.of(new ZoneMetrics(zoneId, activeDrivers, pendingRides, updatedAt));
         } catch (Exception e) {
-            log.warn("Failed to update Redis metrics: {}", e.getMessage());
+            log.warn("Failed to read current zone metrics for zone {}: {}", zoneId, e.getMessage());
+            return Optional.empty();
         }
     }
 
-    public boolean shouldUpdateSurge(String zoneId, BigDecimal newSurge) {
-        BigDecimal currentSurge = getSurgeMultiplier(zoneId);
-        BigDecimal threshold = pricingConfig.getSurge().getUpdateThreshold();
-        BigDecimal difference = newSurge.subtract(currentSurge).abs();
-        return difference.compareTo(threshold) > 0;
-    }
-
-    public Map<String, BigDecimal> getAllSurgeMultipliers() {
-        Map<String, BigDecimal> allSurge = new HashMap<>();
+    public Set<String> getZonesWithCurrentMetrics() {
+        Set<String> zoneIds = new HashSet<>();
         try {
-            Set<String> keys = redisTemplate.keys(SURGE_KEY_PREFIX + "*");
-            if (keys != null) {
-                for (String key : keys) {
-                    String zoneId = key.replace(SURGE_KEY_PREFIX, "");
-                    Object value = redisTemplate.opsForValue().get(key);
-                    if (value != null) {
-                        if (value instanceof Number) {
-                            allSurge.put(zoneId, BigDecimal.valueOf(((Number) value).doubleValue()));
-                        } else {
-                            allSurge.put(zoneId, new BigDecimal(value.toString()));
-                        }
+            Set<Object> members = redisTemplate.opsForSet().members(ACTIVE_ZONES_KEY);
+            if (members != null) {
+                for (Object member : members) {
+                    if (member != null) {
+                        zoneIds.add(member.toString());
                     }
                 }
             }
         } catch (Exception e) {
-            log.warn("Failed to get all surge multipliers from Redis: {}", e.getMessage());
+            log.warn("Failed to read active surge zones from Redis: {}", e.getMessage());
         }
-        return allSurge;
+        return zoneIds;
     }
 
-    public void invalidateSurgeCache(String zoneId) {
-        try {
-            redisTemplate.delete(SURGE_KEY_PREFIX + zoneId);
-            log.debug("Invalidated surge cache for zone: {}", zoneId);
-        } catch (Exception e) {
-            log.warn("Failed to invalidate surge cache: {}", e.getMessage());
+    public SurgeComputationResult computeSurgeFromAi(String zoneId) {
+        ZoneMetrics metrics = getCurrentZoneMetrics(zoneId)
+                .orElseThrow(() -> new IllegalStateException("No current metrics found for zone " + zoneId));
+
+        Map<String, Object> features = fetchHistoricalAndContextFeatures(zoneId);
+        SurgePredictionRequest request = new SurgePredictionRequest(zoneId, metrics, features, Instant.now());
+        BigDecimal predictedSurge = clampSurge(surgePricingAiClient.predictSurgeFactor(request));
+        BigDecimal previousSurge = getSurgeMultiplier(zoneId);
+
+        if (!shouldUpdateSurge(previousSurge, predictedSurge)) {
+            return new SurgeComputationResult(zoneId, previousSurge, predictedSurge, false);
         }
+
+        createOrUpdateSurgeRule(zoneId, predictedSurge, SurgeRule.SurgeSource.AUTOMATIC.name());
+        return new SurgeComputationResult(zoneId, previousSurge, predictedSurge, true);
+    }
+
+    public Map<String, Object> fetchHistoricalAndContextFeatures(String zoneId) {
+        Map<String, Object> features = new HashMap<>();
+        try {
+            Map<Object, Object> cachedFeatures = redisTemplate.opsForHash().entries(FEATURE_KEY_PREFIX + zoneId);
+            if (cachedFeatures != null) {
+                cachedFeatures.forEach((key, value) -> features.put(String.valueOf(key), value));
+            }
+        } catch (Exception e) {
+            log.warn("FeatureStore lookup failed for zone {}. Continuing with current metrics only. Cause: {}",
+                    zoneId, e.getMessage());
+        }
+
+        features.putIfAbsent("featureSource", "redis-feature-store");
+        features.putIfAbsent("fetchedAt", Instant.now().toString());
+        return features;
+    }
+
+    public boolean shouldUpdateSurge(String zoneId, BigDecimal newSurge) {
+        return shouldUpdateSurge(getSurgeMultiplier(zoneId), newSurge);
+    }
+
+    public boolean shouldUpdateSurge(BigDecimal currentSurge, BigDecimal newSurge) {
+        BigDecimal threshold = pricingConfig.getSurge().getUpdateThreshold();
+        BigDecimal difference = newSurge.subtract(currentSurge).abs();
+        return difference.compareTo(threshold) >= 0;
     }
 
     public SurgeRule createOrUpdateSurgeRule(String zoneId, BigDecimal surgeMultiplier, String source) {
+        BigDecimal normalizedMultiplier = clampSurge(surgeMultiplier);
         SurgeRule surgeRule = surgeRuleRepository.findByZoneId(zoneId)
                 .orElse(SurgeRule.builder()
                         .zoneId(zoneId)
                         .createdAt(LocalDateTime.now())
                         .build());
 
-        surgeRule.setSurgeMultiplier(surgeMultiplier);
+        surgeRule.setSurgeMultiplier(normalizedMultiplier);
         surgeRule.setLastUpdated(LocalDateTime.now());
         surgeRule.setSource(source);
         surgeRule.setSchemaVersion("1.0.0");
 
         SurgeRule savedRule = surgeRuleRepository.save(surgeRule);
-        cacheSurgeMultiplier(zoneId, surgeMultiplier);
+        cacheSurgeMultiplier(zoneId, normalizedMultiplier);
 
-        log.info("Updated surge rule for zone {}: multiplier={}, source={}", zoneId, surgeMultiplier, source);
+        log.info("Updated surge rule for zone {}: multiplier={}, source={}",
+                zoneId, normalizedMultiplier, source);
         return savedRule;
+    }
+
+    public void cacheSurgeMultiplier(String zoneId, BigDecimal multiplier) {
+        try {
+            redisTemplate.opsForValue().set(
+                    surgeKey(zoneId),
+                    clampSurge(multiplier).doubleValue(),
+                    Duration.ofSeconds(pricingConfig.getSurge().getCacheTtlSeconds())
+            );
+        } catch (Exception e) {
+            log.warn("Failed to cache surge multiplier for zone {}: {}", zoneId, e.getMessage());
+        }
+    }
+
+    public Map<String, BigDecimal> getAllSurgeMultipliers() {
+        Map<String, BigDecimal> allSurge = new HashMap<>();
+        for (String zoneId : getZonesWithCurrentMetrics()) {
+            allSurge.put(zoneId, getSurgeMultiplier(zoneId));
+        }
+        return allSurge;
+    }
+
+    public void invalidateSurgeCache(String zoneId) {
+        try {
+            redisTemplate.delete(surgeKey(zoneId));
+        } catch (Exception e) {
+            log.warn("Failed to invalidate surge cache for zone {}: {}", zoneId, e.getMessage());
+        }
+    }
+
+    private BigDecimal clampSurge(BigDecimal multiplier) {
+        if (multiplier == null) {
+            return pricingConfig.getSurge().getDefaultMultiplier();
+        }
+        return multiplier
+                .max(pricingConfig.getSurge().getMinMultiplier())
+                .min(pricingConfig.getSurge().getMaxMultiplier())
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal toBigDecimal(Object value) {
+        if (value instanceof Number) {
+            return BigDecimal.valueOf(((Number) value).doubleValue());
+        }
+        return new BigDecimal(value.toString());
+    }
+
+    private int toInteger(Object value, int defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        return Integer.parseInt(value.toString());
+    }
+
+    private Instant toInstant(Object value) {
+        if (value == null) {
+            return Instant.now();
+        }
+        return Instant.parse(value.toString());
+    }
+
+    private String surgeKey(String zoneId) {
+        return SURGE_KEY_PREFIX + zoneId;
+    }
+
+    private String metricsKey(String zoneId) {
+        return METRICS_KEY_PREFIX + zoneId;
+    }
+
+    public record ZoneMetrics(
+            String zoneId,
+            int activeDrivers,
+            int pendingRides,
+            Instant updatedAt
+    ) {
+    }
+
+    public record SurgePredictionRequest(
+            String zoneId,
+            ZoneMetrics metrics,
+            Map<String, Object> historicalAndContextFeatures,
+            Instant requestedAt
+    ) {
+    }
+
+    public record SurgeComputationResult(
+            String zoneId,
+            BigDecimal previousMultiplier,
+            BigDecimal predictedMultiplier,
+            boolean updated
+    ) {
     }
 }

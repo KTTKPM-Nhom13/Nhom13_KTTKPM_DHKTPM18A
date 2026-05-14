@@ -57,6 +57,12 @@ spring:
           predicates:
             - Path=/driver/**,/api/drivers/**
 
+        # ── Pricing Service (Docker network) ──
+        - id: pricing-service
+          uri: http://pricing-service:8084
+          predicates:
+            - Path=/api/pricing/**
+
       # ── Mặc định khi bị 429: trả JSON thay vì body rỗng ────────
       default-filters:
         - name: Retry
