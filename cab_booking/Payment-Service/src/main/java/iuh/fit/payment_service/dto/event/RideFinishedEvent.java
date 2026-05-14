@@ -1,5 +1,6 @@
 package iuh.fit.payment_service.dto.event;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 
@@ -12,13 +13,15 @@ import java.math.BigDecimal;
 public class RideFinishedEvent {
 
     @JsonProperty("eventType")
+    @JsonAlias({"type", "eventType"})
     private String eventType;
 
     @JsonProperty("eventId")
     private String eventId;
 
-    @JsonProperty("bookingId")
-    private String bookingId;
+    @JsonProperty("rideId")
+    @JsonAlias({"bookingId", "rideId"})
+    private String rideId;
 
     @JsonProperty("customerId")
     private String customerId;

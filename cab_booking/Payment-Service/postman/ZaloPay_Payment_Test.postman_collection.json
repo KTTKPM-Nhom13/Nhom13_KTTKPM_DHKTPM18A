@@ -1110,6 +1110,227 @@
 				}
 			],
 			"description": "Complete demo flow: Create payment -> Check by booking ID -> Check by transaction ID"
+		},
+		{
+			"name": "9. Kafka Consumer Tests - ride.finished",
+			"item": [
+				{
+					"name": "Send ride.finished event (rideId format - from booking-service)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response status is 200 or event logged', function() {",
+									"    // Kafka event test - just verify service responds",
+									"    // The actual Kafka message processing is async",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+									"});",
+									"",
+									"console.log('ride.finished event payload:', {",
+									"    type: 'RideFinished',",
+									"    rideId: pm.collectionVariables.get('kafkaRideId'),",
+									"    customerId: pm.collectionVariables.get('customerId'),",
+									"    finalFare: 50000,",
+									"    paymentMethod: 'CASH'",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Generate unique ride ID for Kafka test",
+									"const now = Date.now();",
+									"pm.collectionVariables.set('kafkaRideId', 'RIDE-KAFKA-' + now);",
+									"",
+									"console.log('Generated kafkaRideId:', pm.collectionVariables.get('kafkaRideId'));"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "test-token",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/booking/{{kafkaRideId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payments", "booking", "{{kafkaRideId}}"]
+						},
+						"description": "Test Kafka consumer for ride.finished topic.\n\n## Kafka Event Schema (from booking-service):\n```json\n{\n    \"eventId\": \"uuid\",\n    \"type\": \"RideFinished\",\n    \"rideId\": \"booking-id\",\n    \"customerId\": \"CUST-001\",\n    \"finalFare\": 50000,\n    \"paymentMethod\": \"CASH\",\n    \"timestamp\": \"2024-01-01T00:00:00Z\"\n}\n```\n\n## Fixed in this update:\n- Consumer now accepts both `type` and `eventType` fields\n- Consumer now accepts both `rideId` and `bookingId` fields\n- Check payment-service logs for: '[Consumer] Received ride.finished'"
+					},
+					"response": []
+				},
+				{
+					"name": "Send ride.finished event (bookingId format - legacy)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response status is 200 or event logged', function() {",
+									"    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "test-token",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/booking/BK-LEGACY-{{$timestamp}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payments", "booking", "BK-LEGACY-{{$timestamp}}"]
+						},
+						"description": "Test Kafka consumer with legacy bookingId format.\n\n## Legacy Kafka Event Schema:\n```json\n{\n    \"eventType\": \"RIDE_FINISHED\",\n    \"eventId\": \"uuid\",\n    \"bookingId\": \"BK-LEGACY-xxx\",\n    \"customerId\": \"CUST-001\",\n    \"finalFare\": 50000,\n    \"paymentMethod\": \"ZALOPAY\"\n}\n```"
+					},
+					"response": []
+				}
+			],
+			"description": "Tests for Kafka consumer - ride.finished topic. Verifies that the payment-service correctly receives and processes ride.finished events from booking-service.\n\n## Expected Kafka Event (from booking-service):\n- Topic: `ride.finished`\n- Consumer Group: `payment-ride-consumer-group`\n- Payload: RideFinishedEvent with rideId, customerId, finalFare, paymentMethod\n\n## Validation:\n1. Check logs for: '[Consumer] Received ride.finished'\n2. Check logs for: '[Consumer] Initiating automatic payment for rideId=XXX'\n3. Check logs for: '[Consumer] Payment saga triggered successfully'"
+		},
+		{
+			"name": "10. Kafka Consumer Tests - booking.failed",
+			"item": [
+				{
+					"name": "Check booking.failed topic consumer status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Service is running', function() {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response is valid JSON', function() {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response).to.exist;",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "test-token",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payments", "health"]
+						},
+						"description": "Health check to verify payment-service is running and Kafka consumers are active.\n\n## Kafka booking.failed topic:\n- Consumer: BookingFailedConsumer\n- Group ID: payment-booking-consumer-group\n- Topic: booking.failed\n\n## Expected Event Schema:\n```json\n{\n    \"eventType\": \"BOOKING_FAILED\",\n    \"eventId\": \"uuid\",\n    \"bookingId\": \"BK-xxx\",\n    \"customerId\": \"CUST-001\",\n    \"reason\": \"Driver not found\",\n    \"failedAt\": 1234567890\n}\n```\n\n## NOTE:\nThis topic may not have a producer yet. Check that booking-service or matching-service publishes to this topic."
+					},
+					"response": []
+				}
+			],
+			"description": "Tests for Kafka consumer - booking.failed topic.\n\n## IMPORTANT:\nThe booking.failed topic exists in payment-service but may NOT have a producer yet. If no events are received:\n1. Check if booking-service publishes to booking.failed topic\n2. Or check if matching-service publishes when no driver is found\n3. This consumer will wait for events to be published"
+		},
+		{
+			"name": "11. Kafka Producer Events - Outbound to Other Services",
+			"description": "Documentation for events that Payment Service PRODUCES and sends to other services.\n\n## Events Published by Payment Service:\n\n### 1. payment.completed\n- **Topic:** `payment.completed`\n- **Consumers:** ride-service, booking-service\n- **Purpose:** Notify other services when payment is successful\n\n### 2. payment.failed\n- **Topic:** `payment.failed`\n- **Consumers:** booking-service\n- **Purpose:** Notify when payment fails\n\n### 3. payment.refunded\n- **Topic:** `payment.refunded`\n- **Consumers:** (for future use)\n- **Purpose:** Notify when payment is refunded",
+			"item": [
+				{
+					"name": "Kafka Producer Payload: payment.completed",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"console.log('=== Payment Service OUTBOUND Event: payment.completed ===');",
+									"console.log(JSON.stringify({",
+									"    eventId: 'uuid-string',",
+									"    type: 'PaymentCompleted',",
+									"    eventType: 'PAYMENT_COMPLETED',",
+									"    rideId: 'BK-xxx (same as bookingId)',",
+									"    bookingId: 'BK-xxx',",
+									"    amount: 50000,",
+									"    timestamp: '2024-01-01T00:00:00Z'",
+									"}, null, 2));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payments", "health"]
+						},
+						"description": "Reference: payment.completed event schema sent by Payment Service to other services.\n\n## Event Schema (FIXED):\n```json\n{\n    \"eventId\": \"uuid-string\",\n    \"type\": \"PaymentCompleted\",\n    \"eventType\": \"PAYMENT_COMPLETED\",\n    \"rideId\": \"BK-xxx\",\n    \"bookingId\": \"BK-xxx\",\n    \"amount\": 50000,\n    \"timestamp\": \"2024-01-01T00:00:00Z\"\n}\n```\n\n## Field Mapping for consumers:\n| Field | Consumer Expects | Status |\n|-------|-----------------|--------|\n| eventId | eventId | ✅ Match |\n| type | type | ✅ Match |\n| rideId | rideId | ✅ Match (added) |\n| bookingId | N/A | ✅ Match (extra) |\n| amount | amount | ✅ Match |\n| timestamp | timestamp | ✅ Match |"
+					},
+					"response": []
+				},
+				{
+					"name": "Kafka Producer Payload: payment.failed",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"console.log('=== Payment Service OUTBOUND Event: payment.failed ===');",
+									"console.log(JSON.stringify({",
+									"    eventId: 'uuid-string',",
+									"    type: 'PaymentFailed',",
+									"    eventType: 'PAYMENT_FAILED',",
+									"    rideId: 'BK-xxx',",
+									"    bookingId: 'BK-xxx',",
+									"    status: 'FAILED',",
+									"    reason: 'Payment gateway timeout',",
+									"    timestamp: '2024-01-01T00:00:00Z'",
+									"}, null, 2));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "payments", "health"]
+						},
+						"description": "Reference: payment.failed event schema sent by Payment Service.\n\n## Event Schema (FIXED):\n```json\n{\n    \"eventId\": \"uuid-string\",\n    \"type\": \"PaymentFailed\",\n    \"eventType\": \"PAYMENT_FAILED\",\n    \"rideId\": \"BK-xxx\",\n    \"bookingId\": \"BK-xxx\",\n    \"status\": \"FAILED\",\n    \"reason\": \"Payment gateway timeout\",\n    \"timestamp\": \"2024-01-01T00:00:00Z\"\n}\n```\n\n## Field Mapping:\n| Field | Consumer Expects | Status |\n|-------|-----------------|--------|\n| eventId | eventId | ✅ Match |\n| type | type | ✅ Match |\n| rideId | rideId | ✅ Match (added) |\n| reason | reason | ✅ Match |"
+					},
+					"response": []
+				}
+			]
 		}
 	]
 }

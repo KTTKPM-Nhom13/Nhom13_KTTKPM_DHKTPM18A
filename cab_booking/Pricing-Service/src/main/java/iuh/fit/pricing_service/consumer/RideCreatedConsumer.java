@@ -47,25 +47,30 @@ public class RideCreatedConsumer {
 
     private void processRideCreatedEvent(Map<String, Object> event) {
         String rideId = extractString(event, "rideId");
-        String userId = extractString(event, "userId");
-        String driverId = extractString(event, "driverId");
-        String pickupZone = extractString(event, "pickupZone");
-        String dropoffZone = extractString(event, "dropoffZone");
+        String userId = extractString(event, "customerId");
         String vehicleType = extractString(event, "vehicleType");
-        Double pickupLat = extractDouble(event, "pickupLat");
-        Double pickupLng = extractDouble(event, "pickupLng");
-        Double dropoffLat = extractDouble(event, "dropoffLat");
-        Double dropoffLng = extractDouble(event, "dropoffLng");
+
+        Map<String, Object> pickupMap = extractMap(event, "pickup");
+        Map<String, Object> dropoffMap = extractMap(event, "dropoff");
+
+        Double pickupLat = extractDoubleFromMap(pickupMap, "lat");
+        Double pickupLng = extractDoubleFromMap(pickupMap, "lng");
+        Double dropoffLat = extractDoubleFromMap(dropoffMap, "lat");
+        Double dropoffLng = extractDoubleFromMap(dropoffMap, "lng");
+
         Double distance = extractDouble(event, "distance");
         Integer duration = extractInteger(event, "durationMinutes");
 
-        log.info("Processing ride.created - rideId: {}, vehicleType: {}, distance: {} km, duration: {} min",
-                rideId, vehicleType, distance, duration);
+        log.info("Processing ride.created - rideId: {}, userId: {}, vehicleType: {}, distance: {} km, duration: {} min",
+                rideId, userId, vehicleType, distance, duration);
 
         if (rideId == null || rideId.isBlank()) {
             log.warn("Received ride.created event with null or blank rideId, skipping");
             return;
         }
+
+        String pickupZone = extractString(event, "pickupZone");
+        String dropoffZone = extractString(event, "dropoffZone");
 
         if (pickupZone == null || pickupZone.isBlank()) {
             pickupZone = determineZone(pickupLat, pickupLng);
@@ -124,6 +129,30 @@ public class RideCreatedConsumer {
             return Integer.parseInt(value.toString());
         } catch (NumberFormatException e) {
             log.warn("Failed to parse integer for key {}: {}", key, value);
+            return null;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> extractMap(Map<String, Object> event, String key) {
+        Object value = event.get(key);
+        if (value instanceof Map) {
+            return (Map<String, Object>) value;
+        }
+        return null;
+    }
+
+    private Double extractDoubleFromMap(Map<String, Object> map, String key) {
+        if (map == null) return null;
+        Object value = map.get(key);
+        if (value == null) return null;
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue();
+        }
+        try {
+            return Double.parseDouble(value.toString());
+        } catch (NumberFormatException e) {
+            log.warn("Failed to parse double from map for key {}: {}", key, value);
             return null;
         }
     }
