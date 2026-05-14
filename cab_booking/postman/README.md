@@ -1,20 +1,25 @@
-# Postman for Auth, User, Driver
+# Postman
 
-Files:
+File chinh de import:
 
-- `CAB_Auth_User_Driver.postman_collection.json`
-- `CAB_Auth_User_Driver.postman_environment.json`
+- `CAB_Booking_Postman_Collection.json`
 
-Suggested run order:
+Collection hien tai da duoc tach lai thanh 2 luong dang ky dung theo code:
 
-1. `1.1 Register Rider` or `1.2 Login Rider`
-2. `2.x User Service` requests
-3. `1.3 Register Driver` or `1.4 Login Driver`
-4. `3.x Driver Service` requests
+- `1. Customer Registration Flow`
+- `2. Driver Registration Flow`
+- `3. Shared Auth Utilities`
 
-Notes:
+Nhung diem da duoc check lai:
 
-- `Register` and `Login` requests auto-save tokens into collection variables.
-- `2.4 Register Device` auto-saves `userDeviceId`.
-- `3.10 Internal Driver Availability Check` uses `driverUserId` captured from auth response.
-- Current dev flow uses direct `POST /api/auth/register` without registration OTP.
+- Gateway auth dung `{{baseUrl}}/api/auth/...` theo `cab-booking-config/api-gateway.yaml`.
+- Dang ky hien tai la 1 buoc `POST /api/auth/register`; flow OTP dang ky cu trong `auth-service` dang duoc comment out.
+- Luong khach sau dang ky di qua `user-service` voi profile, account, device.
+- Luong tai xe sau dang ky di qua `driver-service` voi profile/KYC, roi moi len `ONLINE`.
+- `PUT /api/drivers/me/profile` hien tai tu dong dua `verificationStatus` sang `APPROVED`, nen sau buoc nay co the test `PATCH /api/drivers/me/availability`.
+
+Thu tu chay goi y:
+
+1. Chay folder `1. Customer Registration Flow` tu tren xuong duoi.
+2. Chay folder `2. Driver Registration Flow` tu tren xuong duoi.
+3. Neu can doi mat khau, refresh token, logout, dung folder `3. Shared Auth Utilities`.
