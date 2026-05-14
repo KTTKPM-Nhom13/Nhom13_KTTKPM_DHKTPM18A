@@ -1,0 +1,553 @@
+{
+  "info": {
+    "_postman_id": "6f1bd1f0-3e40-45ce-b3aa-9d1e6efc2f11",
+    "name": "CAB Booking - LEVEL 1 DTO Flow",
+    "description": "LEVEL 1 smoke/core-flow collection. URLs and payload fields are aligned with current DTOs/controllers in auth-service, driver-service, ride-service, pricing-service, booking-service, and Payment-Service. Uses direct service ports from cab_booking/.env.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('runNonce')) {",
+          "  pm.collectionVariables.set('runNonce', Date.now().toString());",
+          "}",
+          "const nonce = pm.collectionVariables.get('runNonce');",
+          "if (!pm.collectionVariables.get('customerEmail')) {",
+          "  pm.collectionVariables.set('customerEmail', `level1.customer.${nonce}@cab.local`);",
+          "}",
+          "if (!pm.collectionVariables.get('driverEmail')) {",
+          "  pm.collectionVariables.set('driverEmail', `level1.driver.${nonce}@cab.local`);",
+          "}",
+          "if (!pm.collectionVariables.get('idempotencyKey')) {",
+          "  pm.collectionVariables.set('idempotencyKey', `level1-booking-${nonce}`);",
+          "}",
+          "if (!pm.collectionVariables.get('paymentIdempotencyKey')) {",
+          "  pm.collectionVariables.set('paymentIdempotencyKey', `level1-payment-${nonce}`);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Health Checks",
+      "item": [
+        {
+          "name": "0.1 Booking Ping",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{bookingServiceUrl}}/api/v1/bookings/ping"
+          }
+        },
+        {
+          "name": "0.2 Ride Ping",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{rideServiceUrl}}/api/v1/rides/ping"
+          }
+        },
+        {
+          "name": "0.3 Gateway Health",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{gatewayUrl}}/gateway/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Auth - Customer And Driver",
+      "item": [
+        {
+          "name": "1.1 Register Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || {};",
+                  "pm.collectionVariables.set('customerAccessToken', result.accessToken || pm.collectionVariables.get('customerAccessToken') || '');",
+                  "pm.collectionVariables.set('customerRefreshToken', result.refreshToken || pm.collectionVariables.get('customerRefreshToken') || '');",
+                  "pm.collectionVariables.set('customerUserId', result.user?.userId || result.user?.id || pm.collectionVariables.get('customerUserId') || '');",
+                  "pm.test('registered customer', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Level 1 Customer\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"phoneNumber\": \"0901000001\",\n  \"avatarUrl\": \"https://example.com/avatar/customer.png\",\n  \"role\": \"USER\",\n  \"deviceId\": \"level1-customer-web\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman LEVEL 1 Customer\",\n  \"appVersion\": \"1.0.0\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{authServiceUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "1.2 Login Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || {};",
+                  "pm.collectionVariables.set('customerAccessToken', result.accessToken || '');",
+                  "pm.collectionVariables.set('customerRefreshToken', result.refreshToken || '');",
+                  "pm.collectionVariables.set('customerUserId', result.user?.userId || result.user?.id || '');",
+                  "pm.test('logged in customer', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"deviceId\": \"level1-customer-web\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman LEVEL 1 Customer\",\n  \"appVersion\": \"1.0.0\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{authServiceUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "1.3 Verify Customer Token",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{customerAccessToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{authServiceUrl}}/auth/verify"
+          }
+        },
+        {
+          "name": "1.4 Register Driver",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || {};",
+                  "pm.collectionVariables.set('driverAccessToken', result.accessToken || pm.collectionVariables.get('driverAccessToken') || '');",
+                  "pm.collectionVariables.set('driverRefreshToken', result.refreshToken || pm.collectionVariables.get('driverRefreshToken') || '');",
+                  "pm.collectionVariables.set('driverUserId', result.user?.userId || result.user?.id || pm.collectionVariables.get('driverUserId') || '');",
+                  "pm.test('registered driver', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Level 1 Driver\",\n  \"email\": \"{{driverEmail}}\",\n  \"password\": \"{{driverPassword}}\",\n  \"phoneNumber\": \"0902000002\",\n  \"avatarUrl\": \"https://example.com/avatar/driver.png\",\n  \"role\": \"DRIVER\",\n  \"deviceId\": \"level1-driver-ios\",\n  \"platform\": \"IOS\",\n  \"userAgent\": \"Postman LEVEL 1 Driver\",\n  \"appVersion\": \"1.0.0\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{authServiceUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "1.5 Login Driver",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || {};",
+                  "pm.collectionVariables.set('driverAccessToken', result.accessToken || '');",
+                  "pm.collectionVariables.set('driverRefreshToken', result.refreshToken || '');",
+                  "pm.collectionVariables.set('driverUserId', result.user?.userId || result.user?.id || '');",
+                  "pm.test('logged in driver', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{driverEmail}}\",\n  \"password\": \"{{driverPassword}}\",\n  \"deviceId\": \"level1-driver-ios\",\n  \"platform\": \"IOS\",\n  \"userAgent\": \"Postman LEVEL 1 Driver\",\n  \"appVersion\": \"1.0.0\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{authServiceUrl}}/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Driver And Location",
+      "item": [
+        {
+          "name": "2.1 Upsert Driver Profile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{driverAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Level 1 Driver\",\n  \"email\": \"{{driverEmail}}\",\n  \"phoneNumber\": \"0902000002\",\n  \"avatarUrl\": \"https://example.com/avatar/driver.png\",\n  \"licenseNumber\": \"GPLX-LEVEL-1\",\n  \"vehicleType\": \"ECONOMY\",\n  \"vehiclePlate\": \"51H-10001\",\n  \"vehicleModel\": \"Toyota Vios\",\n  \"vehicleColor\": \"Black\",\n  \"serviceArea\": \"Ho Chi Minh City\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{driverServiceUrl}}/api/drivers/me/profile"
+          }
+        },
+        {
+          "name": "2.2 Update Driver Availability ONLINE",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{driverAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"availabilityStatus\": \"ONLINE\",\n  \"currentLatitude\": 10.7769,\n  \"currentLongitude\": 106.7009\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{driverServiceUrl}}/api/drivers/me/availability"
+          }
+        },
+        {
+          "name": "2.3 Push Driver GPS To Ride Service Redis GEO",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{driverAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driverId\": \"{{driverUserId}}\",\n  \"lat\": 10.7769,\n  \"lng\": 106.7009\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{rideServiceUrl}}/api/v1/rides/location"
+          }
+        },
+        {
+          "name": "2.4 Internal Driver Availability Check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{driverServiceUrl}}/internal/drivers/{{driverUserId}}/availability"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Pricing",
+      "item": [
+        {
+          "name": "3.1 Estimate Fare",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('estimateId', body.estimateId || pm.collectionVariables.get('estimateId') || '');",
+                  "pm.collectionVariables.set('estimatedFare', body.totalFare || pm.collectionVariables.get('estimatedFare') || '45000');",
+                  "pm.collectionVariables.set('quoteToken', body.estimateId || pm.collectionVariables.get('quoteToken') || 'manual-quote-token');",
+                  "pm.test('fare estimated', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{pricingServiceUrl}}/api/pricing/estimate?pickupLat=10.7769&pickupLng=106.7009&dropoffLat=10.7626&dropoffLng=106.6602&vehicleType=ECONOMY&estimatedDurationMinutes=18"
+          }
+        },
+        {
+          "name": "3.2 Confirm Fare Estimate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('estimatedFare', body.totalFare || pm.collectionVariables.get('estimatedFare') || '45000');",
+                  "pm.collectionVariables.set('quoteToken', body.id || pm.collectionVariables.get('quoteToken') || pm.collectionVariables.get('estimateId') || 'manual-quote-token');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "url": "{{pricingServiceUrl}}/api/pricing/confirm/{{estimateId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Booking Core Flow",
+      "item": [
+        {
+          "name": "4.1 Create Booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || {};",
+                  "pm.collectionVariables.set('bookingId', result.id || pm.collectionVariables.get('bookingId') || '');",
+                  "pm.collectionVariables.set('bookingStatus', result.status || '');",
+                  "pm.test('booking created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{customerAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Ben Thanh Market, District 1, Ho Chi Minh City\",\n  \"customerNote\": \"Meet at main lobby\",\n  \"pickupCoordinates\": {\n    \"lat\": 10.7769,\n    \"lng\": 106.7009\n  },\n  \"dropoffCoordinates\": {\n    \"lat\": 10.7626,\n    \"lng\": 106.6602\n  },\n  \"vehicleType\": \"ECONOMY\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"promoCode\": \"LEVEL1\",\n  \"quoteToken\": \"{{quoteToken}}\",\n  \"idempotencyKey\": \"{{idempotencyKey}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{bookingServiceUrl}}/api/v1/bookings"
+          }
+        },
+        {
+          "name": "4.2 Get Customer Active Booking",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{customerAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "url": "{{bookingServiceUrl}}/api/v1/bookings/customer/{{customerUserId}}/active"
+          }
+        },
+        {
+          "name": "4.3 Get Nearby Matching Bookings",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{customerAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "url": "{{bookingServiceUrl}}/api/v1/bookings/nearby?lat=10.7769&lng=106.7009&radius=5"
+          }
+        },
+        {
+          "name": "4.4 Manual Assign Driver To Booking",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{driverAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "url": "{{bookingServiceUrl}}/api/v1/bookings/{{bookingId}}/assign?driverId={{driverUserId}}"
+          }
+        },
+        {
+          "name": "4.5 Driver Arrive At Pickup",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{driverAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "url": "{{bookingServiceUrl}}/api/v1/bookings/{{bookingId}}/arrive"
+          }
+        },
+        {
+          "name": "4.6 Start Ride",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{driverAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "url": "{{bookingServiceUrl}}/api/v1/bookings/{{bookingId}}/start"
+          }
+        },
+        {
+          "name": "4.7 Complete Ride",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{driverAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "url": "{{bookingServiceUrl}}/api/v1/bookings/{{bookingId}}/complete"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Payment",
+      "item": [
+        {
+          "name": "5.1 Charge CASH Payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || {};",
+                  "pm.collectionVariables.set('transactionId', result.transactionId || pm.collectionVariables.get('transactionId') || '');",
+                  "pm.test('payment charged/requested', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{customerAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Idempotency-Key", "value": "{{paymentIdempotencyKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": \"{{bookingId}}\",\n  \"customerId\": \"{{customerUserId}}\",\n  \"amount\": {{estimatedFare}},\n  \"paymentMethod\": \"CASH\",\n  \"currency\": \"VND\",\n  \"description\": \"LEVEL 1 cash payment for booking {{bookingId}}\",\n  \"idempotencyKey\": \"{{paymentIdempotencyKey}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{paymentServiceUrl}}/api/payments/charge"
+          }
+        },
+        {
+          "name": "5.2 Get Payment By Booking ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{customerAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "url": "{{paymentServiceUrl}}/api/payments/booking/{{bookingId}}"
+          }
+        },
+        {
+          "name": "5.3 Get Payment By Transaction ID",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{customerAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "url": "{{paymentServiceUrl}}/api/payments/txn/{{transactionId}}"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "gatewayUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "authServiceUrl", "value": "http://localhost:8081", "type": "string" },
+    { "key": "driverServiceUrl", "value": "http://localhost:8083", "type": "string" },
+    { "key": "bookingServiceUrl", "value": "http://localhost:8084", "type": "string" },
+    { "key": "rideServiceUrl", "value": "http://localhost:8085", "type": "string" },
+    { "key": "pricingServiceUrl", "value": "http://localhost:8088", "type": "string" },
+    { "key": "paymentServiceUrl", "value": "http://localhost:8090", "type": "string" },
+    { "key": "runNonce", "value": "", "type": "string" },
+    { "key": "customerEmail", "value": "", "type": "string" },
+    { "key": "customerPassword", "value": "12345678", "type": "string" },
+    { "key": "customerAccessToken", "value": "", "type": "string" },
+    { "key": "customerRefreshToken", "value": "", "type": "string" },
+    { "key": "customerUserId", "value": "", "type": "string" },
+    { "key": "driverEmail", "value": "", "type": "string" },
+    { "key": "driverPassword", "value": "12345678", "type": "string" },
+    { "key": "driverAccessToken", "value": "", "type": "string" },
+    { "key": "driverRefreshToken", "value": "", "type": "string" },
+    { "key": "driverUserId", "value": "", "type": "string" },
+    { "key": "estimateId", "value": "", "type": "string" },
+    { "key": "estimatedFare", "value": "45000", "type": "string" },
+    { "key": "quoteToken", "value": "manual-quote-token", "type": "string" },
+    { "key": "idempotencyKey", "value": "", "type": "string" },
+    { "key": "bookingId", "value": "", "type": "string" },
+    { "key": "bookingStatus", "value": "", "type": "string" },
+    { "key": "paymentIdempotencyKey", "value": "", "type": "string" },
+    { "key": "transactionId", "value": "", "type": "string" }
+  ]
+}

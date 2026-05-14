@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit;
 public class MatchingService {
 
     // ── Constants ──────────────────────────────────────────────────────────
-    private static final String DRIVER_LOCATION_KEY  = "driver_locations";
+    private static final String DRIVER_LOCATION_KEY  = "driver:locations";
     private static final String DRIVER_STATUS_PREFIX = "driver:status:";
     private static final String DRIVER_LOCK_PREFIX   = "lock:driver:";
     private static final String DRIVER_STATUS_BUSY   = "BUSY";
@@ -151,8 +151,10 @@ public class MatchingService {
         log.info("🔐 [STEP 3] Race Condition Lock Loop — {} ung vien | rideId={}",
             ranking.size(), event.rideId());
 
+        boolean assigned = false;
+
         for (RankingEntry entry : ranking) {
-            String driverId  = entry.getDriverId();
+            String driverId  = normalizeDriverId(entry.getDriverId());
             String lockKey   = DRIVER_LOCK_PREFIX + driverId;   // "lock:driver:drv-001"
             String statusKey = DRIVER_STATUS_PREFIX + driverId; // "driver:status:drv-001"
 
@@ -187,6 +189,7 @@ public class MatchingService {
                 log.info("📤 Da ban ride.assigned | rideId={} | driverId={}", event.rideId(), driverId);
 
                 // QUAN TRỌNG: Break ngay — đã gán thành công, không thử tài xế khác
+                assigned = true;
                 break;
 
             } else {
@@ -199,7 +202,9 @@ public class MatchingService {
         }
 
         // Đến đây mà không break = toàn bộ tài xế trong ranking đều bị xí mất
-        log.warn("⚠️ Khong con tai xe kha dung sau Race Condition loop | rideId={}", event.rideId());
+        if (!assigned) {
+            log.warn("⚠️ Khong con tai xe kha dung sau Race Condition loop | rideId={}", event.rideId());
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -261,5 +266,12 @@ public class MatchingService {
         }
 
         return featureList;
+    }
+
+    private String normalizeDriverId(String driverId) {
+        if (driverId == null) {
+            return null;
+        }
+        return driverId.replace("\"", "").trim();
     }
 }

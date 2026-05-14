@@ -112,8 +112,8 @@ public class BookingServiceImpl implements BookingService {
                     .orElseThrow(() -> new IllegalStateException("Lỗi tranh chấp dữ liệu IdempotencyKey."));
             return BookingResponse.fromEntity(existing);
         }
-        // Đã xóa dòng đổi status thành MATCHING ở đây theo yêu cầu.
-        // Booking sẽ giữ trạng thái CREATED cho đến khi Matching Service gửi lại sự kiện.
+        bookingStateMachine.transitionTo(booking, BookingStatus.MATCHING);
+        booking = bookingRepository.saveAndFlush(booking);
 
         // BƯỚC 5: Gửi Kafka event
         RideCreatedEvent event = RideCreatedEvent.builder()
