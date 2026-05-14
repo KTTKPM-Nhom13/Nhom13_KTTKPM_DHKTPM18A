@@ -200,7 +200,7 @@ public class PricingController {
     @PostMapping("/demand-supply")
     @Operation(
             summary = "Update demand and supply metrics",
-            description = "Update demand and supply metrics to recalculate surge pricing"
+            description = "Cache demand and supply metrics in Redis. Surge pricing is recalculated asynchronously by scheduler."
     )
     public ResponseEntity<Map<String, Object>> updateDemandSupply(
             @RequestParam @NotBlank String zoneId,
@@ -215,7 +215,7 @@ public class PricingController {
                 "zone_id", zoneId,
                 "active_drivers", activeDrivers,
                 "pending_rides", pendingRides,
-                "message", "Demand/supply metrics processed and surge updated if needed"
+                "message", "Demand/supply metrics cached. Surge update is handled asynchronously by scheduler."
         );
 
         return ResponseEntity.ok(response);

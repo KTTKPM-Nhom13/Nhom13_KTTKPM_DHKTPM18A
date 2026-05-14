@@ -1,0 +1,844 @@
+{
+	"info": {
+		"_postman_id": "cab-booking-pricing-service",
+		"name": "Cab Booking - Pricing Service",
+		"description": "Postman collection for testing Cab Booking Pricing Service APIs including authentication",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "authServiceUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "pricingServiceUrl",
+			"value": "http://localhost:8084",
+			"type": "string"
+		},
+		{
+			"key": "accessToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refreshToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "userId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "estimateId",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{accessToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "0. Auth - Register",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 200 || pm.response.code === 201) {",
+							"    var jsonData = pm.response.json();",
+							"    if (jsonData.result && jsonData.result.accessToken) {",
+							"        pm.collectionVariables.set('accessToken', jsonData.result.accessToken);",
+							"    }",
+							"    if (jsonData.result && jsonData.result.refreshToken) {",
+							"        pm.collectionVariables.set('refreshToken', jsonData.result.refreshToken);",
+							"    }",
+							"    if (jsonData.result && jsonData.result.user && jsonData.result.user.userId) {",
+							"        pm.collectionVariables.set('userId', jsonData.result.user.userId);",
+							"    }",
+							"}",
+							"",
+							"pm.test('Registration successful', function() {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.message).to.include('success');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"email\": \"testuser{{$timestamp}}@example.com\",\n    \"password\": \"Password123!\",\n    \"fullName\": \"Test User\",\n    \"phoneNumber\": \"+1234567890\",\n    \"deviceId\": \"postman-test-device-{{$timestamp}}\",\n    \"platform\": \"ANDROID\",\n    \"userAgent\": \"Postman/1.0\"\n}"
+				},
+				"url": {
+					"raw": "{{authServiceUrl}}/auth/register",
+					"host": ["{{authServiceUrl}}"],
+					"path": ["auth", "register"]
+				},
+				"description": "Register a new user account"
+			},
+			"response": []
+		},
+		{
+			"name": "1. Auth - Login",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 200) {",
+							"    var jsonData = pm.response.json();",
+							"    if (jsonData.result && jsonData.result.accessToken) {",
+							"        pm.collectionVariables.set('accessToken', jsonData.result.accessToken);",
+							"        pm.test('Access token received', function() {",
+							"            pm.expect(jsonData.result.accessToken).to.be.a('string');",
+							"        });",
+							"    }",
+							"    if (jsonData.result && jsonData.result.refreshToken) {",
+							"        pm.collectionVariables.set('refreshToken', jsonData.result.refreshToken);",
+							"    }",
+							"    if (jsonData.result && jsonData.result.user && jsonData.result.user.userId) {",
+							"        pm.collectionVariables.set('userId', jsonData.result.user.userId);",
+							"    }",
+							"}",
+							"",
+							"pm.test('Login successful', function() {",
+							"    pm.expect(pm.response.code).to.eql(200);",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.result).to.have.property('accessToken');",
+							"    pm.expect(jsonData.result).to.have.property('refreshToken');",
+							"    pm.expect(jsonData.result).to.have.property('user');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"email\": \"testuser@example.com\",\n    \"password\": \"Password123!\",\n    \"deviceId\": \"postman-test-device-001\",\n    \"platform\": \"ANDROID\",\n    \"userAgent\": \"Postman/1.0\"\n}"
+				},
+				"url": {
+					"raw": "{{authServiceUrl}}/auth/login",
+					"host": ["{{authServiceUrl}}"],
+					"path": ["auth", "login"]
+				},
+				"description": "Login with existing credentials"
+			},
+			"response": []
+		},
+		{
+			"name": "2. Auth - Verify Token",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Token verified', function() {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.result).to.have.property('status', 'success');",
+							"    pm.expect(jsonData.result).to.have.property('userId');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"token\": \"{{accessToken}}\"\n}"
+				},
+				"url": {
+					"raw": "{{authServiceUrl}}/auth/verify",
+					"host": ["{{authServiceUrl}}"],
+					"path": ["auth", "verify"]
+				},
+				"description": "Verify the JWT token"
+			},
+			"response": []
+		},
+		{
+			"name": "3. Auth - Refresh Token",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 200) {",
+							"    var jsonData = pm.response.json();",
+							"    if (jsonData.result && jsonData.result.accessToken) {",
+							"        pm.collectionVariables.set('accessToken', jsonData.result.accessToken);",
+							"    }",
+							"    if (jsonData.result && jsonData.result.refreshToken) {",
+							"        pm.collectionVariables.set('refreshToken', jsonData.result.refreshToken);",
+							"    }",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"refreshToken\": \"{{refreshToken}}\"\n}"
+				},
+				"url": {
+					"raw": "{{authServiceUrl}}/auth/refresh",
+					"host": ["{{authServiceUrl}}"],
+					"path": ["auth", "refresh"]
+				},
+				"description": "Refresh the access token using refresh token"
+			},
+			"response": []
+		},
+		{
+			"name": "4. Auth - Logout",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Logout successful', function() {",
+							"    pm.expect(pm.response.code).to.eql(200);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"refreshToken\": \"{{refreshToken}}\",\n    \"deviceId\": \"postman-test-device-001\"\n}"
+				},
+				"url": {
+					"raw": "{{authServiceUrl}}/auth/logout",
+					"host": ["{{authServiceUrl}}"],
+					"path": ["auth", "logout"]
+				},
+				"description": "Logout and invalidate the refresh token"
+			},
+			"response": []
+		},
+		{
+			"name": "Pricing Service",
+			"item": [
+				{
+					"name": "5. Calculate Simple Price",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Simple price calculated', function() {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('distanceKm');",
+									"    pm.expect(jsonData).to.have.property('totalFare');",
+									"    pm.test('Total fare is positive', function() {",
+									"        pm.expect(parseFloat(jsonData.totalFare)).to.be.above(0);",
+									"    });",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"distanceKm\": 10.5,\n    \"demandIndex\": 1.2\n}"
+						},
+						"url": {
+							"raw": "{{pricingServiceUrl}}/api/pricing/calculate",
+							"host": ["{{pricingServiceUrl}}"],
+							"path": ["api", "pricing", "calculate"]
+						},
+						"description": "Calculate simple price based on distance and demand index"
+					},
+					"response": []
+				},
+				{
+					"name": "6. Get Fare Estimate",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.estimateId) {",
+									"        pm.collectionVariables.set('estimateId', jsonData.estimateId);",
+									"    }",
+									"}",
+									"",
+									"pm.test('Fare estimate generated', function() {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('estimateId');",
+									"    pm.expect(jsonData).to.have.property('totalFare');",
+									"    pm.expect(jsonData).to.have.property('vehicleType');",
+									"    pm.expect(jsonData).to.have.property('distanceKm');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{pricingServiceUrl}}/api/pricing/estimate?pickupLat=10.7629&pickupLng=106.68&dropoffLat=10.8231&dropoffLng=106.63&vehicleType=ECONOMY&estimatedDurationMinutes=30",
+							"host": ["{{pricingServiceUrl}}"],
+							"path": ["api", "pricing", "estimate"],
+							"query": [
+								{
+									"key": "pickupLat",
+									"value": "10.7629",
+									"description": "Pickup latitude (Ho Chi Minh City)"
+								},
+								{
+									"key": "pickupLng",
+									"value": "106.68",
+									"description": "Pickup longitude"
+								},
+								{
+									"key": "dropoffLat",
+									"value": "10.8231",
+									"description": "Dropoff latitude"
+								},
+								{
+									"key": "dropoffLng",
+									"value": "106.63",
+									"description": "Dropoff longitude"
+								},
+								{
+									"key": "vehicleType",
+									"value": "ECONOMY",
+									"description": "Vehicle type: ECONOMY, COMFORT, PREMIUM"
+								},
+								{
+									"key": "estimatedDurationMinutes",
+									"value": "30",
+									"description": "Estimated trip duration in minutes"
+								}
+							]
+						},
+						"description": "Get fare estimate with vehicle type selection"
+					},
+					"response": []
+				},
+				{
+					"name": "7. Get Fare Estimate - Comfort",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Comfort fare estimate generated', function() {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('estimateId');",
+									"    pm.expect(jsonData.vehicleType).to.eql('COMFORT');",
+									"    pm.expect(jsonData).to.have.property('totalFare');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{pricingServiceUrl}}/api/pricing/estimate?pickupLat=10.7629&pickupLng=106.68&dropoffLat=10.8231&dropoffLng=106.63&vehicleType=COMFORT&estimatedDurationMinutes=30",
+							"host": ["{{pricingServiceUrl}}"],
+							"path": ["api", "pricing", "estimate"],
+							"query": [
+								{
+									"key": "pickupLat",
+									"value": "10.7629"
+								},
+								{
+									"key": "pickupLng",
+									"value": "106.68"
+								},
+								{
+									"key": "dropoffLat",
+									"value": "10.8231"
+								},
+								{
+									"key": "dropoffLng",
+									"value": "106.63"
+								},
+								{
+									"key": "vehicleType",
+									"value": "COMFORT"
+								},
+								{
+									"key": "estimatedDurationMinutes",
+									"value": "30"
+								}
+							]
+						},
+						"description": "Get fare estimate for COMFORT vehicle type"
+					},
+					"response": []
+				},
+				{
+					"name": "8. Get Fare Estimate - Premium",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Premium fare estimate generated', function() {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('estimateId');",
+									"    pm.expect(jsonData.vehicleType).to.eql('PREMIUM');",
+									"    pm.expect(jsonData).to.have.property('totalFare');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{pricingServiceUrl}}/api/pricing/estimate?pickupLat=10.7629&pickupLng=106.68&dropoffLat=10.8231&dropoffLng=106.63&vehicleType=PREMIUM&estimatedDurationMinutes=30",
+							"host": ["{{pricingServiceUrl}}"],
+							"path": ["api", "pricing", "estimate"],
+							"query": [
+								{
+									"key": "pickupLat",
+									"value": "10.7629"
+								},
+								{
+									"key": "pickupLng",
+									"value": "106.68"
+								},
+								{
+									"key": "dropoffLat",
+									"value": "10.8231"
+								},
+								{
+									"key": "dropoffLng",
+									"value": "106.63"
+								},
+								{
+									"key": "vehicleType",
+									"value": "PREMIUM"
+								},
+								{
+									"key": "estimatedDurationMinutes",
+									"value": "30"
+								}
+							]
+						},
+						"description": "Get fare estimate for PREMIUM vehicle type"
+					},
+					"response": []
+				},
+				{
+					"name": "9. Confirm Fare Estimate",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Fare estimate confirmed', function() {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.expect(jsonData).to.have.property('status');",
+									"    pm.expect(jsonData).to.have.property('totalFare');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{pricingServiceUrl}}/api/pricing/confirm/{{estimateId}}",
+							"host": ["{{pricingServiceUrl}}"],
+							"path": ["api", "pricing", "confirm", "{{estimateId}}"]
+						},
+						"description": "Confirm a fare estimate to lock in the price"
+					},
+					"response": []
+				},
+				{
+					"name": "10. Get Surge Multiplier",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Surge multiplier retrieved', function() {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('zone_id');",
+									"    pm.expect(jsonData).to.have.property('surge_multiplier');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{pricingServiceUrl}}/api/pricing/surge/zone-downtown",
+							"host": ["{{pricingServiceUrl}}"],
+							"path": ["api", "pricing", "surge", "zone-downtown"]
+						},
+						"description": "Get surge multiplier for a specific zone"
+					},
+					"response": []
+				},
+				{
+					"name": "11. Get All Surge Multipliers",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('All surge multipliers retrieved', function() {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('object');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{pricingServiceUrl}}/api/pricing/surge/all",
+							"host": ["{{pricingServiceUrl}}"],
+							"path": ["api", "pricing", "surge", "all"]
+						},
+						"description": "Get all surge multipliers for all zones"
+					},
+					"response": []
+				},
+				{
+					"name": "12. Update Surge Multiplier",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Surge multiplier updated', function() {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.zone_id).to.eql('zone-downtown');",
+									"    pm.expect(jsonData.surge_multiplier).to.eql('1.5');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "{{pricingServiceUrl}}/api/pricing/surge/zone-downtown?multiplier=1.5",
+							"host": ["{{pricingServiceUrl}}"],
+							"path": ["api", "pricing", "surge", "zone-downtown"],
+							"query": [
+								{
+									"key": "multiplier",
+									"value": "1.5",
+									"description": "New surge multiplier value"
+								}
+							]
+						},
+						"description": "Manually update surge multiplier for a zone"
+					},
+					"response": []
+				},
+				{
+					"name": "13. Update Demand/Supply",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Demand/supply updated', function() {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('zone_id');",
+									"    pm.expect(jsonData).to.have.property('active_drivers');",
+									"    pm.expect(jsonData).to.have.property('pending_rides');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{pricingServiceUrl}}/api/pricing/demand-supply?zoneId=zone-downtown&activeDrivers=10&pendingRides=25",
+							"host": ["{{pricingServiceUrl}}"],
+							"path": ["api", "pricing", "demand-supply"],
+							"query": [
+								{
+									"key": "zoneId",
+									"value": "zone-downtown",
+									"description": "Zone identifier"
+								},
+								{
+									"key": "activeDrivers",
+									"value": "10",
+									"description": "Number of active drivers in the zone"
+								},
+								{
+									"key": "pendingRides",
+									"value": "25",
+									"description": "Number of pending ride requests"
+								}
+							]
+						},
+						"description": "Update demand and supply metrics for surge calculation"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Utility",
+			"item": [
+				{
+					"name": "14. Health Check - Pricing Service",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Pricing service is healthy', function() {",
+									"    pm.expect(pm.response.code).to.eql(200);",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql('UP');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{pricingServiceUrl}}/actuator/health",
+							"host": ["{{pricingServiceUrl}}"],
+							"path": ["actuator", "health"]
+						},
+						"description": "Check health status of Pricing Service"
+					},
+					"response": []
+				},
+				{
+					"name": "15. Swagger UI",
+					"event": [],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{pricingServiceUrl}}/swagger-ui.html",
+							"host": ["{{pricingServiceUrl}}"],
+							"path": ["swagger-ui.html"]
+						},
+						"description": "Open Swagger UI for API documentation"
+					},
+					"response": []
+				},
+				{
+					"name": "16. Generate Debug Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    var token = pm.response.text();",
+									"    pm.collectionVariables.set('accessToken', token);",
+									"    pm.test('Debug token generated', function() {",
+									"        pm.expect(token).to.be.a('string');",
+									"        pm.expect(token.length).to.be.above(0);",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-Debug-Trace-Id",
+								"value": "test-trace-001",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{authServiceUrl}}/auth/token",
+							"host": ["{{authServiceUrl}}"],
+							"path": ["auth", "token"]
+						},
+						"description": "Generate a debug token for testing (bypasses login)"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}

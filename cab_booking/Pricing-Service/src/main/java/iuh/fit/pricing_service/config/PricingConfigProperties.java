@@ -15,6 +15,7 @@ public class PricingConfigProperties {
     private Calculation calculation = new Calculation();
     private Map<String, VehicleConfig> vehicle = new java.util.HashMap<>();
     private Surge surge = new Surge();
+    private Eta eta = new Eta();
 
     @Data
     public static class Calculation {
@@ -39,5 +40,12 @@ public class PricingConfigProperties {
         private BigDecimal maxMultiplier = new BigDecimal("3.0");
         private BigDecimal updateThreshold = new BigDecimal("0.1");
         private int cacheTtlSeconds = 60;
+        private long schedulerFixedDelayMs = 60000;
+        private int metricsTtlSeconds = 600;
+    }
+
+    @Data
+    public static class Eta {
+        private int fallbackDurationMinutes = 15;
     }
 }

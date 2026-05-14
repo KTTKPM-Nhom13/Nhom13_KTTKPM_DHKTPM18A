@@ -26,7 +26,9 @@ public class GatewaySecurityConfig {
             "/eta/**",
             "/api/eta/**",
             "/api/notifications/**",
-            "/api/reviews/**"
+            "/api/reviews/**",
+            "/api/pricing/**",
+            "/pricing/**"
     };
 
     @Bean

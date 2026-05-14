@@ -1,6 +1,7 @@
 package iuh.fit.pricing_service.consumer;
 
 import iuh.fit.pricing_service.config.KafkaConfig;
+import iuh.fit.pricing_service.service.SurgePricingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -10,7 +11,6 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import java.util.Map;
 
 @Component
@@ -20,6 +20,8 @@ public class DemandSupplyConsumer {
 
     private static final String TOPIC_DEMAND_SUPPLY = "demand.supply.updated";
     private static final String GROUP_ID = "pricing-demand-supply-group";
+
+    private final SurgePricingService surgePricingService;
 
     @KafkaListener(
             topics = TOPIC_DEMAND_SUPPLY,
@@ -50,8 +52,6 @@ public class DemandSupplyConsumer {
         String zoneId = extractString(event, "zoneId");
         Integer activeDrivers = extractInteger(event, "activeDrivers");
         Integer pendingRides = extractInteger(event, "pendingRides");
-        BigDecimal surgeMultiplier = extractBigDecimal(event, "surgeMultiplier");
-
         if (zoneId == null || zoneId.isBlank()) {
             log.warn("Received demand.supply event with null or blank zoneId, skipping");
             return;
@@ -62,8 +62,9 @@ public class DemandSupplyConsumer {
             return;
         }
 
-        log.info("Processing demand/supply update - zone: {}, drivers: {}, rides: {}, surge: {}",
-                zoneId, activeDrivers, pendingRides, surgeMultiplier);
+        surgePricingService.updateCurrentZoneMetrics(zoneId, activeDrivers, pendingRides);
+        log.info("Cached demand/supply metrics - zone: {}, drivers: {}, rides: {}",
+                zoneId, activeDrivers, pendingRides);
     }
 
     private String extractString(Map<String, Object> event, String key) {
@@ -85,17 +86,4 @@ public class DemandSupplyConsumer {
         }
     }
 
-    private BigDecimal extractBigDecimal(Map<String, Object> event, String key) {
-        Object value = event.get(key);
-        if (value == null) return null;
-        if (value instanceof Number) {
-            return BigDecimal.valueOf(((Number) value).doubleValue());
-        }
-        try {
-            return new BigDecimal(value.toString());
-        } catch (NumberFormatException e) {
-            log.warn("Failed to parse BigDecimal for key {}: {}", key, value);
-            return null;
-        }
-    }
 }
