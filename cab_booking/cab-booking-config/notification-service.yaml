@@ -30,3 +30,12 @@ eureka:
       defaultZone: http://eureka-server:8761/eureka/
   instance:
     prefer-ip-address: true
+
+app:
+  security:
+    public-endpoints: >-
+      /actuator/health,
+      /actuator/info,
+      /v3/api-docs/**,
+      /swagger-ui/**,
+      /swagger-ui.html
