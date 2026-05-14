@@ -14,6 +14,15 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "*"
+        spring.json.type.mapping: >
+          ride-created:java.util.Map,
+          ride-cancelled:java.util.Map,
+          ride-accepted:java.util.Map,
+          booking-timeout:java.util.Map,
+          ride-finished:java.util.Map,
+          ride-started:java.util.Map,
+          driver-arrived:java.util.Map,
+          ride-assigned:java.util.Map
 
 eureka:
   client:
