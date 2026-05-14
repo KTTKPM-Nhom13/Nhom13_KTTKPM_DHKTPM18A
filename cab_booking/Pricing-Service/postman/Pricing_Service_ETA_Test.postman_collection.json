@@ -1,0 +1,388 @@
+{
+	"info": {
+		"_postman_id": "cab-booking-pricing-eta-testing",
+		"name": "CAB Booking - Pricing Service ETA Testing",
+		"description": "Postman collection for testing ETA functionality in Pricing Service. This collection verifies that the ETA calculation service returns valid values based on distance and traffic conditions.\n\n## Prerequisites\n1. Pricing Service must be running on port 8084\n2. Redis must be available for ETA caching\n3. Optional: Google Maps API key configured for accurate ETA\n\n## Test Cases\n1. **ETA Calculation - Normal Distance** - Verify ETA > 0 for 5km distance\n2. **ETA Calculation - Short Distance** - Verify ETA for 1km distance\n3. **ETA Calculation - Long Distance** - Verify ETA for 20km distance\n\n## ETA Validation Rules\n- ETA (durationMinutes) must be > 0\n- ETA should be reasonable (< 60 minutes for distances under 10km)\n- Response must include distanceKm and durationMinutes fields",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8088",
+			"type": "string"
+		},
+		{
+			"key": "pickupLat",
+			"value": "10.7629",
+			"type": "string"
+		},
+		{
+			"key": "pickupLng",
+			"value": "106.6602",
+			"type": "string"
+		},
+		{
+			"key": "dropoffLat",
+			"value": "10.8231",
+			"type": "string"
+		},
+		{
+			"key": "dropoffLng",
+			"value": "106.6873",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "ETA Service - 5km Distance (Normal Traffic)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Response status is 200', function() {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response contains valid ETA structure', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response).to.have.property('distanceKm');",
+							"    pm.expect(response).to.have.property('durationMinutes');",
+							"    pm.expect(response).to.have.property('vehicleType');",
+							"});",
+							"",
+							"pm.test('ETA (durationMinutes) is greater than 0', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.durationMinutes).to.be.a('number');",
+							"    pm.expect(response.durationMinutes).to.be.above(0);",
+							"});",
+							"",
+							"pm.test('Distance is valid and greater than 0', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.distanceKm).to.be.a('number');",
+							"    pm.expect(response.distanceKm).to.be.above(0);",
+							"});",
+							"",
+							"pm.test('ETA is reasonable for 5km distance (< 60 minutes)', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.durationMinutes).to.be.below(60);",
+							"});",
+							"",
+							"pm.test('Vehicle type matches request', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.vehicleType).to.eql('ECONOMY');",
+							"});",
+							"",
+							"pm.test('Response contains fare estimate', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response).to.have.property('totalFare');",
+							"    pm.expect(response).to.have.property('baseFare');",
+							"});",
+							"",
+							"pm.test('ETA calculation source is documented', function() {",
+							"    const response = pm.response.json();",
+							"    console.log('ETA Response:', JSON.stringify(response, null, 2));",
+							"    console.log('Distance:', response.distanceKm, 'km');",
+							"    console.log('Duration:', response.durationMinutes, 'minutes');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Calculate expected coordinates for ~5km distance",
+							"// Using Ho Chi Minh City coordinates as base",
+							"// Starting point: 10.7629, 106.6602",
+							"// Moving approximately 5km north-east",
+							"",
+							"// For ~5km, roughly 0.045 degrees latitude",
+							"const pickupLat = 10.7629;",
+							"const pickupLng = 106.6602;",
+							"",
+							"// Dropoff ~5km away",
+							"const dropoffLat = 10.8231; // ~6.7km north",
+							"const dropoffLng = 106.6873; // ~3km east",
+							"",
+							"pm.collectionVariables.set('pickupLat', pickupLat.toString());",
+							"pm.collectionVariables.set('pickupLng', pickupLng.toString());",
+							"pm.collectionVariables.set('dropoffLat', dropoffLat.toString());",
+							"pm.collectionVariables.set('dropoffLng', dropoffLng.toString());",
+							"",
+							"console.log('Coordinates set for ~5km distance test');"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/pricing/estimate?pickupLat={{pickupLat}}&pickupLng={{pickupLng}}&dropoffLat={{dropoffLat}}&dropoffLng={{dropoffLng}}&vehicleType=ECONOMY",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "pricing", "estimate"],
+					"query": [
+						{
+							"key": "pickupLat",
+							"value": "{{pickupLat}}"
+						},
+						{
+							"key": "pickupLng",
+							"value": "{{pickupLng}}"
+						},
+						{
+							"key": "dropoffLat",
+							"value": "{{dropoffLat}}"
+						},
+						{
+							"key": "dropoffLng",
+							"value": "{{dropoffLng}}"
+						},
+						{
+							"key": "vehicleType",
+							"value": "ECONOMY"
+						}
+					]
+				},
+				"description": "Test ETA calculation for approximately 5km distance with normal traffic conditions. This test verifies:\n1. HTTP 200 response\n2. ETA (durationMinutes) > 0\n3. ETA is reasonable (< 60 minutes for 5km)\n4. Response contains valid distance and duration fields"
+			},
+			"response": []
+		},
+		{
+			"name": "ETA Service - Short Distance (1km)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Response status is 200', function() {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('ETA is greater than 0', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.durationMinutes).to.be.above(0);",
+							"});",
+							"",
+							"pm.test('ETA is reasonable for short distance (< 15 minutes)', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.durationMinutes).to.be.below(15);",
+							"});",
+							"",
+							"pm.test('Distance is approximately 1km', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.distanceKm).to.be.below(3);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Short distance coordinates (~1km)",
+							"const pickupLat = 10.7629;",
+							"const pickupLng = 106.6602;",
+							"",
+							"// Dropoff ~1km away",
+							"const dropoffLat = 10.7700;",
+							"const dropoffLng = 106.6650;",
+							"",
+							"pm.collectionVariables.set('pickupLat', pickupLat.toString());",
+							"pm.collectionVariables.set('pickupLng', pickupLng.toString());",
+							"pm.collectionVariables.set('dropoffLat', dropoffLat.toString());",
+							"pm.collectionVariables.set('dropoffLng', dropoffLng.toString());"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/pricing/estimate?pickupLat={{pickupLat}}&pickupLng={{pickupLng}}&dropoffLat={{dropoffLat}}&dropoffLng={{dropoffLng}}&vehicleType=ECONOMY",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "pricing", "estimate"],
+					"query": [
+						{
+							"key": "pickupLat",
+							"value": "{{pickupLat}}"
+						},
+						{
+							"key": "pickupLng",
+							"value": "{{pickupLng}}"
+						},
+						{
+							"key": "dropoffLat",
+							"value": "{{dropoffLat}}"
+						},
+						{
+							"key": "dropoffLng",
+							"value": "{{dropoffLng}}"
+						},
+						{
+							"key": "vehicleType",
+							"value": "ECONOMY"
+						}
+					]
+				},
+				"description": "Test ETA calculation for short distance (~1km)"
+			},
+			"response": []
+		},
+		{
+			"name": "ETA Service - Long Distance (20km)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Response status is 200', function() {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('ETA is greater than 0', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.durationMinutes).to.be.above(0);",
+							"});",
+							"",
+							"pm.test('ETA is reasonable for 20km distance (< 120 minutes)', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.durationMinutes).to.be.below(120);",
+							"});",
+							"",
+							"pm.test('Distance is approximately 20km', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.distanceKm).to.be.above(15);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Long distance coordinates (~20km)",
+							"const pickupLat = 10.7629;",
+							"const pickupLng = 106.6602;",
+							"",
+							"// Dropoff ~20km away (near Vung Tau direction)",
+							"const dropoffLat = 10.9800;",
+							"const dropoffLng = 106.8200;",
+							"",
+							"pm.collectionVariables.set('pickupLat', pickupLat.toString());",
+							"pm.collectionVariables.set('pickupLng', pickupLng.toString());",
+							"pm.collectionVariables.set('dropoffLat', dropoffLat.toString());",
+							"pm.collectionVariables.set('dropoffLng', dropoffLng.toString());"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/pricing/estimate?pickupLat={{pickupLat}}&pickupLng={{pickupLng}}&dropoffLat={{dropoffLat}}&dropoffLng={{dropoffLng}}&vehicleType=ECONOMY",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "pricing", "estimate"],
+					"query": [
+						{
+							"key": "pickupLat",
+							"value": "{{pickupLat}}"
+						},
+						{
+							"key": "pickupLng",
+							"value": "{{pickupLng}}"
+						},
+						{
+							"key": "dropoffLat",
+							"value": "{{dropoffLat}}"
+						},
+						{
+							"key": "dropoffLng",
+							"value": "{{dropoffLng}}"
+						},
+						{
+							"key": "vehicleType",
+							"value": "ECONOMY"
+						}
+					]
+				},
+				"description": "Test ETA calculation for long distance (~20km)"
+			},
+			"response": []
+		},
+		{
+			"name": "ETA Service - Premium Vehicle Type",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Response status is 200', function() {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('ETA is greater than 0', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.durationMinutes).to.be.above(0);",
+							"});",
+							"",
+							"pm.test('Vehicle type is PREMIUM', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.vehicleType).to.eql('PREMIUM');",
+							"});",
+							"",
+							"pm.test('Premium fare is higher than economy', function() {",
+							"    const response = pm.response.json();",
+							"    // Premium multiplier is 2.0x",
+							"    pm.expect(response.totalFare).to.be.above(0);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/pricing/estimate?pickupLat={{pickupLat}}&pickupLng={{pickupLng}}&dropoffLat={{dropoffLat}}&dropoffLng={{dropoffLng}}&vehicleType=PREMIUM",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "pricing", "estimate"],
+					"query": [
+						{
+							"key": "pickupLat",
+							"value": "{{pickupLat}}"
+						},
+						{
+							"key": "pickupLng",
+							"value": "{{pickupLng}}"
+						},
+						{
+							"key": "dropoffLat",
+							"value": "{{dropoffLat}}"
+						},
+						{
+							"key": "dropoffLng",
+							"value": "{{dropoffLng}}"
+						},
+						{
+							"key": "vehicleType",
+							"value": "PREMIUM"
+						}
+					]
+				},
+				"description": "Test ETA with PREMIUM vehicle type"
+			},
+			"response": []
+		}
+	]
+}

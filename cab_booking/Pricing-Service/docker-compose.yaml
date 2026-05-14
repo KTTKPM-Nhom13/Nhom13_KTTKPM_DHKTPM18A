@@ -5,10 +5,11 @@ services:
       dockerfile: ./Pricing-Service/Dockerfile
     container_name: pricing-service
     ports:
-      - "8088:8088"
+      - "8088:8084"
     env_file:
       - ../Pricing-Service/.env
     environment:
+      - SERVER_ADDRESS=0.0.0.0
       - SPRING_PROFILES_ACTIVE=default
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
       - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/pricing_db

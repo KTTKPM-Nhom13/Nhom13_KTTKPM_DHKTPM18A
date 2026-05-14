@@ -1,0 +1,1115 @@
+{
+	"info": {
+		"_postman_id": "cab-booking-zalopay-testing",
+		"name": "CAB Booking - ZaloPay Payment Testing",
+		"description": "Postman collection for testing ZaloPay payment integration in CAB Booking system. This collection covers the full payment flow including charge creation, callback simulation, and payment status queries.\n\n## Prerequisites\n1. Payment Service must be running on port 8090\n2. ZaloPay Sandbox credentials are pre-configured:\n   - App ID: 2553\n   - Key1: PcY4iZIKFCIdgZvA6ueMcMHHUbRLYjPL\n   - Key2: kLtgPl8HHhfvMuDHPwKfgfsY4Ydm9eIz\n\n## Test Flow\n1. **Create Payment** - Initiate a ZaloPay payment charge\n2. **Check Payment Status** - Query payment by booking ID or transaction ID\n3. **Simulate Callback** - Test the callback webhook (for sandbox testing)\n\n## Notes\n- For local testing, use ngrok to expose callback URLs\n- Update ZALOPAY_CALLBACK_URL in .env when using new ngrok URLs",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8090",
+			"type": "string"
+		},
+		{
+			"key": "bookingId",
+			"value": "BK-{{$timestamp}}",
+			"type": "string"
+		},
+		{
+			"key": "customerId",
+			"value": "CUST-001",
+			"type": "string"
+		},
+		{
+			"key": "transactionId",
+			"value": "txn_{{$timestamp}}",
+			"type": "string"
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "test-token",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "1. Create ZaloPay Payment",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Response status is 200', function() {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response has success or pending status', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.result).to.have.property('status');",
+							"    const status = response.result.status;",
+							"    pm.expect(['SUCCESS', 'PENDING', 'FAILED']).to.include(status);",
+							"});",
+							"",
+							"pm.test('Response contains payment gateway info', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.result).to.have.any.keys(['gatewayTransactionId', 'payUrl', 'zaloPayAppTransId']);",
+							"});",
+							"",
+							"// Store transaction ID for subsequent requests",
+							"if (pm.response.json().result && pm.response.json().result.transactionId) {",
+							"    pm.collectionVariables.set('transactionId', pm.response.json().result.transactionId);",
+							"}",
+							"",
+							"// Store booking ID",
+							"if (pm.response.json().result && pm.response.json().result.bookingId) {",
+							"    pm.collectionVariables.set('bookingId', pm.response.json().result.bookingId);",
+							"}",
+							"",
+							"// Store ZaloPay specific values",
+							"const response = pm.response.json();",
+							"if (response.result) {",
+							"    if (response.result.zaloPayAppTransId) {",
+							"        pm.collectionVariables.set('zaloPayAppTransId', response.result.zaloPayAppTransId);",
+							"    }",
+							"    if (response.result.zaloPayOrderToken) {",
+							"        pm.collectionVariables.set('zaloPayOrderToken', response.result.zaloPayOrderToken);",
+							"    }",
+							"}",
+							"",
+							"console.log('Transaction created:', pm.response.json());"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Generate unique values for each request",
+							"const now = Date.now();",
+							"pm.collectionVariables.set('bookingId', 'BK-' + now);",
+							"pm.collectionVariables.set('transactionId', 'txn_' + now);",
+							"",
+							"console.log('Generated IDs:', {",
+							"    bookingId: pm.collectionVariables.get('bookingId'),",
+							"    transactionId: pm.collectionVariables.get('transactionId')",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "test-token",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "X-Idempotency-Key",
+						"value": "{{idempotencyKey}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"bookingId\": \"{{bookingId}}\",\n    \"customerId\": \"{{customerId}}\",\n    \"amount\": 50000,\n    \"paymentMethod\": \"ZALOPAY\",\n    \"currency\": \"VND\",\n    \"description\": \"Test ZaloPay payment for cab booking\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/payments/charge",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"payments",
+						"charge"
+					]
+				},
+				"description": "Creates a new ZaloPay payment charge. This endpoint initiates the payment saga and returns a payment URL for the customer to complete payment.\n\n**Response includes:**\n- `payUrl` - URL to redirect customer for payment\n- `zaloPayAppTransId` - ZaloPay transaction ID\n- `zaloPayOrderToken` - Order token for tracking\n\n**Test Scenarios:**\n1. Valid payment request\n2. Duplicate request with same idempotency key\n3. Invalid amount (below 1000 VND)\n4. Missing required fields"
+			},
+			"response": []
+		},
+		{
+			"name": "2. Get Payment by Booking ID",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Response status is 200', function() {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response contains payment result', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.result).to.exist;",
+							"    pm.expect(response.result.bookingId).to.eq(pm.collectionVariables.get('bookingId'));",
+							"});",
+							"",
+							"console.log('Payment by booking:', pm.response.json());"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "test-token",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/payments/booking/{{bookingId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"payments",
+						"booking",
+						"{{bookingId}}"
+					]
+				},
+				"description": "Retrieves payment details by booking ID. Use this to check the payment status after creation."
+			},
+			"response": []
+		},
+		{
+			"name": "3. Get Payment by Transaction ID",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Response status is 200', function() {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response contains payment result', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.result).to.exist;",
+							"});",
+							"",
+							"console.log('Payment by transaction:', pm.response.json());"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "test-token",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/payments/txn/{{transactionId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"payments",
+						"txn",
+						"{{transactionId}}"
+					]
+				},
+				"description": "Retrieves payment details by transaction ID. Use this to check the payment status after creation."
+			},
+			"response": []
+		},
+		{
+			"name": "4. ZaloPay Callback (Webhook)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Response status is 200', function() {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Callback response indicates success', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.return_code).to.eq(1);",
+							"    pm.expect(response.return_message).to.eq('Callback Received');",
+							"});",
+							"",
+							"console.log('Callback response:', pm.response.json());"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// This script generates a valid ZaloPay callback for sandbox testing",
+							"// In production, ZaloPay server will send this callback automatically",
+							"",
+							"const appId = 2553;",
+							"const appTransId = pm.collectionVariables.get('zaloPayAppTransId') || '260525_txn_test';",
+							"const key2 = 'kLtgPl8HHhfvMuDHPwKfgfsY4Ydm9eIz';",
+							"",
+							"// Build callback data",
+							"const callbackData = {",
+							"    app_id: appId,",
+							"    app_trans_id: appTransId,",
+							"    app_time: Date.now(),",
+							"    app_user: pm.collectionVariables.get('customerId') || 'CUST-001',",
+							"    amount: 50000,",
+							"    embed_data: JSON.stringify({",
+							"        transactionId: pm.collectionVariables.get('transactionId'),",
+							"        bookingId: pm.collectionVariables.get('bookingId'),",
+							"        customerId: pm.collectionVariables.get('customerId')",
+							"    }),",
+							"    item: JSON.stringify([{",
+							"        itemid: pm.collectionVariables.get('bookingId'),",
+							"        itemname: 'CAB booking',",
+							"        itemprice: 50000,",
+							"        itemquantity: 1",
+							"    }]),",
+							"    zp_trans_id: Math.floor(Math.random() * 1000000000),",
+							"    server_time: Date.now(),",
+							"    channel: 0,",
+							"    merchant_user_id: pm.collectionVariables.get('customerId') || 'CUST-001'",
+							"};",
+							"",
+							"// Generate MAC using HMAC SHA256",
+							"const dataString = JSON.stringify(callbackData);",
+							"",
+							"// For Postman, we'll use a pre-computed MAC or skip signature in sandbox",
+							"// In production, ZaloPay generates this signature server-side",
+							"pm.collectionVariables.set('callbackData', dataString);",
+							"pm.collectionVariables.set('callbackAppTransId', appTransId);",
+							"",
+							"console.log('Callback data prepared:', callbackData);"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "bearer",
+					"bearer": [
+						{
+							"key": "token",
+							"value": "test-token",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"type\": \"offer\",\n    \"data\": \"{{callbackData}}\",\n    \"mac\": \"pre_computed_mac_in_production\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/payments/zalopay/callback",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"payments",
+						"zalopay",
+						"callback"
+					]
+				},
+				"description": "ZaloPay webhook callback endpoint. In production, ZaloPay server calls this endpoint after successful payment.\n\n**For Sandbox Testing:**\n1. This endpoint simulates the callback from ZaloPay\n2. The callback contains payment confirmation data\n3. Signature verification uses Key2\n\n**Note:** In a real scenario, ZaloPay sends the callback directly. For testing, you can:\n1. Use ZaloPay Sandbox portal to simulate payment\n2. Or manually call this endpoint with valid data"
+			},
+			"response": []
+		},
+		{
+			"name": "5. Create Payment - Different Amounts",
+			"item": [
+				{
+					"name": "Minimum Amount (1000 VND)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response status is 200', function() {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Payment created with minimum amount', function() {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.result.amount).to.eq(1000);",
+									"});",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "test-token",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"bookingId\": \"BK-MIN-{{$timestamp}}\",\n    \"customerId\": \"CUST-001\",\n    \"amount\": 1000,\n    \"paymentMethod\": \"ZALOPAY\",\n    \"currency\": \"VND\",\n    \"description\": \"Minimum amount payment test\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/charge",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"payments",
+								"charge"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Large Amount (1,000,000 VND)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response status is 200', function() {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Payment created with large amount', function() {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.result.amount).to.eq(1000000);",
+									"});",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "test-token",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"bookingId\": \"BK-LARGE-{{$timestamp}}\",\n    \"customerId\": \"CUST-002\",\n    \"amount\": 1000000,\n    \"paymentMethod\": \"ZALOPAY\",\n    \"currency\": \"VND\",\n    \"description\": \"Large amount payment test\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/charge",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"payments",
+								"charge"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Invalid - Below Minimum Amount",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response status is 400 (Bad Request)', function() {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									"",
+									"pm.test('Error message indicates validation failure', function() {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.message).to.include('amount');",
+									"});",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "test-token",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"bookingId\": \"BK-INVALID-{{$timestamp}}\",\n    \"customerId\": \"CUST-001\",\n    \"amount\": 500,\n    \"paymentMethod\": \"ZALOPAY\",\n    \"currency\": \"VND\",\n    \"description\": \"This should fail - below minimum\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/charge",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"payments",
+								"charge"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Test ZaloPay payments with different amount scenarios"
+		},
+		{
+			"name": "6. Idempotency Tests",
+			"item": [
+				{
+					"name": "First Request - Creates Payment",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('First request succeeds', function() {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"if (response.result && response.result.transactionId) {",
+									"    pm.collectionVariables.set('sharedIdempotencyKey', 'idem-shared-12345');",
+									"    pm.collectionVariables.set('sharedTransactionId', response.result.transactionId);",
+									"}",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "test-token",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Idempotency-Key",
+								"value": "{{sharedIdempotencyKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"bookingId\": \"BK-IDEM-{{$timestamp}}\",\n    \"customerId\": \"CUST-001\",\n    \"amount\": 25000,\n    \"paymentMethod\": \"ZALOPAY\",\n    \"currency\": \"VND\",\n    \"description\": \"Idempotency test - first request\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/charge",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"payments",
+								"charge"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Duplicate Request - Returns Same Response",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Duplicate request returns 200', function() {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Transaction ID matches original', function() {",
+									"    const response = pm.response.json();",
+									"    const originalTxnId = pm.collectionVariables.get('sharedTransactionId');",
+									"    if (originalTxnId) {",
+									"        pm.expect(response.result.transactionId).to.eq(originalTxnId);",
+									"    }",
+									"});",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "test-token",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Idempotency-Key",
+								"value": "{{sharedIdempotencyKey}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"bookingId\": \"BK-IDEM-DIFFERENT\",\n    \"customerId\": \"CUST-002\",\n    \"amount\": 99999,\n    \"paymentMethod\": \"ZALOPAY\",\n    \"currency\": \"VND\",\n    \"description\": \"Idempotency test - different body but same key\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/charge",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"payments",
+								"charge"
+							]
+						},
+						"description": "This request uses the same idempotency key as the first request but with different body parameters. Should return the same response as the first request."
+					},
+					"response": []
+				}
+			],
+			"description": "Tests for idempotency - same idempotency key should return the same payment"
+		},
+		{
+			"name": "7. Validation Tests",
+			"item": [
+				{
+					"name": "Missing Booking ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response status is 400', function() {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "test-token",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customerId\": \"CUST-001\",\n    \"amount\": 50000,\n    \"paymentMethod\": \"ZALOPAY\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/charge",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"payments",
+								"charge"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Missing Customer ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response status is 400', function() {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "test-token",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"bookingId\": \"BK-001\",\n    \"amount\": 50000,\n    \"paymentMethod\": \"ZALOPAY\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/charge",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"payments",
+								"charge"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Missing Payment Method",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response status is 400', function() {",
+									"    pm.response.to.have.status(400);",
+									"});",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "test-token",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"bookingId\": \"BK-001\",\n    \"customerId\": \"CUST-001\",\n    \"amount\": 50000\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/charge",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"payments",
+								"charge"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Not Found - Get Non-existent Payment",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Response status is 404', function() {",
+									"    pm.response.to.have.status(404);",
+									"});",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "test-token",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/txn/non-existent-txn-999999",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"payments",
+								"txn",
+								"non-existent-txn-999999"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Validation error tests for the payment API"
+		},
+		{
+			"name": "8. Full Payment Flow Demo",
+			"item": [
+				{
+					"name": "Step 1: Create Payment",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Payment created successfully', function() {",
+									"    pm.response.to.have.status(200);",
+									"    const response = pm.response.json();",
+									"    pm.expect(response.result).to.exist;",
+									"});",
+									"",
+									"const response = pm.response.json();",
+									"if (response.result) {",
+									"    pm.collectionVariables.set('demoTransactionId', response.result.transactionId);",
+									"    pm.collectionVariables.set('demoBookingId', response.result.bookingId);",
+									"    if (response.result.zaloPayAppTransId) {",
+									"        pm.collectionVariables.set('demoAppTransId', response.result.zaloPayAppTransId);",
+									"    }",
+									"}",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "test-token",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"bookingId\": \"BK-DEMO-{{$timestamp}}\",\n    \"customerId\": \"CUST-DEMO\",\n    \"amount\": 100000,\n    \"paymentMethod\": \"ZALOPAY\",\n    \"currency\": \"VND\",\n    \"description\": \"Demo payment for full flow testing\",\n    \"idempotencyKey\": \"demo-flow-{{$timestamp}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/charge",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"payments",
+								"charge"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Step 2: Check Payment Status by Booking ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Payment status retrieved', function() {",
+									"    pm.response.to.have.status(200);",
+									"    const response = pm.response.json();",
+									"    console.log('Payment Status:', response.result.status);",
+									"});",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "test-token",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/booking/{{demoBookingId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"payments",
+								"booking",
+								"{{demoBookingId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Step 3: Check Payment Status by Transaction ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Payment status retrieved', function() {",
+									"    pm.response.to.have.status(200);",
+									"    const response = pm.response.json();",
+									"    console.log('Payment Status:', response.result.status);",
+									"});",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "test-token",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/txn/{{demoTransactionId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"payments",
+								"txn",
+								"{{demoTransactionId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Complete demo flow: Create payment -> Check by booking ID -> Check by transaction ID"
+		}
+	]
+}

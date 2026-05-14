@@ -16,7 +16,7 @@ include:
   - matching-service/docker-compose.yaml
   - ai-scoring-service/docker-compose.yaml
   - ride-service/docker-compose.yaml
-
+  
 services:
   redis:
     image: redis:7-alpine
