@@ -48,8 +48,8 @@ public class RideFinishedConsumer {
     }
 
     private void processPaymentFromRideFinished(RideFinishedEvent event) {
-        String bookingId = event.getRideId();
-        log.info("[Consumer] Initiating automatic payment for bookingId={}", bookingId);
+        String rideId = event.getRideId();
+        log.info("[Consumer] Initiating automatic payment for rideId={}", rideId);
 
         PaymentMethod method = PaymentMethod.CASH;
         if (event.getPaymentMethod() != null) {
@@ -62,25 +62,25 @@ public class RideFinishedConsumer {
 
         BigDecimal amount = event.getFinalFare();
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            log.warn("[Consumer] Skipping payment - invalid finalFare {} for bookingId={}", amount, bookingId);
+            log.warn("[Consumer] Skipping payment - invalid finalFare {} for rideId={}", amount, rideId);
             return;
         }
 
         ChargePaymentRequest chargeRequest = ChargePaymentRequest.builder()
-                .bookingId(bookingId)
+            .bookingId(rideId)
                 .customerId(event.getCustomerId())
                 .amount(amount)
                 .currency("VND")
                 .paymentMethod(method)
-                .description("Auto-payment for booking " + bookingId)
-                .idempotencyKey("ride-finished-" + bookingId)
+            .description("Auto-payment for ride " + rideId)
+            .idempotencyKey("ride-finished-" + rideId)
                 .build();
 
         try {
             paymentSagaService.startPaymentSaga(chargeRequest);
-            log.info("[Consumer] Payment saga triggered successfully for bookingId={}", bookingId);
+            log.info("[Consumer] Payment saga triggered successfully for rideId={}", rideId);
         } catch (Exception e) {
-            log.error("[Consumer] Failed to trigger payment saga for bookingId={}", bookingId, e);
+            log.error("[Consumer] Failed to trigger payment saga for rideId={}", rideId, e);
         }
     }
 }

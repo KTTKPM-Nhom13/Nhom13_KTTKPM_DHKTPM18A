@@ -219,4 +219,39 @@ public class PricingService {
         int lngZone = (int) Math.floor(lng * gridSize);
         return String.format("Z%02d%02d", latZone + 50, lngZone + 100);
     }
+
+    public iuh.fit.pricing_service.model.PricingTestResponse calculateSimplePrice(
+            Double distanceKm, Double demandIndex) {
+        
+        log.info("Calculating simple price - distance: {} km, demandIndex: {}", distanceKm, demandIndex);
+
+        BigDecimal baseFare = pricingConfig.getCalculation().getBaseFare();
+        BigDecimal perKmRate = pricingConfig.getCalculation().getPerKmRate();
+        
+        BigDecimal distanceFare = perKmRate.multiply(BigDecimal.valueOf(distanceKm));
+        
+        BigDecimal subtotal = baseFare.add(distanceFare);
+        
+        BigDecimal surgeMultiplier = BigDecimal.valueOf(demandIndex);
+        surgeMultiplier = surgeMultiplier.max(pricingConfig.getSurge().getMinMultiplier());
+        surgeMultiplier = surgeMultiplier.min(pricingConfig.getSurge().getMaxMultiplier());
+        
+        BigDecimal surgeAmount = subtotal.multiply(surgeMultiplier.subtract(BigDecimal.ONE));
+        BigDecimal totalFare = subtotal.add(surgeAmount).setScale(2, RoundingMode.HALF_UP);
+        
+        totalFare = totalFare.max(pricingConfig.getCalculation().getMinimumFare());
+
+        log.info("Simple price calculated - baseFare: {}, distanceFare: {}, surge: {}, total: {}",
+                baseFare, distanceFare, surgeMultiplier, totalFare);
+
+        return iuh.fit.pricing_service.model.PricingTestResponse.builder()
+                .distanceKm(distanceKm)
+                .demandIndex(demandIndex)
+                .baseFare(baseFare.setScale(2, RoundingMode.HALF_UP))
+                .distanceFare(distanceFare.setScale(2, RoundingMode.HALF_UP))
+                .surgeMultiplier(surgeMultiplier.setScale(2, RoundingMode.HALF_UP))
+                .totalFare(totalFare)
+                .message("Pricing calculated successfully")
+                .build();
+    }
 }

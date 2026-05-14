@@ -127,7 +127,7 @@ public class PaymentSagaService {
                     log.info("[Saga] {} payment PENDING - txnId={}, awaiting callback",
                             transaction.getPaymentMethod(),
                             transaction.getTransactionId());
-                    updateStatus(transaction, PaymentStatus.PENDING);
+                    updateStatusWithGatewayResponse(transaction, PaymentStatus.PENDING, gatewayResponse);
                     PaymentResponse resp = PaymentResponse.fromEntity(transaction,
                             transaction.getPaymentMethod() + " payment initiated, awaiting customer confirmation");
                     resp.setPayUrl(gatewayResponse.getPayUrl());
@@ -194,6 +194,19 @@ public class PaymentSagaService {
     @Transactional
     public void updateStatus(PaymentTransaction transaction, PaymentStatus status) {
         transaction.setStatus(status);
+        paymentRepository.save(transaction);
+    }
+
+    @Transactional
+    public void updateStatusWithGatewayResponse(PaymentTransaction transaction, PaymentStatus status,
+                                                 GatewayChargeResponse gatewayResponse) {
+        transaction.setStatus(status);
+        try {
+            transaction.setGatewayResponseJson(objectMapper.writeValueAsString(gatewayResponse));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.warn("[Saga] Failed to serialize gateway response for PENDING txnId={}: {}",
+                    transaction.getTransactionId(), e.getMessage());
+        }
         paymentRepository.save(transaction);
     }
 

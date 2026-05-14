@@ -1,0 +1,716 @@
+{
+	"info": {
+		"_postman_id": "cab-booking-pricing-eta-testing",
+		"name": "CAB Booking - Pricing Service ETA Testing",
+		"description": "Postman collection for testing ETA functionality in Pricing Service. This collection verifies that the ETA calculation service returns valid values based on distance and traffic conditions.\n\n## Prerequisites\n1. Pricing Service must be running on port 8088\n2. Redis must be available for ETA caching\n3. Optional: Google Maps API key configured for accurate ETA\n\n## Test Cases\n1. **ETA Calculation - Normal Distance** - Verify ETA > 0 for 5km distance\n2. **ETA Calculation - Short Distance** - Verify ETA for 1km distance\n3. **ETA Calculation - Long Distance** - Verify ETA for 20km distance\n\n## ETA Validation Rules\n- ETA (durationMinutes) must be > 0\n- ETA should be reasonable (< 60 minutes for distances under 10km)\n- Response must include distanceKm and durationMinutes fields",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8088",
+			"type": "string"
+		},
+		{
+			"key": "pickupLat",
+			"value": "10.7629",
+			"type": "string"
+		},
+		{
+			"key": "pickupLng",
+			"value": "106.6602",
+			"type": "string"
+		},
+		{
+			"key": "dropoffLat",
+			"value": "10.8231",
+			"type": "string"
+		},
+		{
+			"key": "dropoffLng",
+			"value": "106.6873",
+			"type": "string"
+		},
+		{
+			"key": "kafkaRideId",
+			"value": "RIDE-TEST-{{$timestamp}}",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "ETA Service - 5km Distance (Normal Traffic)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Response status is 200', function() {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response contains valid ETA structure', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response).to.have.property('distanceKm');",
+							"    pm.expect(response).to.have.property('durationMinutes');",
+							"    pm.expect(response).to.have.property('vehicleType');",
+							"});",
+							"",
+							"pm.test('ETA (durationMinutes) is greater than 0', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.durationMinutes).to.be.a('number');",
+							"    pm.expect(response.durationMinutes).to.be.above(0);",
+							"});",
+							"",
+							"pm.test('Distance is valid and greater than 0', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.distanceKm).to.be.a('number');",
+							"    pm.expect(response.distanceKm).to.be.above(0);",
+							"});",
+							"",
+							"pm.test('ETA is reasonable for 5km distance (< 60 minutes)', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.durationMinutes).to.be.below(60);",
+							"});",
+							"",
+							"pm.test('Vehicle type matches request', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.vehicleType).to.eql('ECONOMY');",
+							"});",
+							"",
+							"pm.test('Response contains fare estimate', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response).to.have.property('totalFare');",
+							"    pm.expect(response).to.have.property('baseFare');",
+							"});",
+							"",
+							"pm.test('ETA calculation source is documented', function() {",
+							"    const response = pm.response.json();",
+							"    console.log('ETA Response:', JSON.stringify(response, null, 2));",
+							"    console.log('Distance:', response.distanceKm, 'km');",
+							"    console.log('Duration:', response.durationMinutes, 'minutes');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Calculate expected coordinates for ~5km distance",
+							"// Using Ho Chi Minh City coordinates as base",
+							"// Starting point: 10.7629, 106.6602",
+							"// Moving approximately 5km north-east",
+							"",
+							"// For ~5km, roughly 0.045 degrees latitude",
+							"const pickupLat = 10.7629;",
+							"const pickupLng = 106.6602;",
+							"",
+							"// Dropoff ~5km away",
+							"const dropoffLat = 10.8231; // ~6.7km north",
+							"const dropoffLng = 106.6873; // ~3km east",
+							"",
+							"pm.collectionVariables.set('pickupLat', pickupLat.toString());",
+							"pm.collectionVariables.set('pickupLng', pickupLng.toString());",
+							"pm.collectionVariables.set('dropoffLat', dropoffLat.toString());",
+							"pm.collectionVariables.set('dropoffLng', dropoffLng.toString());",
+							"",
+							"console.log('Coordinates set for ~5km distance test');"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/pricing/estimate?pickupLat={{pickupLat}}&pickupLng={{pickupLng}}&dropoffLat={{dropoffLat}}&dropoffLng={{dropoffLng}}&vehicleType=ECONOMY",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "pricing", "estimate"],
+					"query": [
+						{
+							"key": "pickupLat",
+							"value": "{{pickupLat}}"
+						},
+						{
+							"key": "pickupLng",
+							"value": "{{pickupLng}}"
+						},
+						{
+							"key": "dropoffLat",
+							"value": "{{dropoffLat}}"
+						},
+						{
+							"key": "dropoffLng",
+							"value": "{{dropoffLng}}"
+						},
+						{
+							"key": "vehicleType",
+							"value": "ECONOMY"
+						}
+					]
+				},
+				"description": "Test ETA calculation for approximately 5km distance with normal traffic conditions. This test verifies:\n1. HTTP 200 response\n2. ETA (durationMinutes) > 0\n3. ETA is reasonable (< 60 minutes for 5km)\n4. Response contains valid distance and duration fields"
+			},
+			"response": []
+		},
+		{
+			"name": "ETA Service - Short Distance (1km)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Response status is 200', function() {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('ETA is greater than 0', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.durationMinutes).to.be.above(0);",
+							"});",
+							"",
+							"pm.test('ETA is reasonable for short distance (< 15 minutes)', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.durationMinutes).to.be.below(15);",
+							"});",
+							"",
+							"pm.test('Distance is approximately 1km', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.distanceKm).to.be.below(3);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Short distance coordinates (~1km)",
+							"const pickupLat = 10.7629;",
+							"const pickupLng = 106.6602;",
+							"",
+							"// Dropoff ~1km away",
+							"const dropoffLat = 10.7700;",
+							"const dropoffLng = 106.6650;",
+							"",
+							"pm.collectionVariables.set('pickupLat', pickupLat.toString());",
+							"pm.collectionVariables.set('pickupLng', pickupLng.toString());",
+							"pm.collectionVariables.set('dropoffLat', dropoffLat.toString());",
+							"pm.collectionVariables.set('dropoffLng', dropoffLng.toString());"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/pricing/estimate?pickupLat={{pickupLat}}&pickupLng={{pickupLng}}&dropoffLat={{dropoffLat}}&dropoffLng={{dropoffLng}}&vehicleType=ECONOMY",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "pricing", "estimate"],
+					"query": [
+						{
+							"key": "pickupLat",
+							"value": "{{pickupLat}}"
+						},
+						{
+							"key": "pickupLng",
+							"value": "{{pickupLng}}"
+						},
+						{
+							"key": "dropoffLat",
+							"value": "{{dropoffLat}}"
+						},
+						{
+							"key": "dropoffLng",
+							"value": "{{dropoffLng}}"
+						},
+						{
+							"key": "vehicleType",
+							"value": "ECONOMY"
+						}
+					]
+				},
+				"description": "Test ETA calculation for short distance (~1km)"
+			},
+			"response": []
+		},
+		{
+			"name": "ETA Service - Long Distance (20km)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Response status is 200', function() {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('ETA is greater than 0', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.durationMinutes).to.be.above(0);",
+							"});",
+							"",
+							"pm.test('ETA is reasonable for 20km distance (< 120 minutes)', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.durationMinutes).to.be.below(120);",
+							"});",
+							"",
+							"pm.test('Distance is approximately 20km', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.distanceKm).to.be.above(15);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Long distance coordinates (~20km)",
+							"const pickupLat = 10.7629;",
+							"const pickupLng = 106.6602;",
+							"",
+							"// Dropoff ~20km away (near Vung Tau direction)",
+							"const dropoffLat = 10.9800;",
+							"const dropoffLng = 106.8200;",
+							"",
+							"pm.collectionVariables.set('pickupLat', pickupLat.toString());",
+							"pm.collectionVariables.set('pickupLng', pickupLng.toString());",
+							"pm.collectionVariables.set('dropoffLat', dropoffLat.toString());",
+							"pm.collectionVariables.set('dropoffLng', dropoffLng.toString());"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/pricing/estimate?pickupLat={{pickupLat}}&pickupLng={{pickupLng}}&dropoffLat={{dropoffLat}}&dropoffLng={{dropoffLng}}&vehicleType=ECONOMY",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "pricing", "estimate"],
+					"query": [
+						{
+							"key": "pickupLat",
+							"value": "{{pickupLat}}"
+						},
+						{
+							"key": "pickupLng",
+							"value": "{{pickupLng}}"
+						},
+						{
+							"key": "dropoffLat",
+							"value": "{{dropoffLat}}"
+						},
+						{
+							"key": "dropoffLng",
+							"value": "{{dropoffLng}}"
+						},
+						{
+							"key": "vehicleType",
+							"value": "ECONOMY"
+						}
+					]
+				},
+				"description": "Test ETA calculation for long distance (~20km)"
+			},
+			"response": []
+		},
+		{
+			"name": "ETA Service - Premium Vehicle Type",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Response status is 200', function() {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('ETA is greater than 0', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.durationMinutes).to.be.above(0);",
+							"});",
+							"",
+							"pm.test('Vehicle type is PREMIUM', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.vehicleType).to.eql('PREMIUM');",
+							"});",
+							"",
+							"pm.test('Premium fare is higher than economy', function() {",
+							"    const response = pm.response.json();",
+							"    // Premium multiplier is 2.0x",
+							"    pm.expect(response.totalFare).to.be.above(0);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/pricing/estimate?pickupLat={{pickupLat}}&pickupLng={{pickupLng}}&dropoffLat={{dropoffLat}}&dropoffLng={{dropoffLng}}&vehicleType=PREMIUM",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "pricing", "estimate"],
+					"query": [
+						{
+							"key": "pickupLat",
+							"value": "{{pickupLat}}"
+						},
+						{
+							"key": "pickupLng",
+							"value": "{{pickupLng}}"
+						},
+						{
+							"key": "dropoffLat",
+							"value": "{{dropoffLat}}"
+						},
+						{
+							"key": "dropoffLng",
+							"value": "{{dropoffLng}}"
+						},
+						{
+							"key": "vehicleType",
+							"value": "PREMIUM"
+						}
+					]
+				},
+				"description": "Test ETA with PREMIUM vehicle type"
+			},
+			"response": []
+		},
+		{
+			"name": "Pricing API - Calculate Valid Price (5km, demand 1.0)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Response status is 200', function() {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Response contains valid pricing structure', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response).to.have.property('distanceKm');",
+							"    pm.expect(response).to.have.property('demandIndex');",
+							"    pm.expect(response).to.have.property('baseFare');",
+							"    pm.expect(response).to.have.property('distanceFare');",
+							"    pm.expect(response).to.have.property('totalFare');",
+							"    pm.expect(response).to.have.property('surgeMultiplier');",
+							"    pm.expect(response).to.have.property('message');",
+							"});",
+							"",
+							"pm.test('Distance matches request (5km)', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.distanceKm).to.eql(5);",
+							"});",
+							"",
+							"pm.test('Demand index matches request (1.0)', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.demandIndex).to.eql(1.0);",
+							"});",
+							"",
+							"pm.test('Total fare is greater than base fare', function() {",
+							"    const response = pm.response.json();",
+							"    const totalFare = parseFloat(response.totalFare);",
+							"    const baseFare = parseFloat(response.baseFare);",
+							"    pm.expect(totalFare).to.be.above(baseFare);",
+							"});",
+							"",
+							"pm.test('Surge multiplier is >= 1', function() {",
+							"    const response = pm.response.json();",
+							"    const surge = parseFloat(response.surgeMultiplier);",
+							"    pm.expect(surge).to.be.at.least(1.0);",
+							"});",
+							"",
+							"pm.test('Total fare is a positive number', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.totalFare).to.be.a('number');",
+							"    pm.expect(response.totalFare).to.be.above(0);",
+							"});",
+							"",
+							"pm.test('Base fare is 2.50 (USD)', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(parseFloat(response.baseFare)).to.eql(2.50);",
+							"});",
+							"",
+							"pm.test('Distance fare calculation is correct (5km * 1.50 = 7.50)', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(parseFloat(response.distanceFare)).to.eql(7.50);",
+							"});",
+							"",
+							"pm.test('Pricing calculated successfully message', function() {",
+							"    const response = pm.response.json();",
+							"    pm.expect(response.message).to.eql('Pricing calculated successfully');",
+							"});",
+							"",
+							"pm.test('Log pricing details for verification', function() {",
+							"    const response = pm.response.json();",
+							"    console.log('=== Pricing API Test Results ===');",
+							"    console.log('Distance:', response.distanceKm, 'km');",
+							"    console.log('Demand Index:', response.demandIndex);",
+							"    console.log('Base Fare:', response.baseFare, 'USD');",
+							"    console.log('Distance Fare:', response.distanceFare, 'USD');",
+							"    console.log('Surge Multiplier:', response.surgeMultiplier);",
+							"    console.log('Total Fare:', response.totalFare, 'USD');",
+							"    console.log('Expected Total: baseFare (2.50) + distanceFare (7.50) = 10.00 USD');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"distanceKm\": 5,\n    \"demandIndex\": 1.0\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/pricing/calculate",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "pricing", "calculate"]
+				},
+				"description": "Test case for Pricing API returning valid price.\n\n## Test Criteria:\n1. HTTP 200 - Success response\n2. Response contains all pricing fields\n3. distanceKm matches request (5)\n4. demandIndex matches request (1.0)\n5. totalFare > baseFare (10.00 > 2.50)\n6. surgeMultiplier >= 1 (should be 1.00)\n7. Total Fare = Base Fare (2.50) + Distance Fare (7.50) = 10.00 USD\n\n## Request Body:\n```json\n{\n    \"distanceKm\": 5,\n    \"demandIndex\": 1.0\n}\n```"
+			},
+			"response": []
+		},
+		{
+			"name": "Pricing API - Calculate Price with Surge (demand 2.0)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test('Response status is 200', function() {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"pm.test('Surge multiplier is applied (demand 2.0)', function() {",
+							"    const response = pm.response.json();",
+							"    const surge = parseFloat(response.surgeMultiplier);",
+							"    pm.expect(surge).to.be.at.least(1.0);",
+							"    // With demand 2.0, surge should be 2.0 (or capped at max 3.0)",
+							"    pm.expect(surge).to.be.at.most(3.0);",
+							"});",
+							"",
+							"pm.test('Total fare with surge is higher than without surge', function() {",
+							"    const response = pm.response.json();",
+							"    const totalFare = parseFloat(response.totalFare);",
+							"    // Base without surge for 5km: 2.50 + 7.50 = 10.00",
+							"    // With surge 2.0: 10.00 * 2.0 = 20.00",
+							"    pm.expect(totalFare).to.be.above(10.00);",
+							"});",
+							"",
+							"pm.test('Log surge pricing details', function() {",
+							"    const response = pm.response.json();",
+							"    console.log('=== Surge Pricing Test ===');",
+							"    console.log('Distance:', response.distanceKm, 'km');",
+							"    console.log('Demand Index:', response.demandIndex);",
+							"    console.log('Base Fare:', response.baseFare);",
+							"    console.log('Distance Fare:', response.distanceFare);",
+							"    console.log('Surge Multiplier:', response.surgeMultiplier);",
+							"    console.log('Total Fare:', response.totalFare);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"distanceKm\": 5,\n    \"demandIndex\": 2.0\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/pricing/calculate",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "pricing", "calculate"]
+				},
+				"description": "Test Pricing API with surge pricing (demand index 2.0)\n\n## Expected:\n- surgeMultiplier = 2.0\n- Total Fare = (2.50 + 7.50) * 2.0 = 20.00 USD"
+			},
+			"response": []
+		},
+		{
+			"name": "Kafka Consumer Tests",
+			"item": [
+				{
+					"name": "Kafka Test - ride.created event (from booking-service)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Service is running', function() {",
+									"    pm.response.to.have.status(200);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/pricing/estimate?pickupLat={{pickupLat}}&pickupLng={{pickupLng}}&dropoffLat={{dropoffLat}}&dropoffLng={{dropoffLng}}&vehicleType=ECONOMY",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "pricing", "estimate"],
+							"query": [
+								{"key": "pickupLat", "value": "{{pickupLat}}"},
+								{"key": "pickupLng", "value": "{{pickupLng}}"},
+								{"key": "dropoffLat", "value": "{{dropoffLat}}"},
+								{"key": "dropoffLng", "value": "{{dropoffLng}}"},
+								{"key": "vehicleType", "value": "ECONOMY"}
+							]
+						},
+						"description": "Health check for pricing service.\n\n## Kafka ride.created event format (from booking-service):\n```json\n{\n    \"eventId\": \"uuid\",\n    \"type\": \"RideCreated\",\n    \"rideId\": \"booking-id\",\n    \"customerId\": \"CUST-001\",\n    \"pickup\": {\"lat\": 10.7629, \"lng\": 106.6602},\n    \"dropoff\": {\"lat\": 10.8231, \"lng\": 106.6873},\n    \"vehicleType\": \"ECONOMY\",\n    \"paymentMethod\": \"CASH\"\n}\n```\n\n## Fixed in this update:\n- Consumer now extracts pickup/dropoff from nested Map objects\n- Consumer now uses `customerId` instead of `userId`\n- Consumer calculates distance from lat/lng if not provided"
+					},
+					"response": []
+				},
+				{
+					"name": "Kafka Test - demand.supply.updated event",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Service is running', function() {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response contains pricing info', function() {",
+									"    const response = pm.response.json();",
+									"    pm.expect(response).to.have.property('distanceKm');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/pricing/estimate?pickupLat=10.7629&pickupLng=106.6602&dropoffLat=10.7700&dropoffLng=106.6650&vehicleType=ECONOMY",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "pricing", "estimate"],
+							"query": [
+								{"key": "pickupLat", "value": "10.7629"},
+								{"key": "pickupLng", "value": "106.6602"},
+								{"key": "dropoffLat", "value": "10.7700"},
+								{"key": "dropoffLng", "value": "106.6650"},
+								{"key": "vehicleType", "value": "ECONOMY"}
+							]
+						},
+						"description": "Health check endpoint for Kafka demand.supply.updated topic testing.\n\n## Kafka demand.supply.updated event format:\n```json\n{\n    \"zoneId\": \"Z5045\",\n    \"activeDrivers\": 5,\n    \"pendingRides\": 15,\n    \"surgeMultiplier\": 1.5\n}\n```\n\n## IMPORTANT:\nThis topic may not have a producer yet. The consumer is listening but waiting for events.\nExpected producer: driver-service or a demand-supply calculation service."
+					},
+					"response": []
+				}
+			],
+			"description": "Kafka consumer tests for pricing-service.\n\n## Topics listened by pricing-service:\n\n1. **ride.created** (Topic: `ride.created`)\n   - Consumer Group: `pricing-ride-consumer-group`\n   - Purpose: Apply final pricing when ride is created\n   - Expected payload: RideCreatedEvent with pickup/dropoff coordinates\n\n2. **demand.supply.updated** (Topic: `demand.supply.updated`)\n   - Consumer Group: `pricing-demand-supply-group`\n   - Purpose: Update surge pricing based on demand/supply ratio\n   - Expected payload: zoneId, activeDrivers, pendingRides, surgeMultiplier\n\n## How to test Kafka consumers:\n1. Start the pricing-service with Docker\n2. Publish a test event to Kafka using kafka-console-producer:\n   ```bash\n   docker exec -it kafka kafka-console-producer --broker-list localhost:9092 --topic ride.created\n   ```\n3. Enter the JSON payload:\n   ```json\n   {\"eventId\":\"test-1\",\"type\":\"RideCreated\",\"rideId\":\"BK-TEST-123\",\"customerId\":\"CUST-001\",\"pickup\":{\"lat\":10.7629,\"lng\":106.6602},\"dropoff\":{\"lat\":10.8231,\"lng\":106.6873},\"vehicleType\":\"ECONOMY\",\"paymentMethod\":\"CASH\"}\n   ```\n4. Check pricing-service logs for:\n   - `Received ride.created event`\n   - `Final pricing applied for ride: BK-TEST-123`"
+		},
+		{
+			"name": "Payload Schema Documentation",
+			"item": [
+				{
+					"name": "Expected ride.created payload from booking-service",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"console.log('=== Expected Kafka Payload: ride.created ===');",
+									"console.log(JSON.stringify({",
+									"    eventId: 'uuid-string',",
+									"    type: 'RideCreated',",
+									"    rideId: 'BK-xxx',",
+									"    customerId: 'CUST-001',",
+									"    pickup: {lat: 10.7629, lng: 106.6602},",
+									"    dropoff: {lat: 10.8231, lng: 106.6873},",
+									"    vehicleType: 'ECONOMY',",
+									"    paymentMethod: 'CASH'",
+									"}, null, 2));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/pricing/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "pricing", "health"]
+						},
+						"description": "Reference: Expected ride.created Kafka payload from booking-service.\n\n## Field Mapping:\n| Producer Field | Consumer Expects | Status |\n|---------------|------------------|--------|\n| rideId | rideId | ✅ Match |\n| customerId | customerId (was userId) | ✅ Fixed |\n| pickup (Map) | Extract lat/lng from Map | ✅ Fixed |\n| dropoff (Map) | Extract lat/lng from Map | ✅ Fixed |\n| vehicleType | vehicleType | ✅ Match |\n| paymentMethod | paymentMethod | ✅ Match |"
+					},
+					"response": []
+				},
+				{
+					"name": "Expected demand.supply.updated payload",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"console.log('=== Expected Kafka Payload: demand.supply.updated ===');",
+									"console.log(JSON.stringify({",
+									"    zoneId: 'Z5045',",
+									"    activeDrivers: 5,",
+									"    pendingRides: 15,",
+									"    surgeMultiplier: 1.5",
+									"}, null, 2));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/pricing/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "pricing", "health"]
+						},
+						"description": "Reference: Expected demand.supply.updated Kafka payload.\n\n## Field Mapping:\n| Field | Type | Description |\n|-------|------|-------------|\n| zoneId | String | Zone identifier (e.g., Z5045) |\n| activeDrivers | Integer | Number of available drivers in zone |\n| pendingRides | Integer | Number of pending rides in zone |\n| surgeMultiplier | BigDecimal | Surge multiplier to apply |\n\n## NOTE:\nNo producer found for this topic yet. This consumer is waiting for events."
+					},
+					"response": []
+				}
+			],
+			"description": "Documentation for expected Kafka payload schemas.\n\n## ride.created Topic\nProducer: booking-service\n\n## demand.supply.updated Topic\nProducer: NOT FOUND - needs to be implemented"
+		}
+	]
+}

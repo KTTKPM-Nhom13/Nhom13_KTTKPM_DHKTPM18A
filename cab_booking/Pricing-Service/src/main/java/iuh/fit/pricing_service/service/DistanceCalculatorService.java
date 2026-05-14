@@ -170,7 +170,8 @@ public class DistanceCalculatorService {
 
         try {
             Object cachedValue = redisTemplate.opsForValue().get(cacheKey);
-            if (cachedValue instanceof EtaResult etaResult) {
+            if (cachedValue instanceof EtaResult) {
+                EtaResult etaResult = (EtaResult) cachedValue;
                 return etaResult;
             }
             if (cachedValue != null) {

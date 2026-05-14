@@ -2,6 +2,8 @@ package iuh.fit.pricing_service.controller;
 
 import iuh.fit.pricing_service.model.FareEstimate;
 import iuh.fit.pricing_service.model.FareEstimateResponse;
+import iuh.fit.pricing_service.model.PricingTestRequest;
+import iuh.fit.pricing_service.model.PricingTestResponse;
 import iuh.fit.pricing_service.service.PricingService;
 import iuh.fit.pricing_service.service.SurgePricingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,6 +13,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -34,6 +37,29 @@ public class PricingController {
 
     private final PricingService pricingService;
     private final SurgePricingService surgePricingService;
+
+    @PostMapping("/calculate")
+    @Operation(
+            summary = "Calculate simple price",
+            description = "Calculate price based on distance and demand index for testing"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Price calculated successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid request parameters")
+    })
+    public ResponseEntity<PricingTestResponse> calculateSimplePrice(
+            @RequestBody @Valid PricingTestRequest request) {
+
+        log.info("Received simple pricing request - distance: {} km, demandIndex: {}",
+                request.getDistanceKm(), request.getDemandIndex());
+
+        PricingTestResponse response = pricingService.calculateSimplePrice(
+                request.getDistanceKm(), request.getDemandIndex());
+
+        log.info("Simple price calculated - total: {}", response.getTotalFare());
+
+        return ResponseEntity.ok(response);
+    }
 
     @GetMapping("/estimate")
     @Operation(
