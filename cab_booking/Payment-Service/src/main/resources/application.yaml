@@ -47,7 +47,11 @@ spring:
       acks: all
       retries: 3
       properties:
-        spring.json.add.type.headers: false
+        spring.json.type.mapping: >
+          payment-completed:iuh.fit.payment_service.dto.event.PaymentCompletedEvent,
+          payment-refunded:iuh.fit.payment_service.dto.event.PaymentRefundedEvent,
+          payment-failed:iuh.fit.payment_service.dto.event.PaymentFailedEvent,
+          booking-failed:iuh.fit.payment_service.dto.event.BookingFailedEvent
     consumer:
       group-id: payment-service-group
       auto-offset-reset: earliest
@@ -55,7 +59,8 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "*"
-        spring.json.value.default.type: java.util.Map
+        spring.json.type.mapping: >
+          ride-finished:iuh.fit.payment_service.dto.event.RideFinishedEvent
 
 eureka:
   client:
