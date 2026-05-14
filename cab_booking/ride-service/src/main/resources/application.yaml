@@ -34,10 +34,10 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
-        spring.json.type.mapping: >-
-          ride-arrived:com.cab.ride.core.dto.event.outbound.DriverArrivedEvent,
+        spring.json.type.mapping: >
+          ride-finished:com.cab.ride.core.dto.event.outbound.RideFinishedEvent,
           ride-started:com.cab.ride.core.dto.event.outbound.RideStartedEvent,
-          ride-finished:com.cab.ride.core.dto.event.outbound.RideFinishedEvent
+          driver-arrived:com.cab.ride.core.dto.event.outbound.DriverArrivedEvent
     consumer:
       group-id: ride-service-group
       auto-offset-reset: earliest
@@ -46,8 +46,11 @@ spring:
       properties:
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: "*"
-        # TODO: Đổi FQCN bên phải nếu bạn refactor package/class inbound của ride-service
-        spring.json.type.mapping: ride-created:com.cab.ride.core.dto.event.inbound.RideCreatedEvent,ride-assigned:com.cab.ride.core.dto.event.inbound.RideAssignedEvent
+        spring.json.type.mapping: >
+          ride-assigned:com.cab.ride.core.dto.event.inbound.RideAssignedEvent,
+          payment-completed:com.cab.ride.core.dto.event.inbound.PaymentCompletedEvent,
+          ride-created:com.cab.ride.core.dto.event.inbound.RideCreatedEvent,
+          driver-location:com.cab.ride.core.dto.event.DriverLocationEvent
 
 # ── Eureka ──────────────────────────────────────────────────────────────────
 eureka:
