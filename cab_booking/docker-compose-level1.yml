@@ -7,15 +7,17 @@ include:
   - user-service/docker-compose.yaml
   - driver-service/docker-compose.yaml
   - booking-service/docker-compose.yaml
-  - Pricing-Service/docker-compose.yaml
+  - matching-service/docker-compose.yaml
+  - ride-service/docker-compose.yaml
+  - review-service/docker-compose.yaml
   - notification-service/docker-compose.yaml
+  - api-gateway/docker-compose.yaml
 
 services:
   # Infrastructure
   
   redis:
     image: redis:7-alpine
-    container_name: cab-redis
     command: redis-server --requirepass redis123
     ports:
       - "6379:6379"
@@ -25,11 +27,11 @@ services:
       test: [ "CMD", "redis-cli", "-a", "redis123", "ping" ]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 10
+      start_period: 30s
 
   mongodb:
     image: mongo:7.0
-    container_name: mongodb
     ports:
       - "27017:27017"
     networks:
@@ -40,11 +42,11 @@ services:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
-    container_name: zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
@@ -53,7 +55,6 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
-    container_name: kafka
     depends_on:
       zookeeper:
         condition: service_started
@@ -74,7 +75,23 @@ services:
       test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list || exit 1"]
       interval: 20s
       timeout: 10s
+      retries: 15
+      start_period: 60s
+
+  ai-scoring-service:
+    build:
+      context: .
+      dockerfile: ./ai-scoring-service/Dockerfile
+    ports:
+      - "8000:8000"
+    networks:
+      - cab-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ping')"]
+      interval: 10s
+      timeout: 5s
       retries: 10
+      start_period: 30s
 
 volumes:
   maven-cache:
