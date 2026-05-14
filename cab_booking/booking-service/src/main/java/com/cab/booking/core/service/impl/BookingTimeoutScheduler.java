@@ -52,7 +52,7 @@ public class BookingTimeoutScheduler {
                     BookingTimeoutEvent event = BookingTimeoutEvent.builder()
                             .eventId(UUID.randomUUID().toString())
                             .type(BookingTimeoutEvent.EVENT_TYPE)
-                            .bookingId(bookingIdStr)
+                            .rideId(bookingIdStr)
                             .customerId(booking.getCustomerId())
                             .reason("TIMEOUT_NO_DRIVER_FOUND")
                             .timestamp(Instant.now().toString())

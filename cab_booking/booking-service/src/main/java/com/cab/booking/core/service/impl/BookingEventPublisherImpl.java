@@ -27,38 +27,17 @@ public class BookingEventPublisherImpl implements BookingEventPublisher {
 
     @Override
     public void publishRideAccepted(RideAcceptedEvent event) {
-        kafkaTemplate.send("ride.accepted", event.bookingId(), event);
-        log.info("🚀 Published RideAcceptedEvent | Topic: ride.accepted | Key: {}", event.bookingId());
+        kafkaTemplate.send("ride.accepted", event.rideId(), event);
+        log.info("🚀 Published RideAcceptedEvent | Topic: ride.accepted | Key: {}", event.rideId());
     }
 
     @Override
     public void publishBookingTimeout(BookingTimeoutEvent event) {
-        kafkaTemplate.send("booking.timeout", event.bookingId(), event);
-        log.info("🚀 Published BookingTimeoutEvent | Topic: booking.timeout | Key: {}", event.bookingId());
+        kafkaTemplate.send("booking.timeout", event.rideId(), event);
+        log.info("🚀 Published BookingTimeoutEvent | Topic: booking.timeout | Key: {}", event.rideId());
     }
 
-    @Override
-    public void publishDriverArrived(com.cab.booking.core.entity.Booking booking) {
-        com.cab.booking.core.dto.event.outbound.DriverArrivedEvent event = com.cab.booking.core.dto.event.outbound.DriverArrivedEvent.create(
-                booking.getId().toString(),
-                booking.getCustomerId(),
-                booking.getAssignedDriverId()
-        );
-        // Dùng ID cuốc xe làm Kafka Key để đảm bảo thứ tự message
-        kafkaTemplate.send("booking-events", booking.getId().toString(), event);
-        log.info("🚀 Published DriverArrivedEvent | Topic: booking-events | Key: {}", booking.getId());
-    }
 
-    @Override
-    public void publishRideStarted(com.cab.booking.core.entity.Booking booking) {
-        com.cab.booking.core.dto.event.outbound.RideStartedEvent event = com.cab.booking.core.dto.event.outbound.RideStartedEvent.create(
-                booking.getId().toString(),
-                booking.getCustomerId(),
-                booking.getAssignedDriverId()
-        );
-        kafkaTemplate.send("booking-events", booking.getId().toString(), event);
-        log.info("🚀 Published RideStartedEvent | Topic: booking-events | Key: {}", booking.getId());
-    }
 
     @Override
     public void publishRideCancelled(com.cab.booking.core.entity.Booking booking, String reason) {

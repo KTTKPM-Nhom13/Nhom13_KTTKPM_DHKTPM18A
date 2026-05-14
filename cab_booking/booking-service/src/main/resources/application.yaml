@@ -33,6 +33,9 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        # TODO: Đổi FQCN bên phải nếu bạn refactor package/class RideCreatedEvent
+        spring.json.type.mapping: ride-created:com.cab.booking.core.dto.event.outbound.RideCreatedEvent
     consumer:
       group-id: booking-group
       auto-offset-reset: earliest
@@ -41,6 +44,11 @@ spring:
       properties:
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: "*"
+        spring.json.type.mapping: >-
+          ride-created:com.cab.booking.core.dto.event.outbound.RideCreatedEvent,
+          ride-arrived:com.cab.booking.core.dto.event.inbound.DriverArrivedEvent,
+          ride-started:com.cab.booking.core.dto.event.inbound.RideStartedEvent,
+          ride-finished:com.cab.booking.core.dto.event.inbound.RideFinishedEvent
 
 # Cấu hình Eureka Client
 eureka:

@@ -14,8 +14,8 @@ public class PaymentFailedEvent {
     @JsonProperty("eventType")
     private String eventType;
 
-    @JsonProperty("bookingId")
-    private String bookingId;
+    @JsonProperty("rideId")
+    private String rideId;
 
     @JsonProperty("status")
     private String status;
@@ -24,14 +24,14 @@ public class PaymentFailedEvent {
     private String reason;
 
     public static PaymentFailedEvent fromTransaction(
-            String bookingId,
+            String rideId,
             BigDecimal amount,
             String currency,
             String failureReason,
             int retryCount) {
         return PaymentFailedEvent.builder()
                 .eventType("PAYMENT_FAILED")
-                .bookingId(bookingId)
+                .rideId(rideId)
                 .status("FAILED")
                 .reason(failureReason)
                 .build();

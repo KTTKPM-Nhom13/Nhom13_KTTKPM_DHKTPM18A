@@ -8,25 +8,25 @@ import java.util.UUID;
  */
 public class DriverMatchedEvent {
 
-    private UUID bookingId;
+    private UUID rideId;
     private String driverId;
     private Instant matchedAt;
 
     public DriverMatchedEvent() {
     }
 
-    public DriverMatchedEvent(UUID bookingId, String driverId, Instant matchedAt) {
-        this.bookingId = bookingId;
+    public DriverMatchedEvent(UUID rideId, String driverId, Instant matchedAt) {
+        this.rideId = rideId;
         this.driverId = driverId;
         this.matchedAt = matchedAt;
     }
 
-    public UUID getBookingId() {
-        return bookingId;
+    public UUID getRideId() {
+        return rideId;
     }
 
-    public void setBookingId(UUID bookingId) {
-        this.bookingId = bookingId;
+    public void setRideId(UUID rideId) {
+        this.rideId = rideId;
     }
 
     public String getDriverId() {

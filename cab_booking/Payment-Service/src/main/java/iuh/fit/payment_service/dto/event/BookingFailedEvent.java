@@ -15,8 +15,8 @@ public class BookingFailedEvent {
     @JsonProperty("eventId")
     private String eventId;
 
-    @JsonProperty("bookingId")
-    private String bookingId;
+    @JsonProperty("rideId")
+    private String rideId;
 
     @JsonProperty("customerId")
     private String customerId;

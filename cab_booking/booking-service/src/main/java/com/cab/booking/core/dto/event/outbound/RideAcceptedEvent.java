@@ -7,7 +7,7 @@ import lombok.Builder;
 public record RideAcceptedEvent(
         String eventId,
         String type,
-        String bookingId,
+        String rideId,
         String customerId,
         String driverId,
         BookingStatus status,

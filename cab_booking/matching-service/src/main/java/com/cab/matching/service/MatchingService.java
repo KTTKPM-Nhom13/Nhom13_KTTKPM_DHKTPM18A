@@ -67,23 +67,23 @@ public class MatchingService {
      * @param event sự kiện RideCreated từ booking-service.
      */
     public void processMatching(RideCreatedEvent event) {
-        log.info("⚡ [STEP 1] Bắt đầu matching | bookingId={}", event.bookingId());
+        log.info("⚡ [STEP 1] Bat dau matching | rideId={}", event.rideId());
 
         // ── STEP 1: Lấy ứng viên từ Redis GEO (có priceMultiplier) ────────
         List<DriverFeatureDto> candidates = fetchCandidatesFromRedis(
                 event.pickupLat(), event.pickupLng());
 
         if (candidates.isEmpty()) {
-            log.warn("⚠️ Không tìm thấy tài xế nào xung quanh bookingId={}. Bỏ qua.", event.bookingId());
+            log.warn("⚠️ Khong tim thay tai xe nao xung quanh rideId={}. Bo qua.", event.rideId());
             // TODO: Publish NO_DRIVER_AVAILABLE event hoặc đẩy vào DLQ
             return;
         }
 
         // ── STEP 2: Gọi AI Scoring — Feign tự retry (FeignConfig.aiScoringRetryer) ──
-        List<RankingEntry> ranking = callAiWithFallback(candidates, event.bookingId());
+        List<RankingEntry> ranking = callAiWithFallback(candidates, event.rideId());
 
         if (ranking.isEmpty()) {
-            log.error("❌ Ranking rỗng sau AI + Fallback cho bookingId={}. Abort.", event.bookingId());
+            log.error("❌ Ranking rong sau AI + Fallback cho rideId={}. Abort.", event.rideId());
             return;
         }
 
@@ -100,21 +100,21 @@ public class MatchingService {
      * Nếu vẫn lỗi sau retry → fallback: tạo ranking theo thứ tự gần nhất (candidates đã sort asc).
      *
      * @param candidates danh sách ứng viên đã có priceMultiplier.
-     * @param bookingId  ID cuốc xe (dùng cho logging).
+         * @param rideId  ID cuoc xe (dung cho logging).
      * @return ranking đã sắp xếp từ cao xuống thấp.
      */
-    private List<RankingEntry> callAiWithFallback(List<DriverFeatureDto> candidates, String bookingId) {
+        private List<RankingEntry> callAiWithFallback(List<DriverFeatureDto> candidates, String rideId) {
         try {
-            log.info("🤖 [STEP 2] Gọi AI Scoring cho {} ứng viên | bookingId={}", candidates.size(), bookingId);
+            log.info("🤖 [STEP 2] Goi AI Scoring cho {} ung vien | rideId={}", candidates.size(), rideId);
             AiScoringResponse response = aiScoringClient.getBestMatch(candidates);
-            log.info("🏆 AI đề xuất: bestDriver={} | score={} | bookingId={}",
-                    response.getBestDriverId(), response.getHighestScore(), bookingId);
+            log.info("🏆 AI de xuat: bestDriver={} | score={} | rideId={}",
+                response.getBestDriverId(), response.getHighestScore(), rideId);
             return response.getRanking() != null ? response.getRanking() : List.of();
 
         } catch (Exception ex) {
             // Feign đã retry 3 lần và thất bại — chuyển sang fallback
-            log.error("🔥 AI Service thất bại sau 3 lần retry: {}. Fallback → tài xế gần nhất | bookingId={}",
-                    ex.getMessage(), bookingId);
+            log.error("🔥 AI Service that bai sau 3 lan retry: {}. Fallback → tai xe gan nhat | rideId={}",
+                ex.getMessage(), rideId);
 
             // Fallback: tạo ranking thủ công từ candidates (đã sắp xếp distance asc)
             List<RankingEntry> fallbackRanking = new ArrayList<>();
@@ -145,11 +145,11 @@ public class MatchingService {
      * request còn lại thất bại ({@code false}) → thử tài xế tiếp theo.
      *
      * @param ranking danh sách xếp hạng từ AI (đã sắp xếp điểm cao → thấp).
-     * @param event   sự kiện cuốc xe gốc (chứa bookingId, tọa độ...).
+         * @param event   su kien cuoc xe goc (chua rideId, toa do...).
      */
     private void assignDriverWithLock(List<RankingEntry> ranking, RideCreatedEvent event) {
-        log.info("🔐 [STEP 3] Race Condition Lock Loop — {} ứng viên | bookingId={}",
-                ranking.size(), event.bookingId());
+        log.info("🔐 [STEP 3] Race Condition Lock Loop — {} ung vien | rideId={}",
+            ranking.size(), event.rideId());
 
         for (RankingEntry entry : ranking) {
             String driverId  = entry.getDriverId();
@@ -166,8 +166,8 @@ public class MatchingService {
             if (Boolean.TRUE.equals(locked)) {
                 // ✅ XÍ ĐƯỢC KHÓA — tài xế này chưa bị cuốc nào khác lấy
                 // Critical section: thực hiện gán tài xế và thay đổi trạng thái
-                log.info("✅ Đã xí driver={} cho bookingId={} | score={}",
-                        driverId, event.bookingId(), entry.getScore());
+                log.info("✅ Da xi driver={} cho rideId={} | score={}",
+                    driverId, event.rideId(), entry.getScore());
 
                 // Đổi trạng thái tài xế → BUSY trong Redis (TTL 30 phút)
                 // Tài xế BUSY sẽ không xuất hiện trong kết quả GEO search tiếp theo
@@ -177,14 +177,14 @@ public class MatchingService {
                 // Bắn sự kiện ride.assigned lên Kafka
                 // → ride-service sẽ lắng nghe và cập nhật DB (MATCHING → ASSIGNED)
                 DriverMatchedEvent assignedEvent = DriverMatchedEvent.create(
-                        event.bookingId(),
+                    event.rideId(),
                         driverId,
                         event.pickupLat(),
                         event.pickupLng()
                 );
-                kafkaTemplate.send(TOPIC_RIDE_ASSIGNED, event.bookingId(), assignedEvent);
+                kafkaTemplate.send(TOPIC_RIDE_ASSIGNED, event.rideId(), assignedEvent);
 
-                log.info("📤 Đã bắn ride.assigned | bookingId={} | driverId={}", event.bookingId(), driverId);
+                log.info("📤 Da ban ride.assigned | rideId={} | driverId={}", event.rideId(), driverId);
 
                 // QUAN TRỌNG: Break ngay — đã gán thành công, không thử tài xế khác
                 break;
@@ -192,14 +192,14 @@ public class MatchingService {
             } else {
                 // ❌ THUA KHÓA — tài xế này vừa bị một cuốc xe song song giành mất
                 // Log cảnh báo và tiếp tục sang tài xế xếp hạng kế tiếp (top 2, top 3...)
-                log.warn("⚡ Race Condition! driver={} đã bị cuốc khác xí. Thử tài xế tiếp theo | bookingId={}",
-                        driverId, event.bookingId());
+                log.warn("⚡ Race Condition! driver={} da bi cuoc khac xi. Thu tai xe tiep theo | rideId={}",
+                    driverId, event.rideId());
                 // → for-loop tiếp tục iteration tiếp theo
             }
         }
 
         // Đến đây mà không break = toàn bộ tài xế trong ranking đều bị xí mất
-        log.warn("⚠️ Không còn tài xế khả dụng sau Race Condition loop | bookingId={}", event.bookingId());
+        log.warn("⚠️ Khong con tai xe kha dung sau Race Condition loop | rideId={}", event.rideId());
     }
 
     // ══════════════════════════════════════════════════════════════════════

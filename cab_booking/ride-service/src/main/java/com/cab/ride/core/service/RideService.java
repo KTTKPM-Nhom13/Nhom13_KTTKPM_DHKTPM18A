@@ -1,6 +1,9 @@
 package com.cab.ride.core.service;
 
 import com.cab.ride.core.dto.event.DriverLocationEvent;
+import com.cab.ride.core.dto.event.outbound.DriverArrivedEvent;
+import com.cab.ride.core.dto.event.outbound.RideStartedEvent;
+import com.cab.ride.core.dto.event.outbound.RideFinishedEvent;
 import com.cab.ride.core.entity.Ride;
 import com.cab.ride.core.enums.RideStatus;
 import com.cab.ride.core.repository.RideRepository;
@@ -13,6 +16,8 @@ import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -63,12 +68,36 @@ public class RideService {
                             "Ride not found: " + rideId);
                 });
 
+        Ride oldRideState = ride;
         RideStatus oldStatus = ride.getStatus();
         ride.setStatus(newStatus);
         Ride saved = rideRepository.save(ride);
 
         log.info("[RideService] Status transition: rideId={} | {} → {}",
                 rideId, oldStatus, newStatus);
+
+        // Bắn sự kiện lên Kafka khi có API tương ứng gọi vào thay đổi trạng thái
+        if (newStatus == RideStatus.PICKUP) {
+            DriverArrivedEvent event = DriverArrivedEvent.create(rideId, saved.getCustomerId(), saved.getDriverId());
+            kafkaTemplate.send("ride.arrived", rideId, event);
+            log.info("✅ DriverArrivedEvent → Kafka | rideId={}", rideId);
+        } else if (newStatus == RideStatus.IN_PROGRESS) {
+            RideStartedEvent event = RideStartedEvent.create(rideId, saved.getCustomerId(), saved.getDriverId());
+            kafkaTemplate.send("ride.started", rideId, event);
+            log.info("✅ RideStartedEvent → Kafka | rideId={}", rideId);
+        } else if (newStatus == RideStatus.COMPLETED) {
+            RideFinishedEvent event = RideFinishedEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
+                    .type(RideFinishedEvent.EVENT_TYPE)
+                    .rideId(rideId)
+                    .customerId(saved.getCustomerId())
+                    .finalFare(BigDecimal.ZERO) // Temporary default
+                    .paymentMethod("CASH") // Temporary default
+                    .timestamp(Instant.now().toString())
+                    .build();
+            kafkaTemplate.send("ride.finished", rideId, event);
+            log.info("✅ RideFinishedEvent → Kafka | rideId={}", rideId);
+        }
 
         return saved;
     }

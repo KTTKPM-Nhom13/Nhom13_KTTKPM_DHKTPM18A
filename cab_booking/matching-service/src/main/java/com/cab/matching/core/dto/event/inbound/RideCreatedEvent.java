@@ -7,7 +7,7 @@ package com.cab.matching.core.dto.event.inbound;
 public record RideCreatedEvent(
         String eventType,
         String eventId,
-        String bookingId,
+        String rideId,
         String customerId,
         Double pickupLat,
         Double pickupLng,

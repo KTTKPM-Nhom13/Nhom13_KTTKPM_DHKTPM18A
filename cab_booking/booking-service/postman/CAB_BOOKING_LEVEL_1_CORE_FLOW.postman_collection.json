@@ -1,0 +1,693 @@
+{
+  "info": {
+    "_postman_id": "cab-booking-level-1-core-flow",
+    "name": "CAB-BOOKING LEVEL 1 - CORE FLOW",
+    "description": "Level 1 basic API and core flow collection generated from the real Controller/DTO contracts.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.environment.get('run_id')) {",
+          "    const runId = Date.now().toString();",
+          "    pm.environment.set('run_id', runId);",
+          "    pm.environment.set('customer_email', `customer_${runId}@example.com`);",
+          "    pm.environment.set('driver_email', `driver_${runId}@example.com`);",
+          "    pm.environment.set('customer_device_id', `customer-device-${runId}`);",
+          "    pm.environment.set('driver_device_id', `driver-device-${runId}`);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "auth_base_url",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
+      "key": "booking_base_url",
+      "value": "http://localhost:8084",
+      "type": "string"
+    },
+    {
+      "key": "driver_base_url",
+      "value": "http://localhost:8083",
+      "type": "string"
+    },
+    {
+      "key": "pricing_base_url",
+      "value": "http://localhost:8088",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Auth Register Customer",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const runId = Date.now().toString();",
+              "pm.environment.set('run_id', runId);",
+              "pm.environment.set('customer_email', `customer_${runId}@example.com`);",
+              "pm.environment.set('driver_email', `driver_${runId}@example.com`);",
+              "pm.environment.set('customer_device_id', `customer-device-${runId}`);",
+              "pm.environment.set('driver_device_id', `driver-device-${runId}`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "const result = json.result || {};",
+              "const user = result.user || {};",
+              "",
+              "pm.test('Register returns valid token and user', function () {",
+              "    pm.expect(json.code).to.eql(200);",
+              "    pm.expect(result.accessToken).to.be.a('string').and.not.empty;",
+              "    pm.expect(result.refreshToken).to.be.a('string').and.not.empty;",
+              "    pm.expect(user.userId).to.be.a('string').and.not.empty;",
+              "    pm.expect(user.role).to.eql('CUSTOMER');",
+              "});",
+              "",
+              "pm.environment.set('access_token', result.accessToken);",
+              "pm.environment.set('refresh_token', result.refreshToken);",
+              "pm.environment.set('user_id', user.userId);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Level 1 Customer\",\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"Customer@123456\",\n  \"phoneNumber\": \"+84910000001\",\n  \"avatarUrl\": \"https://example.com/avatar/customer.png\",\n  \"role\": \"CUSTOMER\",\n  \"deviceId\": \"{{customer_device_id}}\",\n  \"platform\": \"android\",\n  \"userAgent\": \"Postman Level 1\",\n  \"appVersion\": \"1.0.0\"\n}"
+        },
+        "url": {
+          "raw": "{{auth_base_url}}/auth/register",
+          "host": [
+            "{{auth_base_url}}"
+          ],
+          "path": [
+            "auth",
+            "register"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "02 - Auth Login Customer",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "const result = json.result || {};",
+              "const user = result.user || {};",
+              "",
+              "pm.test('Login returns valid token and user id', function () {",
+              "    pm.expect(json.code).to.eql(200);",
+              "    pm.expect(result.accessToken).to.be.a('string').and.not.empty;",
+              "    pm.expect(result.tokenType).to.match(/Bearer/i);",
+              "    pm.expect(user.userId).to.be.a('string').and.not.empty;",
+              "});",
+              "",
+              "pm.environment.set('access_token', result.accessToken);",
+              "pm.environment.set('refresh_token', result.refreshToken);",
+              "pm.environment.set('user_id', user.userId);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"Customer@123456\",\n  \"deviceId\": \"{{customer_device_id}}\",\n  \"platform\": \"android\",\n  \"userAgent\": \"Postman Level 1\",\n  \"appVersion\": \"1.0.0\"\n}"
+        },
+        "url": {
+          "raw": "{{auth_base_url}}/auth/login",
+          "host": [
+            "{{auth_base_url}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "03 - Pricing Estimate Fare And ETA",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "",
+              "pm.test('Pricing returns ETA and fare', function () {",
+              "    pm.expect(json.estimateId).to.be.a('string').and.not.empty;",
+              "    pm.expect(Number(json.durationMinutes)).to.be.above(0);",
+              "    pm.expect(Number(json.distanceKm)).to.be.above(0);",
+              "    pm.expect(Number(json.totalFare)).to.be.above(0);",
+              "    pm.expect(json.vehicleType).to.eql('ECONOMY');",
+              "});",
+              "",
+              "pm.environment.set('estimate_id', json.estimateId);",
+              "pm.environment.set('eta_minutes', json.durationMinutes);",
+              "pm.environment.set('distance_km', json.distanceKm);",
+              "pm.environment.set('estimated_fare', json.totalFare);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{pricing_base_url}}/api/pricing/estimate?pickupLat=10.8221&pickupLng=106.6885&dropoffLat=10.8188&dropoffLng=106.6619&vehicleType=ECONOMY&estimatedDurationMinutes=18",
+          "host": [
+            "{{pricing_base_url}}"
+          ],
+          "path": [
+            "api",
+            "pricing",
+            "estimate"
+          ],
+          "query": [
+            {
+              "key": "pickupLat",
+              "value": "10.8221"
+            },
+            {
+              "key": "pickupLng",
+              "value": "106.6885"
+            },
+            {
+              "key": "dropoffLat",
+              "value": "10.8188"
+            },
+            {
+              "key": "dropoffLng",
+              "value": "106.6619"
+            },
+            {
+              "key": "vehicleType",
+              "value": "ECONOMY"
+            },
+            {
+              "key": "estimatedDurationMinutes",
+              "value": "18"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "04 - Booking Create Ride",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "const result = json.result || {};",
+              "",
+              "pm.test('Booking created with correct DTO fields', function () {",
+              "    pm.expect(json.code).to.eql(200);",
+              "    pm.expect(result.id).to.be.a('string').and.not.empty;",
+              "    pm.expect(result.customerId).to.eql(pm.environment.get('user_id'));",
+              "    pm.expect(result.status).to.eql('CREATED');",
+              "    pm.expect(result.pickupCoordinates.lat).to.eql(10.8221);",
+              "    pm.expect(result.dropoffCoordinates.lng).to.eql(106.6619);",
+              "});",
+              "",
+              "pm.environment.set('booking_id', result.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"pickupLocation\": \"12 Nguyen Van Bao, Go Vap\",\n  \"dropoffLocation\": \"Tan Son Nhat Airport\",\n  \"customerNote\": \"Level 1 Postman flow\",\n  \"pickupCoordinates\": {\n    \"lat\": 10.8221,\n    \"lng\": 106.6885\n  },\n  \"dropoffCoordinates\": {\n    \"lat\": 10.8188,\n    \"lng\": 106.6619\n  },\n  \"vehicleType\": \"ECONOMY\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": {{estimated_fare}},\n  \"promoCode\": \"\",\n  \"quoteToken\": \"{{estimate_id}}\",\n  \"idempotencyKey\": \"booking-{{run_id}}\"\n}"
+        },
+        "url": {
+          "raw": "{{booking_base_url}}/api/v1/bookings",
+          "host": [
+            "{{booking_base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "bookings"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "05 - Booking Get Customer History",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "const page = json.result || {};",
+              "const content = page.content || [];",
+              "",
+              "pm.test('Customer history contains created booking', function () {",
+              "    pm.expect(json.code).to.eql(200);",
+              "    pm.expect(content).to.be.an('array');",
+              "    const bookingId = pm.environment.get('booking_id');",
+              "    const found = content.some(item => item.id === bookingId);",
+              "    pm.expect(found).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{booking_base_url}}/api/v1/bookings/customer/{{user_id}}?page=0&size=10",
+          "host": [
+            "{{booking_base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "bookings",
+            "customer",
+            "{{user_id}}"
+          ],
+          "query": [
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "06 - Booking Get Nearby",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "",
+              "pm.test('Nearby response is a booking list', function () {",
+              "    pm.expect(json.code).to.eql(200);",
+              "    pm.expect(json.result).to.be.an('array');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{booking_base_url}}/api/v1/bookings/nearby?lat=10.8221&lng=106.6885&radius=5",
+          "host": [
+            "{{booking_base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "bookings",
+            "nearby"
+          ],
+          "query": [
+            {
+              "key": "lat",
+              "value": "10.8221"
+            },
+            {
+              "key": "lng",
+              "value": "106.6885"
+            },
+            {
+              "key": "radius",
+              "value": "5"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "07 - Auth Register Driver",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "const result = json.result || {};",
+              "const user = result.user || {};",
+              "",
+              "pm.test('Driver register returns token and user id', function () {",
+              "    pm.expect(json.code).to.eql(200);",
+              "    pm.expect(result.accessToken).to.be.a('string').and.not.empty;",
+              "    pm.expect(result.refreshToken).to.be.a('string').and.not.empty;",
+              "    pm.expect(user.userId).to.be.a('string').and.not.empty;",
+              "    pm.expect(user.role).to.eql('DRIVER');",
+              "});",
+              "",
+              "pm.environment.set('driver_access_token', result.accessToken);",
+              "pm.environment.set('driver_refresh_token', result.refreshToken);",
+              "pm.environment.set('driver_user_id', user.userId);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Level 1 Driver\",\n  \"email\": \"{{driver_email}}\",\n  \"password\": \"Driver@123456\",\n  \"phoneNumber\": \"+84910000002\",\n  \"avatarUrl\": \"https://example.com/avatar/driver.png\",\n  \"role\": \"DRIVER\",\n  \"deviceId\": \"{{driver_device_id}}\",\n  \"platform\": \"android\",\n  \"userAgent\": \"Postman Level 1\",\n  \"appVersion\": \"1.0.0\"\n}"
+        },
+        "url": {
+          "raw": "{{auth_base_url}}/auth/register",
+          "host": [
+            "{{auth_base_url}}"
+          ],
+          "path": [
+            "auth",
+            "register"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "08 - Driver Upsert Profile",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "const result = json.result || {};",
+              "",
+              "pm.test('Driver profile saved', function () {",
+              "    pm.expect(json.code).to.eql(200);",
+              "    pm.expect(result.externalUserId).to.eql(pm.environment.get('driver_user_id'));",
+              "    pm.expect(result.vehicleType).to.eql('ECONOMY');",
+              "    pm.expect(result.vehiclePlate).to.eql('51A-12345');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{driver_access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Level 1 Driver\",\n  \"email\": \"{{driver_email}}\",\n  \"phoneNumber\": \"+84910000002\",\n  \"avatarUrl\": \"https://example.com/avatar/driver.png\",\n  \"licenseNumber\": \"GPLX-{{run_id}}\",\n  \"vehicleType\": \"ECONOMY\",\n  \"vehiclePlate\": \"51A-12345\",\n  \"vehicleModel\": \"Toyota Vios\",\n  \"vehicleColor\": \"White\",\n  \"serviceArea\": \"Ho Chi Minh City\"\n}"
+        },
+        "url": {
+          "raw": "{{driver_base_url}}/api/drivers/me/profile",
+          "host": [
+            "{{driver_base_url}}"
+          ],
+          "path": [
+            "api",
+            "drivers",
+            "me",
+            "profile"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "09 - Driver Update Availability",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "const result = json.result || {};",
+              "",
+              "pm.test('Driver availability is AVAILABLE with location', function () {",
+              "    pm.expect(json.code).to.eql(200);",
+              "    pm.expect(result.externalUserId).to.eql(pm.environment.get('driver_user_id'));",
+              "    pm.expect(result.availabilityStatus).to.eql('AVAILABLE');",
+              "    pm.expect(Number(result.currentLatitude)).to.eql(10.8221);",
+              "    pm.expect(Number(result.currentLongitude)).to.eql(106.6885);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{driver_access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"availabilityStatus\": \"AVAILABLE\",\n  \"currentLatitude\": 10.8221,\n  \"currentLongitude\": 106.6885\n}"
+        },
+        "url": {
+          "raw": "{{driver_base_url}}/api/drivers/me/availability",
+          "host": [
+            "{{driver_base_url}}"
+          ],
+          "path": [
+            "api",
+            "drivers",
+            "me",
+            "availability"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "10 - Auth Logout Customer",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "",
+              "pm.test('Logout succeeds', function () {",
+              "    pm.expect(json.code).to.eql(200);",
+              "    pm.expect(json.message).to.match(/Logged out/i);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
+        },
+        "url": {
+          "raw": "{{auth_base_url}}/auth/logout",
+          "host": [
+            "{{auth_base_url}}"
+          ],
+          "path": [
+            "auth",
+            "logout"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}

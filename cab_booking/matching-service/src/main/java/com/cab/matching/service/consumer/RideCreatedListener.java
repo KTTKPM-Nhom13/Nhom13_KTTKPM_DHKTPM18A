@@ -20,15 +20,15 @@ public class RideCreatedListener {
      */
     @KafkaListener(topics = "ride.created", groupId = "matching-group")
     public void listenRideCreated(RideCreatedEvent event) {
-        log.info("📥 Nhận sự kiện RideCreated: [BookingId={}, CustomerId={}]", 
-                event.bookingId(), event.customerId());
+        log.info("📥 Nhan su kien RideCreated: [RideId={}, CustomerId={}]", 
+            event.rideId(), event.customerId());
         
         try {
             // Ủy nhiệm việc xử lý cho Brain (MatchingService)
             matchingService.processMatching(event);
         } catch (Exception e) {
-            log.error("❌ CRITICAL ERROR khi xử lý event matching cho bookingId={}: {}", 
-                    event.bookingId(), e.getMessage(), e);
+            log.error("❌ CRITICAL ERROR khi xu ly event matching cho rideId={}: {}", 
+                    event.rideId(), e.getMessage(), e);
         }
     }
 }

@@ -2,6 +2,9 @@ package com.cab.booking.core.listener;
 
 import com.cab.booking.core.dto.event.DriverStatusEvent;
 import com.cab.booking.core.dto.event.inbound.PaymentCompletedEvent;
+import com.cab.booking.core.dto.event.inbound.DriverArrivedEvent;
+import com.cab.booking.core.dto.event.inbound.RideStartedEvent;
+import com.cab.booking.core.dto.event.inbound.RideFinishedEvent;
 import com.cab.booking.core.dto.event.outbound.RideAssignedEvent;
 import com.cab.booking.core.entity.Booking;
 import com.cab.booking.core.enums.BookingStatus;
@@ -58,6 +61,54 @@ public class RideEventListener {
                 event.getActiveForBooking(),
                 event.getRideId(),
                 event.getRideStatus());
+    }
+
+    @KafkaListener(topics = "ride.arrived", groupId = "booking-service-group")
+    public void handleDriverArrived(DriverArrivedEvent event) {
+        log.info("[ride.arrived] rideId={}", event.rideId());
+        try {
+            UUID rideId = UUID.fromString(event.rideId());
+            Booking booking = bookingRepository.findById(rideId).orElse(null);
+            if (booking != null && booking.getStatus() == BookingStatus.ASSIGNED) {
+                booking.setStatus(BookingStatus.PICKUP);
+                bookingRepository.save(booking);
+                log.info("Booking {} moved to PICKUP", booking.getId());
+            }
+        } catch (Exception ex) {
+            log.error("Error processing ride.arrived: {}", ex.getMessage());
+        }
+    }
+
+    @KafkaListener(topics = "ride.started", groupId = "booking-service-group")
+    public void handleRideStarted(RideStartedEvent event) {
+        log.info("[ride.started] rideId={}", event.rideId());
+        try {
+            UUID rideId = UUID.fromString(event.rideId());
+            Booking booking = bookingRepository.findById(rideId).orElse(null);
+            if (booking != null && booking.getStatus() == BookingStatus.PICKUP) {
+                booking.setStatus(BookingStatus.IN_PROGRESS);
+                bookingRepository.save(booking);
+                log.info("Booking {} moved to IN_PROGRESS", booking.getId());
+            }
+        } catch (Exception ex) {
+            log.error("Error processing ride.started: {}", ex.getMessage());
+        }
+    }
+
+    @KafkaListener(topics = "ride.finished", groupId = "booking-service-group")
+    public void handleRideFinished(RideFinishedEvent event) {
+        log.info("[ride.finished] rideId={}", event.getRideId());
+        try {
+            UUID rideId = UUID.fromString(event.getRideId());
+            Booking booking = bookingRepository.findById(rideId).orElse(null);
+            if (booking != null && booking.getStatus() == BookingStatus.IN_PROGRESS) {
+                booking.setStatus(BookingStatus.COMPLETED);
+                bookingRepository.save(booking);
+                log.info("Booking {} moved to COMPLETED", booking.getId());
+            }
+        } catch (Exception ex) {
+            log.error("Error processing ride.finished: {}", ex.getMessage());
+        }
     }
 
     @KafkaListener(topics = "payment.completed", groupId = "booking-service-group")

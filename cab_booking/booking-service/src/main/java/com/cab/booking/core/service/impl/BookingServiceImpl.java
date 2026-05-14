@@ -2,7 +2,6 @@ package com.cab.booking.core.service.impl;
 
 import com.cab.booking.core.dto.event.outbound.RideAcceptedEvent;
 import com.cab.booking.core.dto.event.outbound.RideCreatedEvent;
-import com.cab.booking.core.dto.event.outbound.RideFinishedEvent;
 import com.cab.booking.core.dto.request.BookingRequest;
 import com.cab.booking.core.dto.response.BookingResponse;
 import com.cab.booking.core.entity.Booking;
@@ -174,7 +173,7 @@ public class BookingServiceImpl implements BookingService {
         RideAcceptedEvent event = RideAcceptedEvent.builder()
                 .eventId(UUID.randomUUID().toString())
                 .type(RideAcceptedEvent.EVENT_TYPE)
-                .bookingId(booking.getId().toString())
+            .rideId(booking.getId().toString())
                 .customerId(booking.getCustomerId())
                 .driverId(driverId)
                 .status(booking.getStatus())
@@ -206,8 +205,6 @@ public class BookingServiceImpl implements BookingService {
         booking = bookingRepository.save(booking);
         redisTemplate.opsForValue().set("booking:" + bookingId, booking, Duration.ofHours(2));
 
-        bookingEventPublisher.publishRideStarted(booking);
-
         log.info("✅ Ride started | bookingId={} | driver={} | customer={}",
                 booking.getId(), booking.getAssignedDriverId(), booking.getCustomerId());
 
@@ -232,18 +229,7 @@ public class BookingServiceImpl implements BookingService {
         booking.setStatus(BookingStatus.COMPLETED);
         booking = bookingRepository.save(booking);
 
-        // Gửi sự kiện ride.finished → Payment Service tính tiền
-        RideFinishedEvent event = RideFinishedEvent.builder()
-                .eventId(UUID.randomUUID().toString())
-                .type(RideFinishedEvent.EVENT_TYPE)
-                .rideId(booking.getId().toString())
-                .customerId(booking.getCustomerId())
-                .finalFare(booking.getEstimatedFare()) // TODO: Có thể update finalFare từ tính toán quãng đường thực tế
-                .paymentMethod(booking.getPaymentMethod())
-                .timestamp(Instant.now().toString())
-                .build();
-        kafkaTemplate.send("ride.finished", booking.getId().toString(), event);
-        log.info("✅ RideCompleted & ride.finished → Kafka | bookingId={} | finalFare={} | payment={}",
+        log.info("✅ RideCompleted | bookingId={} | finalFare={} | payment={}",
                 booking.getId(), booking.getEstimatedFare(), booking.getPaymentMethod());
 
         redisTemplate.opsForValue().set("booking:" + bookingId, booking, Duration.ofHours(2));
@@ -327,8 +313,6 @@ public class BookingServiceImpl implements BookingService {
         bookingStateMachine.transitionTo(booking, BookingStatus.PICKUP);
         booking = bookingRepository.save(booking);
         redisTemplate.opsForValue().set("booking:" + bookingId, booking, Duration.ofHours(2));
-
-        bookingEventPublisher.publishDriverArrived(booking);
 
         log.info("✅ Driver arrived at pickup for bookingId={}", bookingId);
         return BookingResponse.fromEntity(booking);

@@ -17,8 +17,8 @@ public class PaymentRefundedEvent {
     @JsonProperty("eventId")
     private String eventId;
 
-    @JsonProperty("bookingId")
-    private String bookingId;
+    @JsonProperty("rideId")
+    private String rideId;
 
     @JsonProperty("status")
     private String status;
@@ -33,7 +33,7 @@ public class PaymentRefundedEvent {
     private String reason;
 
     public static PaymentRefundedEvent fromTransaction(
-            String bookingId,
+            String rideId,
             BigDecimal amount,
             String currency,
             String refundTransactionId,
@@ -41,7 +41,7 @@ public class PaymentRefundedEvent {
         return PaymentRefundedEvent.builder()
                 .eventType("PAYMENT_REFUNDED")
                 .eventId(java.util.UUID.randomUUID().toString())
-                .bookingId(bookingId)
+                .rideId(rideId)
                 .status("REFUNDED")
                 .amount(amount)
                 .refundTransactionId(refundTransactionId)

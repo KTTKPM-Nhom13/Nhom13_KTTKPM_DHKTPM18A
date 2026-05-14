@@ -34,8 +34,8 @@ public class RideFinishedConsumer {
             @Header(KafkaHeaders.RECEIVED_KEY) String key,
             Acknowledgment acknowledgment) {
 
-        log.info("[Consumer] Received ride.finished - key={}, partition={}, offset={}, eventType={}, bookingId={}, finalFare={}",
-                key, partition, offset, event.getEventType(), event.getBookingId(), event.getFinalFare());
+        log.info("[Consumer] Received ride.finished - key={}, partition={}, offset={}, eventType={}, rideId={}, finalFare={}",
+            key, partition, offset, event.getEventType(), event.getRideId(), event.getFinalFare());
 
         try {
             processPaymentFromRideFinished(event);
@@ -48,7 +48,8 @@ public class RideFinishedConsumer {
     }
 
     private void processPaymentFromRideFinished(RideFinishedEvent event) {
-        log.info("[Consumer] Initiating automatic payment for bookingId={}", event.getBookingId());
+        String bookingId = event.getRideId();
+        log.info("[Consumer] Initiating automatic payment for bookingId={}", bookingId);
 
         PaymentMethod method = PaymentMethod.CASH;
         if (event.getPaymentMethod() != null) {
@@ -61,25 +62,25 @@ public class RideFinishedConsumer {
 
         BigDecimal amount = event.getFinalFare();
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            log.warn("[Consumer] Skipping payment - invalid finalFare {} for bookingId={}", amount, event.getBookingId());
+            log.warn("[Consumer] Skipping payment - invalid finalFare {} for bookingId={}", amount, bookingId);
             return;
         }
 
         ChargePaymentRequest chargeRequest = ChargePaymentRequest.builder()
-                .bookingId(event.getBookingId())
+                .bookingId(bookingId)
                 .customerId(event.getCustomerId())
                 .amount(amount)
                 .currency("VND")
                 .paymentMethod(method)
-                .description("Auto-payment for booking " + event.getBookingId())
-                .idempotencyKey("ride-finished-" + event.getBookingId())
+                .description("Auto-payment for booking " + bookingId)
+                .idempotencyKey("ride-finished-" + bookingId)
                 .build();
 
         try {
             paymentSagaService.startPaymentSaga(chargeRequest);
-            log.info("[Consumer] Payment saga triggered successfully for bookingId={}", event.getBookingId());
+            log.info("[Consumer] Payment saga triggered successfully for bookingId={}", bookingId);
         } catch (Exception e) {
-            log.error("[Consumer] Failed to trigger payment saga for bookingId={}", event.getBookingId(), e);
+            log.error("[Consumer] Failed to trigger payment saga for bookingId={}", bookingId, e);
         }
     }
 }

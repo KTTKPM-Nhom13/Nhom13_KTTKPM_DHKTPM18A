@@ -32,13 +32,13 @@ public class BookingFailedConsumer {
             @Header(KafkaHeaders.RECEIVED_KEY) String key,
             Acknowledgment acknowledgment) {
 
-        log.info("[Compensate] Received booking.failed - key={}, partition={}, offset={}, bookingId={}, reason={}",
-                key, partition, offset, event.getBookingId(), event.getReason());
+        log.info("[Compensate] Received booking.failed - key={}, partition={}, offset={}, rideId={}, reason={}",
+            key, partition, offset, event.getRideId(), event.getReason());
 
         try {
-            String bookingId = event.getBookingId();
+            String bookingId = event.getRideId();
             if (bookingId == null || bookingId.isBlank()) {
-                log.warn("[Compensate] booking.failed event has null/blank bookingId, skipping");
+                log.warn("[Compensate] booking.failed event has null/blank rideId, skipping");
                 acknowledgment.acknowledge();
                 return;
             }
@@ -47,8 +47,8 @@ public class BookingFailedConsumer {
             acknowledgment.acknowledge();
             log.info("[Compensate] Compensation triggered for bookingId={}", bookingId);
         } catch (Exception e) {
-            log.error("[Compensate] Error processing booking.failed - bookingId={}: {}",
-                    event.getBookingId(), e.getMessage(), e);
+            log.error("[Compensate] Error processing booking.failed - rideId={}: {}",
+                    event.getRideId(), e.getMessage(), e);
             acknowledgment.acknowledge();
         }
     }

@@ -6,7 +6,7 @@ import lombok.Builder;
 public record BookingTimeoutEvent(
         String eventId,
         String type,
-        String bookingId,
+    String rideId,
         String customerId,
         String reason,
         String timestamp

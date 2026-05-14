@@ -22,7 +22,10 @@ public class RideEventConsumer {
         
         try {
             String rideId = (String) event.get("rideId");
-            if (rideId == null) rideId = (String) event.get("bookingId");
+            if (rideId == null) {
+                log.warn("Missing rideId in event payload for topic {}", topic);
+                return;
+            }
             
             String customerId = (String) event.get("customerId");
             String title = "Ride Update";

@@ -14,8 +14,8 @@ public class PaymentCompletedEvent {
     @JsonProperty("eventType")
     private String eventType;
 
-    @JsonProperty("bookingId")
-    private String bookingId;
+    @JsonProperty("rideId")
+    private String rideId;
 
     @JsonProperty("status")
     private String status;
@@ -24,14 +24,14 @@ public class PaymentCompletedEvent {
     private BigDecimal amount;
 
     public static PaymentCompletedEvent fromTransaction(
-            String bookingId,
+            String rideId,
             BigDecimal amount,
             String currency,
             String gatewayTransactionId,
             String paymentMethod) {
         return PaymentCompletedEvent.builder()
                 .eventType("PAYMENT_COMPLETED")
-                .bookingId(bookingId)
+                .rideId(rideId)
                 .status("SUCCESS")
                 .amount(amount)
                 .build();
