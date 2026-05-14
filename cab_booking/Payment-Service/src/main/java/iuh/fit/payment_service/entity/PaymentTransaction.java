@@ -61,6 +61,9 @@ public class PaymentTransaction {
     @Column(length = 500)
     private String gatewayResponse;
 
+    @Column(length = 2000)
+    private String gatewayResponseJson;
+
     @Column(length = 500)
     private String failureReason;
 

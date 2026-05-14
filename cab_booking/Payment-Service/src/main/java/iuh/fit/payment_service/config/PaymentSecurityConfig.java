@@ -28,6 +28,8 @@ public class PaymentSecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/payments/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payments/momo/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/payments/zalopay/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/payments/vnpay/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/payments/vnpay/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.disable());
