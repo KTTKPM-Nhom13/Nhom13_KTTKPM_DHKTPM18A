@@ -23,5 +23,5 @@ COPY --from=build /app/target/*.jar app.jar
 # Port 8761 là cổng truyền thống của Eureka
 EXPOSE 8761
 
-# Tối ưu RAM cho Java trong Docker (Tùy chọn nhưng nên có)
-ENTRYPOINT ["java", "-Xmx256m", "-jar", "app.jar"]
+# Tối ưu RAM cho Java trong Docker
+ENTRYPOINT ["java", "-Xmx384m", "-XX:+UseSerialGC", "-Xss512k", "-jar", "app.jar"]

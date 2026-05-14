@@ -18,21 +18,25 @@ public class RideEventConsumer {
 
     @KafkaListener(topics = {"ride.created", "ride.assigned", "ride.finished", "booking-events", "pricing.surge.updated"}, groupId = "notification-group")
     public void consumeRideEvents(Map<String, Object> event, @Header(KafkaHeaders.RECEIVED_TOPIC) String topic) {
-        log.info("Consumed event from topic {}: {}", topic, event);
+        // Only log essential info to avoid spamming and potential memory issues with large payloads
+        log.info("Consumed event from topic {}: {}", topic, event.getOrDefault("type", topic));
         
         try {
-            String rideId = (String) event.get("rideId");
-            if (rideId == null) {
-                log.warn("Missing rideId in event payload for topic {}", topic);
+            // Use String.valueOf to safely convert objects to String
+            String rideId = event.containsKey("rideId") ? String.valueOf(event.get("rideId")) : null;
+            String customerId = event.containsKey("customerId") ? String.valueOf(event.get("customerId")) : null;
+
+            // Some topics like 'pricing.surge.updated' don't have rideId/customerId
+            if (rideId == null && !"pricing.surge.updated".equals(topic)) {
+                log.debug("Skipping event from topic {} as it has no rideId", topic);
                 return;
             }
             
-            String customerId = (String) event.get("customerId");
             String title = "Ride Update";
             String message = "";
 
             if ("booking-events".equals(topic)) {
-                String type = (String) event.get("type");
+                String type = String.valueOf(event.get("type"));
                 if ("DriverArrived".equals(type)) {
                     message = "Your driver has arrived at the pickup location!";
                 } else if ("RideStarted".equals(type)) {
@@ -46,7 +50,7 @@ public class RideEventConsumer {
                         message = String.format("Your ride request %s has been created and is looking for a driver.", rideId);
                         break;
                     case "ride.assigned":
-                        String driverId = (String) event.get("driverId");
+                        String driverId = String.valueOf(event.get("driverId"));
                         message = String.format("Driver %s has been assigned to your ride %s.", driverId, rideId);
                         break;
                     case "ride.finished":
@@ -54,19 +58,19 @@ public class RideEventConsumer {
                         title = "Ride Completed";
                         break;
                     case "pricing.surge.updated":
-                        message = "Surge pricing has been updated in your area.";
-                        title = "Pricing Update";
-                        break;
+                        // Surge updates are usually broadcast, but here we might just log it
+                        log.info("Surge pricing update received for zone: {}", event.get("zone_id"));
+                        return; // No specific customer to notify yet in this generic handler
                     default:
                         message = "You have a new update for your ride.";
                 }
             }
             
-            if (customerId != null && !message.isEmpty()) {
+            if (customerId != null && !message.isEmpty() && !"null".equals(customerId)) {
                 notificationService.sendNotification(customerId, title, message, "PUSH");
             }
         } catch (Exception e) {
-            log.error("Error processing Kafka message: {}", e.getMessage());
+            log.error("Error processing Kafka message from topic {}: {}", topic, e.getMessage());
         }
     }
 }
