@@ -8,10 +8,10 @@ include:
   - email-service/docker-compose.yaml
   - user-service/docker-compose.yaml
   - driver-service/docker-compose.yaml
-  - notification-service/docker-compose.yaml
+  # - notification-service/docker-compose.yaml
   - review-service/docker-compose.yaml
   - booking-service/docker-compose.yaml
-  # - Pricing-Service/docker-compose.yaml
+  - Pricing-Service/docker-compose.yaml
   - Payment-Service/docker-compose.yaml
   - matching-service/docker-compose.yaml
   - ai-scoring-service/docker-compose.yaml

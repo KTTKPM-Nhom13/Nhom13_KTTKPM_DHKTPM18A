@@ -14,7 +14,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
                 type = FilterType.ASSIGNABLE_TYPE,
                 classes = {
                         iuh.fit.common.exception.GlobalExceptionHandler.class,
-                        iuh.fit.common.config.SecurityConfig.class,
                         iuh.fit.common.config.JpaAuditingConfig.class
                 }
         )
