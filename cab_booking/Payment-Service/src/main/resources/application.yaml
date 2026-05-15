@@ -112,7 +112,7 @@ resilience4j:
 
 app:
   security:
-    public-endpoints: /internal/**,/actuator/**,/swagger-ui/**,/v3/api-docs/**,/api/payments/charge,/api/payments/momo/**,/api/payments/zalopay/**,/api/payments/vnpay/**,/api/admin/**
+    public-endpoints: /internal/**,/actuator/**,/swagger-ui/**,/v3/api-docs/**,/api/payments/momo/**,/api/payments/zalopay/**,/api/payments/vnpay/**
   payment:
     gateway:
       base-url: http://localhost:8088/internal/gateway

@@ -1,0 +1,161 @@
+{
+  "info": {
+    "_postman_id": "4b9f3e4b-9c2f-4512-87a1-2d7c58f0c1a1",
+    "name": "Payment Service API",
+    "description": "APIs for testing Payment Service with JWT authentication",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Thanh toán ZaloPay (Có JWT)",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "X-Idempotency-Key",
+            "value": "{{$guid}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"bookingId\": \"B-{{$randomInt}}\",\r\n    \"customerId\": \"C-98765\",\r\n    \"amount\": 50000,\r\n    \"paymentMethod\": \"ZALOPAY\",\r\n    \"currency\": \"VND\",\r\n    \"description\": \"Thanh toan chuyen di qua ZaloPay\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/payments/charge",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "payments",
+            "charge"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Lấy thông tin thanh toán theo mã giao dịch (Có JWT)",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/payments/txn/{{transaction_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "payments",
+            "txn",
+            "{{transaction_id}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "ZaloPay Callback Webhook (Không JWT)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"data\": \"...\",\r\n  \"mac\": \"...\",\r\n  \"type\": 1\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/payments/zalopay/callback",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "payments",
+            "zalopay",
+            "callback"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8090",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "paste_your_jwt_token_here",
+      "type": "string"
+    },
+    {
+      "key": "transaction_id",
+      "value": "txn_12345",
+      "type": "string"
+    }
+  ]
+}
