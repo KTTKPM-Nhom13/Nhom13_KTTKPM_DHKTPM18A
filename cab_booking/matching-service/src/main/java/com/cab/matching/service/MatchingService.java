@@ -46,10 +46,12 @@ public class MatchingService {
     // ── Constants ──────────────────────────────────────────────────────────
     private static final String DRIVER_LOCATION_KEY  = "driver:locations";
     private static final String DRIVER_STATUS_PREFIX = "driver:status:";
-    private static final String DRIVER_LOCK_PREFIX   = "lock:driver:";
-    private static final String DRIVER_STATUS_BUSY   = "BUSY";
+    private static final String DRIVER_LOCK_PREFIX   = "driver:lock:";
+    private static final String DRIVER_STATUS_AVAILABLE = "AVAILABLE";
     private static final String DRIVER_LOCK_VALUE    = "LOCKED";
-    private static final long   LOCK_TTL_SECONDS     = 5L;
+    private static final String BOOKING_CANCELLED_PREFIX = "booking:cancelled:";
+    private static final long   LOCK_TTL_SECONDS     = 60L;
+    private static final int    MAX_MATCHING_ATTEMPTS = 3;
     private static final String TOPIC_RIDE_ASSIGNED  = "ride.assigned";
 
     // ── Dependencies ───────────────────────────────────────────────────────
@@ -69,15 +71,20 @@ public class MatchingService {
      * @param event sự kiện RideCreated từ booking-service.
      */
     public void processMatching(RideCreatedEvent event) {
+        if (isBookingCancelled(event.rideId())) {
+            log.info("Skip matching cancelled rideId={}", event.rideId());
+            return;
+        }
         log.info("⚡ [STEP 1] Bat dau matching | rideId={}", event.rideId());
 
         // ── STEP 1: Lấy ứng viên từ Redis GEO (có priceMultiplier) ────────
         List<DriverFeatureDto> candidates = fetchCandidatesFromRedis(
-                event.pickupLat(), event.pickupLng());
+                event.pickupLat(), event.pickupLng(), event.searchRadiusKmOrDefault());
 
         if (candidates.isEmpty()) {
             log.warn("⚠️ Khong tim thay tai xe nao xung quanh rideId={}. Bo qua.", event.rideId());
             // TODO: Publish NO_DRIVER_AVAILABLE event hoặc đẩy vào DLQ
+            scheduleRetryIfPossible(event);
             return;
         }
 
@@ -155,8 +162,7 @@ public class MatchingService {
 
         for (RankingEntry entry : ranking) {
             String driverId  = normalizeDriverId(entry.getDriverId());
-            String lockKey   = DRIVER_LOCK_PREFIX + driverId;   // "lock:driver:drv-001"
-            String statusKey = DRIVER_STATUS_PREFIX + driverId; // "driver:status:drv-001"
+            String lockKey   = DRIVER_LOCK_PREFIX + driverId;
 
             // ── SETNX Atomic: Thử đặt khóa phân tán cho tài xế này ───────
             // Lệnh = SET lockKey "LOCKED" NX EX 5
@@ -173,9 +179,6 @@ public class MatchingService {
 
                 // Đổi trạng thái tài xế → BUSY trong Redis (TTL 30 phút)
                 // Tài xế BUSY sẽ không xuất hiện trong kết quả GEO search tiếp theo
-                redisTemplate.opsForValue()
-                        .set(statusKey, DRIVER_STATUS_BUSY, 30, TimeUnit.MINUTES);
-
                 // Bắn sự kiện ride.assigned lên Kafka
                 // → ride-service sẽ lắng nghe và cập nhật DB (MATCHING → ASSIGNED)
                 RideAssignedEvent assignedEvent = RideAssignedEvent.builder()
@@ -220,9 +223,9 @@ public class MatchingService {
      * @param lng kinh độ điểm đón.
      * @return danh sách FeatureDto sắp xếp gần nhất trước.
      */
-    private List<DriverFeatureDto> fetchCandidatesFromRedis(Double lat, Double lng) {
+    private List<DriverFeatureDto> fetchCandidatesFromRedis(Double lat, Double lng, double radiusKm) {
         GeoReference<String> reference = GeoReference.fromCoordinate(lng, lat);
-        Distance             radius    = new Distance(3.0, Metrics.KILOMETERS);
+        Distance             radius    = new Distance(radiusKm, Metrics.KILOMETERS);
 
         RedisGeoCommands.GeoSearchCommandArgs args = RedisGeoCommands.GeoSearchCommandArgs
                 .newGeoSearchArgs()
@@ -240,8 +243,25 @@ public class MatchingService {
                 return Collections.emptyList();
             }
 
+            // Lấy trước toàn bộ trạng thái của các tài xế để tối ưu performance (tránh gọi Redis n lần)
+            List<String> statusKeys = new ArrayList<>();
             for (GeoResult<RedisGeoCommands.GeoLocation<String>> res : results.getContent()) {
-                String driverId        = res.getContent().getName();
+                statusKeys.add(DRIVER_STATUS_PREFIX + normalizeDriverId(res.getContent().getName()));
+            }
+            List<String> statuses = redisTemplate.opsForValue().multiGet(statusKeys);
+
+            for (int i = 0; i < results.getContent().size(); i++) {
+                GeoResult<RedisGeoCommands.GeoLocation<String>> res = results.getContent().get(i);
+                String rawDriverId     = res.getContent().getName();
+                String driverId        = normalizeDriverId(rawDriverId);
+
+                // Kiểm tra trạng thái tài xế, nếu BUSY thì bỏ qua không cho vào danh sách ứng viên
+                String status = (statuses != null && i < statuses.size()) ? statuses.get(i) : null;
+                if (!DRIVER_STATUS_AVAILABLE.equals(status)) {
+                    log.debug("Driver {} status is {}, skipping.", driverId, status);
+                    continue;
+                }
+
                 double distKm          = res.getDistance().getValue();
                 int    etaMin          = Math.max(2, (int) (distKm * 3));     // 3 phút/km, min 2p
                 double rating          = 4.5 + random.nextDouble() * 0.5;     // mock 4.5 – 5.0
@@ -259,13 +279,66 @@ public class MatchingService {
                         .build());
             }
 
-            log.info("📍 Tìm được {} ứng viên từ Redis GEO (3km radius)", featureList.size());
+            log.info("📍 Tìm được {} ứng viên từ Redis GEO (3km radius) sau khi filter AVAILABLE", featureList.size());
 
         } catch (Exception ex) {
             log.error("❌ Lỗi khi đọc Redis GEO: {}", ex.getMessage(), ex);
         }
 
         return featureList;
+    }
+
+    private void scheduleRetryIfPossible(RideCreatedEvent event) {
+        int currentAttempt = event.attemptOrDefault();
+        if (currentAttempt >= MAX_MATCHING_ATTEMPTS || isBookingCancelled(event.rideId())) {
+            log.warn("No retry for rideId={} | attempt={} | cancelled={}",
+                    event.rideId(),
+                    currentAttempt,
+                    isBookingCancelled(event.rideId()));
+            return;
+        }
+
+        int nextAttempt = currentAttempt + 1;
+        double nextRadiusKm = switch (nextAttempt) {
+            case 2 -> 5.0;
+            case 3 -> 8.0;
+            default -> event.searchRadiusKmOrDefault();
+        };
+
+        RideCreatedEvent retryEvent = new RideCreatedEvent(
+                UUID.randomUUID().toString(),
+                event.type(),
+                event.rideId(),
+                event.customerId(),
+                event.customerNote(),
+                event.pickup(),
+                event.dropoff(),
+                event.vehicleType(),
+                event.paymentMethod(),
+                event.estimatedFare(),
+                event.promoCode(),
+                nextAttempt,
+                nextRadiusKm,
+                event.isRematch(),
+                event.excludedDriverIds(),
+                Instant.now().toString()
+        );
+
+        java.util.concurrent.CompletableFuture.delayedExecutor(5, TimeUnit.SECONDS).execute(() -> {
+            if (isBookingCancelled(event.rideId())) {
+                log.info("Skip scheduled retry for cancelled rideId={}", event.rideId());
+                return;
+            }
+            kafkaTemplate.send("ride.created", retryEvent.rideId(), retryEvent);
+            log.info("Scheduled matching retry published | rideId={} | attempt={} | radiusKm={}",
+                    retryEvent.rideId(),
+                    retryEvent.matchingAttempt(),
+                    retryEvent.searchRadiusKm());
+        });
+    }
+
+    private boolean isBookingCancelled(String rideId) {
+        return Boolean.TRUE.equals(redisTemplate.hasKey(BOOKING_CANCELLED_PREFIX + rideId));
     }
 
     private String normalizeDriverId(String driverId) {

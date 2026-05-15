@@ -3,10 +3,36 @@ spring:
     name: driver-service
   config:
     import: "optional:configserver:http://localhost:8888"
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:redis123}
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
-        spring.json.add.type.headers: false
+        spring.json.add.type.headers: true
+        spring.json.type.mapping: >
+          driver-status:iuh.fit.driverservice.dto.event.DriverStatusEvent,
+          ride-accept-requested:iuh.fit.driverservice.dto.event.RideAcceptRequestedEvent,
+          ride-reject-requested:iuh.fit.driverservice.dto.event.RideRejectRequestedEvent,
+          ride-accepted:iuh.fit.driverservice.dto.event.RideAcceptedEvent,
+          ride-rejected:iuh.fit.driverservice.dto.event.RideRejectedEvent,
+          ride-progress:iuh.fit.driverservice.dto.event.RideProgressEvent,
+          ride-completed:iuh.fit.driverservice.dto.event.RideCompletedEvent,
+          ride-finished:iuh.fit.driverservice.dto.event.RideFinishedEvent
+    consumer:
+      group-id: driver-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: "*"
+        spring.json.type.mapping: >
+          ride-assigned:iuh.fit.driverservice.dto.event.RideAssignedEvent,
+          ride-accepted:iuh.fit.driverservice.dto.event.RideAcceptedEvent,
+          ride-cancelled:iuh.fit.driverservice.dto.event.RideCancelledEvent

@@ -1,6 +1,7 @@
 package com.cab.matching.core.dto.event.inbound;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -18,6 +19,10 @@ public record RideCreatedEvent(
         String paymentMethod,
         BigDecimal estimatedFare,
         String promoCode,
+        Integer matchingAttempt,
+        Double searchRadiusKm,
+        Boolean rematch,
+        List<String> excludedDriverIds,
         String timestamp
 ) {
     public String eventType() {
@@ -30,6 +35,18 @@ public record RideCreatedEvent(
 
     public Double pickupLng() {
         return coordinate(pickup, "lng");
+    }
+
+    public int attemptOrDefault() {
+        return matchingAttempt == null || matchingAttempt < 1 ? 1 : matchingAttempt;
+    }
+
+    public double searchRadiusKmOrDefault() {
+        return searchRadiusKm == null || searchRadiusKm <= 0 ? 3.0 : searchRadiusKm;
+    }
+
+    public boolean isRematch() {
+        return Boolean.TRUE.equals(rematch);
     }
 
     private static Double coordinate(Map<String, Double> coordinates, String key) {

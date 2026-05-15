@@ -24,6 +24,26 @@ public class KafkaTopicConfig {
     }
 
     @Bean
+    public NewTopic rideAcceptRequestedTopic() {
+        return TopicBuilder.name("ride.accept.requested").partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic rideAcceptedTopic() {
+        return TopicBuilder.name("ride.accepted").partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic rideRejectRequestedTopic() {
+        return TopicBuilder.name("ride.reject.requested").partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic rideRejectedTopic() {
+        return TopicBuilder.name("ride.rejected").partitions(3).replicas(1).build();
+    }
+
+    @Bean
     public NewTopic rideStartedTopic() {
         return TopicBuilder.name("ride.started").partitions(3).replicas(1).build();
     }
@@ -31,6 +51,11 @@ public class KafkaTopicConfig {
     @Bean
     public NewTopic rideFinishedTopic() {
         return TopicBuilder.name("ride.finished").partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic rideCompletedTopic() {
+        return TopicBuilder.name("ride.completed").partitions(3).replicas(1).build();
     }
 
     @Bean

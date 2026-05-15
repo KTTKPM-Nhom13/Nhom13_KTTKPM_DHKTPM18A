@@ -22,6 +22,7 @@ import java.util.UUID;
 public class BookingTimeoutScheduler {
 
     public static final String TIMEOUT_QUEUE_KEY = "booking:timeout:queue";
+    private static final String BOOKING_CANCELLED_PREFIX = "booking:cancelled:";
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final BookingRepository bookingRepository;
@@ -48,6 +49,7 @@ public class BookingTimeoutScheduler {
                 if (booking.getStatus() == BookingStatus.MATCHING) {
                     bookingStateMachine.transitionTo(booking, BookingStatus.CANCELLED);
                     bookingRepository.save(booking);
+                    redisTemplate.opsForValue().set(BOOKING_CANCELLED_PREFIX + bookingId, "true");
 
                     BookingTimeoutEvent event = BookingTimeoutEvent.builder()
                             .eventId(UUID.randomUUID().toString())
@@ -59,6 +61,7 @@ public class BookingTimeoutScheduler {
                             .build();
 
                     bookingEventPublisher.publishBookingTimeout(event);
+                    bookingEventPublisher.publishRideCancelled(booking, "TIMEOUT_NO_DRIVER_FOUND");
                     log.info("🚫 Booking {} bị CANCELLED do timeout (Không tìm thấy tài xế sau 3 phút)", bookingId);
                 }
             });
