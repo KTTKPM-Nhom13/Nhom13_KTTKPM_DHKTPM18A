@@ -1,0 +1,413 @@
+{
+  "info": {
+    "_postman_id": "f5e9d9e0-1234-4567-89ab-cdef01234567",
+    "name": "Pricing Service Collection",
+    "description": "Collection to test Mapbox, Open-Meteo, and internal Pricing Service APIs with JWT.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "External APIs",
+      "item": [
+        {
+          "name": "Test Mapbox API",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.mapbox.com/directions-matrix/v1/mapbox/driving/106.6297,10.8231;106.6601,10.7626?annotations=distance,duration&access_token={{MAPBOX_API_KEY}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "mapbox",
+                "com"
+              ],
+              "path": [
+                "directions-matrix",
+                "v1",
+                "mapbox",
+                "driving",
+                "106.6297,10.8231;106.6601,10.7626"
+              ],
+              "query": [
+                {
+                  "key": "annotations",
+                  "value": "distance,duration"
+                },
+                {
+                  "key": "access_token",
+                  "value": "{{MAPBOX_API_KEY}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Test Open-Meteo API",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.open-meteo.com/v1/forecast?latitude=10.8231&longitude=106.6297&current=temperature_2m,weather_code",
+              "protocol": "https",
+              "host": [
+                "api",
+                "open-meteo",
+                "com"
+              ],
+              "path": [
+                "v1",
+                "forecast"
+              ],
+              "query": [
+                {
+                  "key": "latitude",
+                  "value": "10.8231"
+                },
+                {
+                  "key": "longitude",
+                  "value": "106.6297"
+                },
+                {
+                  "key": "current",
+                  "value": "temperature_2m,weather_code"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Pricing Service APIs (JWT Required)",
+      "item": [
+        {
+          "name": "Test Mapbox Connection API",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{JWT_TOKEN}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/test-mapbox",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "test-mapbox"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Fare Estimate API",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{JWT_TOKEN}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/estimate?pickupLat=10.8231&pickupLng=106.6297&dropoffLat=10.7626&dropoffLng=106.6601&vehicleType=ECONOMY",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "estimate"
+              ],
+              "query": [
+                {
+                  "key": "pickupLat",
+                  "value": "10.8231"
+                },
+                {
+                  "key": "pickupLng",
+                  "value": "106.6297"
+                },
+                {
+                  "key": "dropoffLat",
+                  "value": "10.7626"
+                },
+                {
+                  "key": "dropoffLng",
+                  "value": "106.6601"
+                },
+                {
+                  "key": "vehicleType",
+                  "value": "ECONOMY"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Calculate Simple Price API",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{JWT_TOKEN}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"distanceKm\": 5.5,\n  \"demandIndex\": 1.2\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/calculate",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "calculate"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm Fare Estimate API",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{JWT_TOKEN}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/confirm/YOUR_ESTIMATE_ID",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "confirm",
+                "YOUR_ESTIMATE_ID"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Surge Multiplier for Zone API",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{JWT_TOKEN}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/surge/Z123",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "surge",
+                "Z123"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Surge Multiplier API",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{JWT_TOKEN}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/surge/Z123?multiplier=1.5",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "surge",
+                "Z123"
+              ],
+              "query": [
+                {
+                  "key": "multiplier",
+                  "value": "1.5"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Surge Multipliers API",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{JWT_TOKEN}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/surge/all",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "surge",
+                "all"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Demand Supply API",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{JWT_TOKEN}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/demand-supply?zoneId=Z123&activeDrivers=20&pendingRides=30",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "demand-supply"
+              ],
+              "query": [
+                {
+                  "key": "zoneId",
+                  "value": "Z123"
+                },
+                {
+                  "key": "activeDrivers",
+                  "value": "20"
+                },
+                {
+                  "key": "pendingRides",
+                  "value": "30"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:8088",
+      "type": "string"
+    },
+    {
+      "key": "JWT_TOKEN",
+      "value": "YOUR_JWT_TOKEN_HERE",
+      "type": "string"
+    },
+    {
+      "key": "MAPBOX_API_KEY",
+      "value": "YOUR_MAPBOX_API_KEY_HERE",
+      "type": "string"
+    }
+  ]
+}

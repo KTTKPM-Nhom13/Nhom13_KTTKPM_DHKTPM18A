@@ -127,3 +127,16 @@ pricing:
     scheduler-fixed-delay-ms: 60000
   eta:
     fallback-duration-minutes: 15
+
+mapbox:
+  api-key: ${MAPBOX_API_KEY}
+
+feign:
+  client:
+    config:
+      mapboxClient:
+        connectTimeout: 2000
+        readTimeout: 3000
+      openMeteoClient:
+        connectTimeout: 2000
+        readTimeout: 3000

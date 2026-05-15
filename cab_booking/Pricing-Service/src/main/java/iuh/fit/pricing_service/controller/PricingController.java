@@ -61,6 +61,24 @@ public class PricingController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/test-mapbox")
+    @Operation(
+            summary = "Test Mapbox Connection",
+            description = "Test direct connection to Mapbox API to debug keys and limits"
+    )
+    public ResponseEntity<Map<String, Object>> testMapbox() {
+        log.info("Received test Mapbox request");
+        Map<String, Object> result = pricingService.testMapboxConnection();
+        
+        if (Boolean.TRUE.equals(result.get("success"))) {
+            return ResponseEntity.ok(result);
+        } else {
+            return ResponseEntity.status(400).body(result);
+        }
+    }
+
+
+
     @GetMapping("/estimate")
     @Operation(
             summary = "Get fare estimate",

@@ -1,6 +1,5 @@
 package iuh.fit.pricing_service.service;
 
-import iuh.fit.pricing_service.client.EtaClient;
 import iuh.fit.pricing_service.config.PricingConfigProperties;
 import iuh.fit.pricing_service.exception.PricingException;
 import iuh.fit.pricing_service.model.FareEstimate;
@@ -14,6 +13,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import iuh.fit.pricing_service.client.MapboxClient;
+import iuh.fit.pricing_service.client.OpenMeteoClient;
+import org.springframework.beans.factory.annotation.Value;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -25,26 +28,76 @@ import java.util.UUID;
 public class PricingService {
 
     private final FareEstimateRepository fareEstimateRepository;
-    private final EtaClient etaClient;
     private final SurgePricingService surgePricingService;
     private final SurgeEventProducer surgeEventProducer;
     private final PricingConfigProperties pricingConfig;
+    private final MapboxClient mapboxClient;
+    private final OpenMeteoClient openMeteoClient;
+
+    @Value("${mapbox.api-key}")
+    private String mapboxApiKey;
 
     private static final String DEFAULT_CURRENCY = "USD";
     private static final int ESTIMATE_EXPIRY_MINUTES = 15;
 
     public FareEstimateResponse calculateFareEstimate(FareEstimateRequest request) {
         String vehicleType = normalizeVehicleType(request.getVehicleType());
-        EtaClient.EtaEstimateResponse eta = fetchEta(request);
-        int duration = request.getEstimatedDurationMinutes() != null
-                ? request.getEstimatedDurationMinutes()
-                : eta.durationMinutes();
-
         String pickupZone = determineZone(request.getPickupLat(), request.getPickupLng());
         String dropoffZone = determineZone(request.getDropoffLat(), request.getDropoffLng());
-        BigDecimal surgeMultiplier = surgePricingService.getSurgeMultiplier(pickupZone);
 
-        FareBreakdown fareBreakdown = calculateFare(vehicleType, eta.distanceKm(), duration, surgeMultiplier);
+        double distanceKm = -1;
+        int duration = -1;
+
+        try {
+            String coordinates = request.getPickupLng() + "," + request.getPickupLat() + ";"
+                    + request.getDropoffLng() + "," + request.getDropoffLat();
+            
+            MapboxClient.MapboxMatrixResponse response = mapboxClient.getDistanceMatrix(
+                    coordinates, "distance,duration", mapboxApiKey);
+            
+            if (response != null && "Ok".equalsIgnoreCase(response.code()) && response.distances() != null 
+                && response.durations() != null) {
+                
+                distanceKm = response.distances()[0][1] / 1000.0;
+                duration = (int) (response.durations()[0][1] / 60.0);
+            } else {
+                throw new PricingException("Invalid response from Mapbox API: " + (response != null ? response.code() : "null"), "MAPS_API_ERROR");
+            }
+        } catch (Exception e) {
+            log.warn("Mapbox API failed. Using Haversine formula (đường chim bay) for fallback. Error: {}", e.getMessage());
+            double straightLineDistance = calculateHaversineDistance(
+                    request.getPickupLat(), request.getPickupLng(), 
+                    request.getDropoffLat(), request.getDropoffLng()
+            );
+            // Nhân hệ số 1.3 để ước lượng quãng đường thực tế
+            distanceKm = straightLineDistance * 1.3; 
+            // Giả định tốc độ trung bình 30 km/h trong nội thành
+            duration = (int) Math.max(1, Math.round((distanceKm / 30.0) * 60)); 
+        }
+
+        if (request.getEstimatedDurationMinutes() != null) {
+            duration = request.getEstimatedDurationMinutes();
+        }
+
+        BigDecimal surgeMultiplier = surgePricingService.getSurgeMultiplier(pickupZone);
+        String weather = "Clear";
+        try {
+            OpenMeteoClient.OpenMeteoResponse weatherResponse = openMeteoClient.getForecast(
+                    request.getPickupLat(), request.getPickupLng(), "temperature_2m,weather_code");
+            if (weatherResponse != null && weatherResponse.current() != null) {
+                weather = mapWeatherCodeToDescription(weatherResponse.current().weather_code());
+                log.info("Live weather retrieved: {} (Code: {})", weather, weatherResponse.current().weather_code());
+                
+                // Adjust surge multiplier based on bad weather conditions
+                if (weather.contains("Rain") || weather.contains("Snow") || weather.contains("Thunderstorm") || weather.contains("Drizzle") || weather.contains("Fog")) {
+                    surgeMultiplier = surgeMultiplier.multiply(BigDecimal.valueOf(1.2)); // 20% weather surge
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Open-Meteo API failed, continuing with base surge multiplier. Error: {}", e.getMessage());
+        }
+
+        FareBreakdown fareBreakdown = calculateFare(vehicleType, distanceKm, duration, surgeMultiplier);
 
         String estimateId = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
@@ -57,7 +110,7 @@ public class PricingService {
                 .dropoffLat(request.getDropoffLat())
                 .dropoffLng(request.getDropoffLng())
                 .vehicleType(vehicleType)
-                .distanceKm(eta.distanceKm())
+                .distanceKm(distanceKm)
                 .durationMinutes(duration)
                 .baseFare(fareBreakdown.baseFare())
                 .distanceFare(fareBreakdown.distanceFare())
@@ -149,6 +202,34 @@ public class PricingService {
                 zoneId);
     }
 
+    public java.util.Map<String, Object> testMapboxConnection() {
+        try {
+            String coordinates = "106.6297,10.8231;106.6601,10.7626";
+            
+            MapboxClient.MapboxMatrixResponse response = mapboxClient.getDistanceMatrix(
+                    coordinates, "distance,duration", mapboxApiKey);
+                    
+            java.util.Map<String, Object> result = new java.util.HashMap<>();
+            result.put("success", "Ok".equalsIgnoreCase(response.code()));
+            result.put("status", response.code() != null ? response.code() : "UNKNOWN");
+            result.put("raw_response", response);
+            result.put("api_key_used", mapboxApiKey != null && mapboxApiKey.length() > 5 
+                    ? mapboxApiKey.substring(0, 5) + "..." : "EMPTY");
+            
+            return result;
+        } catch (Exception e) {
+            java.util.Map<String, Object> errorResult = new java.util.HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("error_message", e.getMessage());
+            errorResult.put("error_class", e.getClass().getName());
+            errorResult.put("api_key_used", mapboxApiKey != null && mapboxApiKey.length() > 5 
+                    ? mapboxApiKey.substring(0, 5) + "..." : "EMPTY");
+            return errorResult;
+        }
+    }
+
+
+
     public PricingTestResponse calculateSimplePrice(Double distanceKm, Double demandIndex) {
         BigDecimal surgeMultiplier = BigDecimal.valueOf(demandIndex)
                 .max(pricingConfig.getSurge().getMinMultiplier())
@@ -172,26 +253,7 @@ public class PricingService {
                 .build();
     }
 
-    private EtaClient.EtaEstimateResponse fetchEta(FareEstimateRequest request) {
-        try {
-            EtaClient.EtaEstimateRequest etaRequest = new EtaClient.EtaEstimateRequest(
-                    request.getPickupLat(),
-                    request.getPickupLng(),
-                    request.getDropoffLat(),
-                    request.getDropoffLng()
-            );
-            EtaClient.EtaEstimateResponse response = etaClient.estimate(etaRequest);
-            if (response == null || response.distanceKm() < 0 || response.durationMinutes() <= 0) {
-                throw new PricingException("ETA Service returned invalid response", "ETA_INVALID_RESPONSE");
-            }
-            return response;
-        } catch (PricingException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("ETA Service call failed: {}", e.getMessage(), e);
-            throw new PricingException("Unable to fetch ETA from ETA Service", "ETA_SERVICE_UNAVAILABLE");
-        }
-    }
+
 
     private FareBreakdown calculateFare(String vehicleType, double distance, int duration, BigDecimal surgeMultiplier) {
         PricingConfigProperties.VehicleConfig vehicleConfig = getVehicleConfig(vehicleType);
@@ -239,5 +301,32 @@ public class PricingService {
             BigDecimal timeFare,
             BigDecimal totalFare
     ) {
+    }
+
+    private double calculateHaversineDistance(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371; // Bán kính trái đất tính bằng km
+        double latDistance = Math.toRadians(lat2 - lat1);
+        double lonDistance = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    private String mapWeatherCodeToDescription(int code) {
+        if (code == 0) return "Clear sky";
+        if (code >= 1 && code <= 3) return "Mainly clear, partly cloudy, and overcast";
+        if (code >= 45 && code <= 48) return "Fog and depositing rime fog";
+        if (code >= 51 && code <= 55) return "Drizzle: Light, moderate, and dense intensity";
+        if (code >= 56 && code <= 57) return "Freezing Drizzle: Light and dense intensity";
+        if (code >= 61 && code <= 65) return "Rain: Slight, moderate and heavy intensity";
+        if (code >= 66 && code <= 67) return "Freezing Rain: Light and heavy intensity";
+        if (code >= 71 && code <= 75) return "Snow fall: Slight, moderate, and heavy intensity";
+        if (code == 77) return "Snow grains";
+        if (code >= 80 && code <= 82) return "Rain showers: Slight, moderate, and violent";
+        if (code >= 85 && code <= 86) return "Snow showers slight and heavy";
+        if (code >= 95 && code <= 99) return "Thunderstorm";
+        return "Unknown";
     }
 }
