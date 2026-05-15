@@ -42,23 +42,23 @@ public class RideEventConsumer {
 
             if ("booking-events".equals(topic) || "ride.arrived".equals(topic) || "ride.started".equals(topic)) {
                 if ("DriverArrived".equals(type) || "RIDE_ARRIVED".equals(type) || "ride.arrived".equals(topic)) {
-                    notificationMessage = "Your driver has arrived at the pickup location!";
+                    notificationMessage = "Tài xế đã đến điểm đón!";
                 } else if ("RideStarted".equals(type) || "RIDE_STARTED".equals(type) || "ride.started".equals(topic)) {
-                    notificationMessage = "Your ride has started. Have a safe trip!";
+                    notificationMessage = "Chuyến đi đã bắt đầu. Chúc bạn một chuyến đi an toàn!";
                 } else if ("RideCancelled".equals(type) || "RIDE_CANCELLED".equals(type)) {
                     notificationMessage = "Your ride has been cancelled. Reason: " + event.getOrDefault("reason", "Not specified");
                 }
             } else {
                 switch (topic) {
                     case "ride.created":
-                        notificationMessage = "Yêu cầu đặt xe của bạn đã thành công. Hệ thống đang tìm tài xế gần nhất.";
+                        notificationMessage = "Đang tìm tài xế gần nhất cho bạn...";
                         break;
                     case "ride.assigned":
                         String driverId = String.valueOf(event.getOrDefault("driverId", "unknown"));
-                        notificationMessage = String.format("Driver %s has been assigned to your ride %s.", driverId, rideId);
+                        notificationMessage = String.format("Đã tìm thấy tài xế! Tài xế đang đến điểm đón của bạn.");
                         break;
                     case "ride.finished":
-                        notificationMessage = String.format("Your ride %s has been completed. Hope you had a great trip!", rideId);
+                        notificationMessage = "Chuyến đi đã hoàn thành. Cảm ơn bạn đã sử dụng dịch vụ!";
                         title = "Ride Completed";
                         break;
                     case "pricing.surge.updated":
