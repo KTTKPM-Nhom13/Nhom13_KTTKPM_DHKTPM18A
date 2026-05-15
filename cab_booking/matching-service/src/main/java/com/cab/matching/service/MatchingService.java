@@ -5,7 +5,7 @@ import com.cab.matching.client.AiScoringResponse;
 import com.cab.matching.client.DriverFeatureDto;
 import com.cab.matching.client.RankingEntry;
 import com.cab.matching.core.dto.event.inbound.RideCreatedEvent;
-import com.cab.matching.core.dto.event.outbound.DriverMatchedEvent;
+import com.cab.matching.core.dto.event.outbound.RideAssignedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.geo.Distance;
@@ -18,10 +18,12 @@ import org.springframework.data.redis.domain.geo.GeoReference;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -151,8 +153,6 @@ public class MatchingService {
         log.info("🔐 [STEP 3] Race Condition Lock Loop — {} ung vien | rideId={}",
             ranking.size(), event.rideId());
 
-        boolean assigned = false;
-
         for (RankingEntry entry : ranking) {
             String driverId  = normalizeDriverId(entry.getDriverId());
             String lockKey   = DRIVER_LOCK_PREFIX + driverId;   // "lock:driver:drv-001"
@@ -178,19 +178,21 @@ public class MatchingService {
 
                 // Bắn sự kiện ride.assigned lên Kafka
                 // → ride-service sẽ lắng nghe và cập nhật DB (MATCHING → ASSIGNED)
-                DriverMatchedEvent assignedEvent = DriverMatchedEvent.create(
-                    event.rideId(),
-                        driverId,
-                        event.pickupLat(),
-                        event.pickupLng()
-                );
+                RideAssignedEvent assignedEvent = RideAssignedEvent.builder()
+                    .eventId(UUID.randomUUID().toString())
+                    .eventType("RIDE_ASSIGNED")
+                    .rideId(event.rideId())
+                    .bookingId(event.rideId())
+                    .driverId(driverId)
+                    .timestamp(Instant.now().toString())
+                    .build();
+
+                log.info("Publishing ride.assigned | topic={} | rideId={} | payload={}",
+                    TOPIC_RIDE_ASSIGNED, event.rideId(), assignedEvent);
                 kafkaTemplate.send(TOPIC_RIDE_ASSIGNED, event.rideId(), assignedEvent);
 
-                log.info("📤 Da ban ride.assigned | rideId={} | driverId={}", event.rideId(), driverId);
-
-                // QUAN TRỌNG: Break ngay — đã gán thành công, không thử tài xế khác
-                assigned = true;
-                break;
+                log.info("Da ban ride.assigned | rideId={} | driverId={}", event.rideId(), driverId);
+                return;
 
             } else {
                 // ❌ THUA KHÓA — tài xế này vừa bị một cuốc xe song song giành mất
@@ -202,9 +204,7 @@ public class MatchingService {
         }
 
         // Đến đây mà không break = toàn bộ tài xế trong ranking đều bị xí mất
-        if (!assigned) {
-            log.warn("⚠️ Khong con tai xe kha dung sau Race Condition loop | rideId={}", event.rideId());
-        }
+        log.warn("⚠️ Khong con tai xe kha dung sau Race Condition loop | rideId={}", event.rideId());
     }
 
     // ══════════════════════════════════════════════════════════════════════

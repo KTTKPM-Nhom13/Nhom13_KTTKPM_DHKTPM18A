@@ -29,7 +29,7 @@ spring:
 
   # Cấu hình chuẩn cho KAFKA
   kafka:
-    bootstrap-servers: ${KAFKA_URL:localhost:9092}
+    bootstrap-servers: ${KAFKA_URL:kafka:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -52,7 +52,7 @@ spring:
         # Đã gom driver-matched thành ride-assigned và thêm đủ dấu phẩy
         spring.json.type.mapping: >
           ride-assigned:com.cab.booking.core.dto.event.inbound.RideAssignedEvent,
-          com.cab.matching.core.dto.event.outbound.DriverMatchedEvent:com.cab.booking.core.dto.event.inbound.RideAssignedEvent,
+          com.cab.matching.core.dto.event.outbound.RideAssignedEvent:com.cab.booking.core.dto.event.inbound.RideAssignedEvent,
           driver-arrived:com.cab.booking.core.dto.event.inbound.DriverArrivedEvent,
           ride-started:com.cab.booking.core.dto.event.inbound.RideStartedEvent,
           ride-finished:com.cab.booking.core.dto.event.inbound.RideFinishedEvent,
@@ -123,3 +123,5 @@ logging:
   level:
     org.springframework.security: TRACE
     org.springframework.security.oauth2: TRACE
+    org.springframework.kafka: INFO
+    org.apache.kafka.clients.consumer: INFO

@@ -11,9 +11,10 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
+        spring.json.add.type.headers: true
         # MATCHING LÀ NGƯỜI PHÁT RA RIDE-ASSIGNED
         spring.json.type.mapping: >
-          ride-assigned:com.cab.matching.core.dto.event.outbound.DriverMatchedEvent
+          ride-assigned:com.cab.matching.core.dto.event.outbound.RideAssignedEvent
     consumer:
       group-id: matching-group
       auto-offset-reset: earliest
@@ -25,7 +26,7 @@ spring:
         spring.json.use.type.headers: false
         spring.json.value.default.type: com.cab.matching.core.dto.event.inbound.RideCreatedEvent
         spring.json.type.mapping: >
-          ride-created:com.cab.matching.core.dto.event.inbound.RideCreatedEvent
+          ride.created:com.cab.matching.core.dto.event.inbound.RideCreatedEvent
 
   data:
     redis:

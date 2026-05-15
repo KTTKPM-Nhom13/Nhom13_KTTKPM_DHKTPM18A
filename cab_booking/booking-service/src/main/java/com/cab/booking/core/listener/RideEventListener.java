@@ -1,12 +1,12 @@
 package com.cab.booking.core.listener;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.cab.booking.core.dto.event.DriverStatusEvent;
-import com.cab.booking.core.dto.event.inbound.PaymentCompletedEvent;
 import com.cab.booking.core.dto.event.inbound.DriverArrivedEvent;
+import com.cab.booking.core.dto.event.inbound.DriverStatusEvent;
+import com.cab.booking.core.dto.event.inbound.PaymentCompletedEvent;
+import com.cab.booking.core.dto.event.inbound.PaymentFailedEvent;
 import com.cab.booking.core.dto.event.inbound.RideAssignedEvent;
-import com.cab.booking.core.dto.event.inbound.RideStartedEvent;
 import com.cab.booking.core.dto.event.inbound.RideFinishedEvent;
+import com.cab.booking.core.dto.event.inbound.RideStartedEvent;
 import com.cab.booking.core.entity.Booking;
 import com.cab.booking.core.enums.BookingStatus;
 import com.cab.booking.core.repository.BookingRepository;
@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
@@ -23,21 +24,11 @@ import java.util.UUID;
 public class RideEventListener {
 
     private final BookingRepository bookingRepository;
-    private final ObjectMapper objectMapper;
 
-    @KafkaListener(
-            topics = "ride.assigned",
-            groupId = "booking-service-group",
-            containerFactory = "stringKafkaListenerContainerFactory")
-    public void handleRideAssigned(String payload) {
-        RideAssignedEvent event;
-        try {
-            event = objectMapper.readValue(payload, RideAssignedEvent.class);
-        } catch (Exception ex) {
-            log.error("Cannot parse ride.assigned payload: {}", payload, ex);
-            return;
-        }
-
+    @KafkaListener(topics = "ride.assigned", groupId = "booking-service-group")
+    @Transactional
+    public void handleRideAssigned(RideAssignedEvent event) {
+        log.info("Received ride.assigned | payload={}", event);
         log.info("[ride.assigned] rideId={} | driverId={}", event.getRideId(), event.getDriverId());
 
         UUID rideId;
@@ -156,7 +147,7 @@ public class RideEventListener {
     }
 
     @KafkaListener(topics = "payment.failed", groupId = "booking-service-group")
-    public void handlePaymentFailed(com.cab.booking.core.dto.event.inbound.PaymentFailedEvent event) {
+    public void handlePaymentFailed(PaymentFailedEvent event) {
         log.info("[payment.failed] rideId={} | reason={}", event.getRideId(), event.getReason());
 
         UUID rideId;
@@ -173,7 +164,9 @@ public class RideEventListener {
             return;
         }
 
-        // TODO: Xử lý logic nghiệp vụ khi thanh toán lỗi (ví dụ: đòi nợ sau, gửi thông báo)
-        log.warn("Payment failed for booking {} (status: {}). Reason: {}", booking.getId(), booking.getStatus(), event.getReason());
+        log.warn("Payment failed for booking {} (status: {}). Reason: {}",
+                booking.getId(),
+                booking.getStatus(),
+                event.getReason());
     }
 }
