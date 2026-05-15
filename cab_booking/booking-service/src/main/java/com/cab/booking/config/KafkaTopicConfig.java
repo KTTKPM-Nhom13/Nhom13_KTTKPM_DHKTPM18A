@@ -34,12 +34,37 @@ public class KafkaTopicConfig {
     }
 
     @Bean
+    public NewTopic rideArrivedTopic() {
+        return TopicBuilder.name("ride.arrived").partitions(3).replicas(1).build();
+    }
+
+    @Bean
     public NewTopic rideCancelledTopic() {
         return TopicBuilder.name("ride.cancelled").partitions(3).replicas(1).build();
     }
 
     @Bean
+    public NewTopic rideAcceptedTopic() {
+        return TopicBuilder.name("ride.accepted").partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic bookingTimeoutTopic() {
+        return TopicBuilder.name("booking.timeout").partitions(3).replicas(1).build();
+    }
+
+    @Bean
     public NewTopic paymentCompletedTopic() {
         return TopicBuilder.name("payment.completed").partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic paymentFailedTopic() {
+        return TopicBuilder.name("payment.failed").partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    public NewTopic driverStatusChangedTopic() {
+        return TopicBuilder.name("driver.status.changed").partitions(3).replicas(1).build();
     }
 }

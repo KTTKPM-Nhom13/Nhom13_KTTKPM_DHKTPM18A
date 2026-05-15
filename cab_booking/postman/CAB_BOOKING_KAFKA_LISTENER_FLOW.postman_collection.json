@@ -1,0 +1,577 @@
+{
+  "info": {
+    "_postman_id": "2c7f8ec7-9f13-4d8d-a95f-06f1aa04d2dd",
+    "name": "CAB Booking - Kafka Listener Flow",
+    "description": "Postman flow to exercise booking-service Kafka listeners through HTTP flows where available. Covers auth/register/login, ride.assigned, driver.status.changed, payment.completed, payment.failed, plus direct booking status preparation for payment listener verification.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('runNonce')) {",
+          "  pm.collectionVariables.set('runNonce', Date.now().toString());",
+          "}",
+          "const nonce = pm.collectionVariables.get('runNonce');",
+          "if (!pm.collectionVariables.get('customerEmail')) {",
+          "  pm.collectionVariables.set('customerEmail', `kafka.customer.${nonce}@cab.local`);",
+          "}",
+          "if (!pm.collectionVariables.get('driverEmail')) {",
+          "  pm.collectionVariables.set('driverEmail', `kafka.driver.${nonce}@cab.local`);",
+          "}",
+          "if (!pm.collectionVariables.get('customerBookingKey')) {",
+          "  pm.collectionVariables.set('customerBookingKey', `kafka-booking-${nonce}`);",
+          "}",
+          "if (!pm.collectionVariables.get('paymentSuccessKey')) {",
+          "  pm.collectionVariables.set('paymentSuccessKey', `kafka-payment-success-${nonce}`);",
+          "}",
+          "if (!pm.collectionVariables.get('paymentFailedKey')) {",
+          "  pm.collectionVariables.set('paymentFailedKey', `kafka-payment-failed-${nonce}`);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Health",
+      "item": [
+        {
+          "name": "0.1 Booking Ping",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{bookingServiceUrl}}/api/v1/bookings/ping"
+          }
+        },
+        {
+          "name": "0.2 Driver Availability Internal",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{driverServiceUrl}}/internal/drivers/{{driverUserId}}/availability"
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Register And Login",
+      "item": [
+        {
+          "name": "1.1 Register Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || {};",
+                  "pm.collectionVariables.set('customerAccessToken', result.accessToken || '');",
+                  "pm.collectionVariables.set('customerRefreshToken', result.refreshToken || '');",
+                  "pm.collectionVariables.set('customerUserId', result.user?.userId || result.user?.id || '');",
+                  "pm.test('customer register ok', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Kafka Customer\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"phoneNumber\": \"0903000001\",\n  \"avatarUrl\": \"https://example.com/customer.png\",\n  \"role\": \"USER\",\n  \"deviceId\": \"postman-kafka-customer\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Kafka Flow Customer\",\n  \"appVersion\": \"1.0.0\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{authServiceUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "1.2 Login Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || {};",
+                  "pm.collectionVariables.set('customerAccessToken', result.accessToken || pm.collectionVariables.get('customerAccessToken') || '');",
+                  "pm.collectionVariables.set('customerRefreshToken', result.refreshToken || pm.collectionVariables.get('customerRefreshToken') || '');",
+                  "pm.collectionVariables.set('customerUserId', result.user?.userId || result.user?.id || pm.collectionVariables.get('customerUserId') || '');",
+                  "pm.test('customer login ok', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"deviceId\": \"postman-kafka-customer\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Kafka Flow Customer\",\n  \"appVersion\": \"1.0.0\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{authServiceUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "1.3 Register Driver",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || {};",
+                  "pm.collectionVariables.set('driverAccessToken', result.accessToken || '');",
+                  "pm.collectionVariables.set('driverRefreshToken', result.refreshToken || '');",
+                  "pm.collectionVariables.set('driverUserId', result.user?.userId || result.user?.id || '');",
+                  "pm.test('driver register ok', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Kafka Driver\",\n  \"email\": \"{{driverEmail}}\",\n  \"password\": \"{{driverPassword}}\",\n  \"phoneNumber\": \"0903000002\",\n  \"avatarUrl\": \"https://example.com/driver.png\",\n  \"role\": \"DRIVER\",\n  \"deviceId\": \"postman-kafka-driver\",\n  \"platform\": \"ANDROID\",\n  \"userAgent\": \"Postman Kafka Flow Driver\",\n  \"appVersion\": \"1.0.0\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{authServiceUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "1.4 Login Driver",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || {};",
+                  "pm.collectionVariables.set('driverAccessToken', result.accessToken || pm.collectionVariables.get('driverAccessToken') || '');",
+                  "pm.collectionVariables.set('driverRefreshToken', result.refreshToken || pm.collectionVariables.get('driverRefreshToken') || '');",
+                  "pm.collectionVariables.set('driverUserId', result.user?.userId || result.user?.id || pm.collectionVariables.get('driverUserId') || '');",
+                  "pm.test('driver login ok', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{driverEmail}}\",\n  \"password\": \"{{driverPassword}}\",\n  \"deviceId\": \"postman-kafka-driver\",\n  \"platform\": \"ANDROID\",\n  \"userAgent\": \"Postman Kafka Flow Driver\",\n  \"appVersion\": \"1.0.0\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{authServiceUrl}}/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Driver Setup And Kafka Producers",
+      "item": [
+        {
+          "name": "2.1 Upsert Driver Profile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{driverAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Kafka Driver\",\n  \"email\": \"{{driverEmail}}\",\n  \"phoneNumber\": \"0903000002\",\n  \"avatarUrl\": \"https://example.com/driver.png\",\n  \"licenseNumber\": \"GPLX-KAFKA-001\",\n  \"vehicleType\": \"ECONOMY\",\n  \"vehiclePlate\": \"51H-90909\",\n  \"vehicleModel\": \"Toyota Vios\",\n  \"vehicleColor\": \"Black\",\n  \"serviceArea\": \"Ho Chi Minh City\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{driverServiceUrl}}/api/drivers/me/profile"
+          }
+        },
+        {
+          "name": "2.2 Update Driver Availability ONLINE",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{driverAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"availabilityStatus\": \"ONLINE\",\n  \"currentLatitude\": 10.7769,\n  \"currentLongitude\": 106.7009\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{driverServiceUrl}}/api/drivers/me/availability"
+          }
+        },
+        {
+          "name": "2.3 Publish driver.status.changed",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": "{{driverServiceUrl}}/internal/drivers/{{driverUserId}}/availability"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Create Booking",
+      "item": [
+        {
+          "name": "3.1 Create Booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || {};",
+                  "pm.collectionVariables.set('bookingId', result.id || '');",
+                  "pm.collectionVariables.set('bookingStatus', result.status || '');",
+                  "pm.collectionVariables.set('estimatedFare', result.estimatedFare || pm.collectionVariables.get('estimatedFare') || '45000');",
+                  "pm.test('booking created', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{customerAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Ben Thanh Market, District 1, Ho Chi Minh City\",\n  \"customerNote\": \"Kafka listener flow\",\n  \"pickupCoordinates\": {\n    \"lat\": 10.7769,\n    \"lng\": 106.7009\n  },\n  \"dropoffCoordinates\": {\n    \"lat\": 10.7626,\n    \"lng\": 106.6602\n  },\n  \"vehicleType\": \"ECONOMY\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"quoteToken\": \"manual-quote-token\",\n  \"idempotencyKey\": \"{{customerBookingKey}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{bookingServiceUrl}}/api/v1/bookings"
+          }
+        },
+        {
+          "name": "3.2 Get Customer Active Booking",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{customerAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "url": "{{bookingServiceUrl}}/api/v1/bookings/customer/{{customerUserId}}/active"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Kafka Listener - ride.assigned",
+      "item": [
+        {
+          "name": "4.1 Driver Accept Assignment -> emits ride.assigned",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('driver assignment request ok', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{driverAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rideId\": \"{{bookingId}}\",\n  \"action\": \"ACCEPT\",\n  \"pickupAddress\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"destinationAddress\": \"Ben Thanh Market, District 1, Ho Chi Minh City\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{driverServiceUrl}}/api/drivers/me/rides/assignment"
+          }
+        },
+        {
+          "name": "4.2 Assert Active Booking Became ASSIGNED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || {};",
+                  "pm.collectionVariables.set('bookingStatus', result.status || '');",
+                  "pm.test('active booking is assigned', function () {",
+                  "  pm.expect(result.assignedDriverId).to.eql(pm.collectionVariables.get('driverUserId'));",
+                  "  pm.expect(result.status).to.eql('ASSIGNED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{customerAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "url": "{{bookingServiceUrl}}/api/v1/bookings/customer/{{customerUserId}}/active"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Prepare COMPLETED Booking For Payment Listener",
+      "item": [
+        {
+          "name": "5.1 Arrive At Pickup Directly",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{driverAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "url": "{{bookingServiceUrl}}/api/v1/bookings/{{bookingId}}/arrive"
+          }
+        },
+        {
+          "name": "5.2 Start Ride Directly",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{driverAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "url": "{{bookingServiceUrl}}/api/v1/bookings/{{bookingId}}/start"
+          }
+        },
+        {
+          "name": "5.3 Complete Ride Directly",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{driverAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "url": "{{bookingServiceUrl}}/api/v1/bookings/{{bookingId}}/complete"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Kafka Listener - payment.completed",
+      "item": [
+        {
+          "name": "6.1 Reset Payment Circuit Breaker",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "url": "{{paymentServiceUrl}}/api/admin/circuit-breaker/reset/paymentGateway"
+          }
+        },
+        {
+          "name": "6.2 Charge Payment Success Path",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || {};",
+                  "pm.collectionVariables.set('successTransactionId', result.transactionId || '');",
+                  "pm.test('payment success request ok', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{customerAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Idempotency-Key", "value": "{{paymentSuccessKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": \"{{bookingId}}\",\n  \"customerId\": \"{{customerUserId}}\",\n  \"amount\": {{estimatedFare}},\n  \"paymentMethod\": \"CASH\",\n  \"currency\": \"VND\",\n  \"description\": \"Kafka listener success path\",\n  \"idempotencyKey\": \"{{paymentSuccessKey}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{paymentServiceUrl}}/api/payments/charge"
+          }
+        },
+        {
+          "name": "6.3 Assert Booking Status Became PAID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const page = body.result || {};",
+                  "const items = page.content || [];",
+                  "const bookingId = pm.collectionVariables.get('bookingId');",
+                  "const target = items.find(item => item.id === bookingId || item.id?.toString?.() === bookingId);",
+                  "pm.test('booking moved to PAID after payment.completed', function () {",
+                  "  pm.expect(target).to.exist;",
+                  "  pm.expect(target.status).to.eql('PAID');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{customerAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "url": "{{bookingServiceUrl}}/api/v1/bookings/customer/{{customerUserId}}?page=0&size=10"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Kafka Listener - payment.failed",
+      "item": [
+        {
+          "name": "7.1 Force Open Payment Circuit Breaker",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "url": "{{paymentServiceUrl}}/api/admin/circuit-breaker/transition/paymentGateway?state=OPEN"
+          }
+        },
+        {
+          "name": "7.2 Charge Payment Failure Path",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || {};",
+                  "pm.collectionVariables.set('failedTransactionId', result.transactionId || '');",
+                  "pm.test('payment failure request ok', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{customerAccessToken}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Idempotency-Key", "value": "{{paymentFailedKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": \"{{bookingId}}\",\n  \"customerId\": \"{{customerUserId}}\",\n  \"amount\": {{estimatedFare}},\n  \"paymentMethod\": \"CASH\",\n  \"currency\": \"VND\",\n  \"description\": \"Kafka listener failure path\",\n  \"idempotencyKey\": \"{{paymentFailedKey}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{paymentServiceUrl}}/api/payments/charge"
+          }
+        },
+        {
+          "name": "7.3 Reset Payment Circuit Breaker Again",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "url": "{{paymentServiceUrl}}/api/admin/circuit-breaker/reset/paymentGateway"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "authServiceUrl", "value": "http://localhost:8081", "type": "string" },
+    { "key": "driverServiceUrl", "value": "http://localhost:8083", "type": "string" },
+    { "key": "bookingServiceUrl", "value": "http://localhost:8084", "type": "string" },
+    { "key": "paymentServiceUrl", "value": "http://localhost:8090", "type": "string" },
+    { "key": "runNonce", "value": "", "type": "string" },
+    { "key": "customerEmail", "value": "", "type": "string" },
+    { "key": "customerPassword", "value": "12345678", "type": "string" },
+    { "key": "customerAccessToken", "value": "", "type": "string" },
+    { "key": "customerRefreshToken", "value": "", "type": "string" },
+    { "key": "customerUserId", "value": "", "type": "string" },
+    { "key": "driverEmail", "value": "", "type": "string" },
+    { "key": "driverPassword", "value": "12345678", "type": "string" },
+    { "key": "driverAccessToken", "value": "", "type": "string" },
+    { "key": "driverRefreshToken", "value": "", "type": "string" },
+    { "key": "driverUserId", "value": "", "type": "string" },
+    { "key": "estimatedFare", "value": "45000", "type": "string" },
+    { "key": "customerBookingKey", "value": "", "type": "string" },
+    { "key": "paymentSuccessKey", "value": "", "type": "string" },
+    { "key": "paymentFailedKey", "value": "", "type": "string" },
+    { "key": "bookingId", "value": "", "type": "string" },
+    { "key": "bookingStatus", "value": "", "type": "string" },
+    { "key": "successTransactionId", "value": "", "type": "string" },
+    { "key": "failedTransactionId", "value": "", "type": "string" }
+  ]
+}

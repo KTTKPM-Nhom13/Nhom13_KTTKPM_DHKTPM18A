@@ -1,12 +1,12 @@
 package com.cab.booking.core.listener;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.cab.booking.core.dto.event.DriverStatusEvent;
-import com.cab.booking.core.dto.event.inbound.PaymentCompletedEvent;
 import com.cab.booking.core.dto.event.inbound.DriverArrivedEvent;
+import com.cab.booking.core.dto.event.inbound.PaymentCompletedEvent;
+import com.cab.booking.core.dto.event.inbound.PaymentFailedEvent;
 import com.cab.booking.core.dto.event.inbound.RideAssignedEvent;
-import com.cab.booking.core.dto.event.inbound.RideStartedEvent;
 import com.cab.booking.core.dto.event.inbound.RideFinishedEvent;
+import com.cab.booking.core.dto.event.inbound.RideStartedEvent;
 import com.cab.booking.core.entity.Booking;
 import com.cab.booking.core.enums.BookingStatus;
 import com.cab.booking.core.repository.BookingRepository;
@@ -23,21 +23,11 @@ import java.util.UUID;
 public class RideEventListener {
 
     private final BookingRepository bookingRepository;
-    private final ObjectMapper objectMapper;
 
     @KafkaListener(
             topics = "ride.assigned",
-            groupId = "booking-service-group",
-            containerFactory = "stringKafkaListenerContainerFactory")
-    public void handleRideAssigned(String payload) {
-        RideAssignedEvent event;
-        try {
-            event = objectMapper.readValue(payload, RideAssignedEvent.class);
-        } catch (Exception ex) {
-            log.error("Cannot parse ride.assigned payload: {}", payload, ex);
-            return;
-        }
-
+            containerFactory = "rideAssignedKafkaListenerContainerFactory")
+    public void handleRideAssigned(RideAssignedEvent event) {
         log.info("[ride.assigned] rideId={} | driverId={}", event.getRideId(), event.getDriverId());
 
         UUID rideId;
@@ -65,7 +55,7 @@ public class RideEventListener {
         log.info("Booking {} moved to ASSIGNED with driver {}", booking.getId(), event.getDriverId());
     }
 
-    @KafkaListener(topics = "driver.status.changed", groupId = "booking-service-group")
+    @KafkaListener(topics = "driver.status.changed", containerFactory = "driverStatusKafkaListenerContainerFactory")
     public void handleDriverStatusChanged(DriverStatusEvent event) {
         log.info(
                 "[driver.status.changed] driverId={} | availability={} | activeForBooking={} | rideId={} | rideStatus={}",
@@ -76,7 +66,7 @@ public class RideEventListener {
                 event.getRideStatus());
     }
 
-    @KafkaListener(topics = "ride.arrived", groupId = "booking-service-group")
+    @KafkaListener(topics = "ride.arrived", containerFactory = "driverArrivedKafkaListenerContainerFactory")
     public void handleDriverArrived(DriverArrivedEvent event) {
         log.info("[ride.arrived] rideId={}", event.rideId());
         try {
@@ -92,7 +82,7 @@ public class RideEventListener {
         }
     }
 
-    @KafkaListener(topics = "ride.started", groupId = "booking-service-group")
+    @KafkaListener(topics = "ride.started", containerFactory = "rideStartedKafkaListenerContainerFactory")
     public void handleRideStarted(RideStartedEvent event) {
         log.info("[ride.started] rideId={}", event.rideId());
         try {
@@ -108,7 +98,7 @@ public class RideEventListener {
         }
     }
 
-    @KafkaListener(topics = "ride.finished", groupId = "booking-service-group")
+    @KafkaListener(topics = "ride.finished", containerFactory = "rideFinishedKafkaListenerContainerFactory")
     public void handleRideFinished(RideFinishedEvent event) {
         log.info("[ride.finished] rideId={}", event.getRideId());
         try {
@@ -124,7 +114,7 @@ public class RideEventListener {
         }
     }
 
-    @KafkaListener(topics = "payment.completed", groupId = "booking-service-group")
+    @KafkaListener(topics = "payment.completed", containerFactory = "paymentCompletedKafkaListenerContainerFactory")
     public void handlePaymentCompleted(PaymentCompletedEvent event) {
         log.info("[payment.completed] rideId={} | eventId={}", event.getRideId(), event.getEventId());
 
@@ -155,8 +145,8 @@ public class RideEventListener {
                 booking.getEstimatedFare());
     }
 
-    @KafkaListener(topics = "payment.failed", groupId = "booking-service-group")
-    public void handlePaymentFailed(com.cab.booking.core.dto.event.inbound.PaymentFailedEvent event) {
+    @KafkaListener(topics = "payment.failed", containerFactory = "paymentFailedKafkaListenerContainerFactory")
+    public void handlePaymentFailed(PaymentFailedEvent event) {
         log.info("[payment.failed] rideId={} | reason={}", event.getRideId(), event.getReason());
 
         UUID rideId;

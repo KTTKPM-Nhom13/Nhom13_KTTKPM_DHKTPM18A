@@ -33,32 +33,12 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      properties:
-        # BOOKING PHÁT RA CÁC SỰ KIỆN LIÊN QUAN ĐẾN ĐƠN ĐẶT (Đã xóa ride-assigned khỏi đây)
-        spring.json.type.mapping: >
-          ride-created:com.cab.booking.core.dto.event.outbound.RideCreatedEvent,
-          ride-cancelled:com.cab.booking.core.dto.event.outbound.RideCancelledEvent,
-          ride-accepted:com.cab.booking.core.dto.event.outbound.RideAcceptedEvent,
-          booking-timeout:com.cab.booking.core.dto.event.outbound.BookingTimeoutEvent
     consumer:
-      group-id: booking-group
+      group-id: booking-service-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
-        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: "*"
-        # BOOKING NHẬN VỀ CÁC SỰ KIỆN TỪ MATCHING, RIDE, VÀ PAYMENT
-        # Đã gom driver-matched thành ride-assigned và thêm đủ dấu phẩy
-        spring.json.type.mapping: >
-          ride-assigned:com.cab.booking.core.dto.event.inbound.RideAssignedEvent,
-          com.cab.matching.core.dto.event.outbound.DriverMatchedEvent:com.cab.booking.core.dto.event.inbound.RideAssignedEvent,
-          driver-arrived:com.cab.booking.core.dto.event.inbound.DriverArrivedEvent,
-          ride-started:com.cab.booking.core.dto.event.inbound.RideStartedEvent,
-          ride-finished:com.cab.booking.core.dto.event.inbound.RideFinishedEvent,
-          payment-completed:com.cab.booking.core.dto.event.inbound.PaymentCompletedEvent,
-          payment-failed:com.cab.booking.core.dto.event.inbound.PaymentFailedEvent,
-          driver-status:com.cab.booking.core.dto.event.inbound.DriverStatusEvent
 
 # Cấu hình Eureka Client
 eureka:
