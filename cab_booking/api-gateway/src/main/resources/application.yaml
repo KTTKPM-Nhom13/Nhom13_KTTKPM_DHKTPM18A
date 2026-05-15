@@ -51,11 +51,29 @@ spring:
           uri: lb://booking-service
           predicates:
             - Path=/booking/**
+          filters:
+            - RewritePath=/booking/(?<segment>.*), /${segment}
 
         - id: driver-service
           uri: lb://driver-service
           predicates:
             - Path=/driver/**,/api/drivers/**
+
+        # ── Pricing Service (Docker network) ──
+        - id: pricing-service
+          uri: http://pricing-service:8084
+          predicates:
+            - Path=/api/pricing/**
+
+        - id: review-service
+          uri: lb://review-service
+          predicates:
+            - Path=/api/reviews/**
+
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/notifications/**
 
       # ── Mặc định khi bị 429: trả JSON thay vì body rỗng ────────
       default-filters:

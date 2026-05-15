@@ -202,6 +202,27 @@ public class DriverProfileService {
     }
 
     @Transactional
+    public void updateDriverRating(String externalUserId, int newRating) {
+        DriverProfile profile = getOrCreateProfileEntity(externalUserId);
+        
+        BigDecimal currentAverage = profile.getAverageRating() != null ? profile.getAverageRating() : BigDecimal.ZERO;
+        int currentTotalReviews = profile.getTotalReviews() != null ? profile.getTotalReviews() : 0;
+        
+        int newTotalReviews = currentTotalReviews + 1;
+        
+        // New Average = (CurrentAverage * TotalReviews + NewRating) / NewTotalReviews
+        BigDecimal totalScore = currentAverage.multiply(new BigDecimal(currentTotalReviews))
+                .add(new BigDecimal(newRating));
+        
+        BigDecimal newAverage = totalScore.divide(new BigDecimal(newTotalReviews), 2, RoundingMode.HALF_UP);
+        
+        profile.setAverageRating(newAverage);
+        profile.setTotalReviews(newTotalReviews);
+        
+        driverProfileRepository.save(profile);
+    }
+
+    @Transactional
     public DriverStatusCheckResponse checkAvailability(String externalUserId) {
         DriverProfile profile = getRequiredProfile(externalUserId);
         publishDriverStatusChanged(profile, profile.getCurrentRideId(), currentRideStatusName(profile));

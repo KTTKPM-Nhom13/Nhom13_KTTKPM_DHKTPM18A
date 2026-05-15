@@ -1,11 +1,12 @@
 package com.cab.booking.core.listener;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.cab.booking.core.dto.event.DriverStatusEvent;
 import com.cab.booking.core.dto.event.inbound.PaymentCompletedEvent;
 import com.cab.booking.core.dto.event.inbound.DriverArrivedEvent;
+import com.cab.booking.core.dto.event.inbound.RideAssignedEvent;
 import com.cab.booking.core.dto.event.inbound.RideStartedEvent;
 import com.cab.booking.core.dto.event.inbound.RideFinishedEvent;
-import com.cab.booking.core.dto.event.outbound.RideAssignedEvent;
 import com.cab.booking.core.entity.Booking;
 import com.cab.booking.core.enums.BookingStatus;
 import com.cab.booking.core.repository.BookingRepository;
@@ -22,9 +23,21 @@ import java.util.UUID;
 public class RideEventListener {
 
     private final BookingRepository bookingRepository;
+    private final ObjectMapper objectMapper;
 
-    @KafkaListener(topics = "ride.assigned", groupId = "booking-service-group")
-    public void handleRideAssigned(RideAssignedEvent event) {
+    @KafkaListener(
+            topics = "ride.assigned",
+            groupId = "booking-service-group",
+            containerFactory = "stringKafkaListenerContainerFactory")
+    public void handleRideAssigned(String payload) {
+        RideAssignedEvent event;
+        try {
+            event = objectMapper.readValue(payload, RideAssignedEvent.class);
+        } catch (Exception ex) {
+            log.error("Cannot parse ride.assigned payload: {}", payload, ex);
+            return;
+        }
+
         log.info("[ride.assigned] rideId={} | driverId={}", event.getRideId(), event.getDriverId());
 
         UUID rideId;
@@ -41,7 +54,7 @@ public class RideEventListener {
             return;
         }
 
-        if (booking.getStatus() != BookingStatus.MATCHING) {
+        if (booking.getStatus() != BookingStatus.CREATED && booking.getStatus() != BookingStatus.MATCHING) {
             log.warn("Booking {} is in status {}, skipping ride.assigned", booking.getId(), booking.getStatus());
             return;
         }

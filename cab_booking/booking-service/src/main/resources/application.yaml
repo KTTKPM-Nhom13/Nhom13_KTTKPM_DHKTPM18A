@@ -52,6 +52,7 @@ spring:
         # Đã gom driver-matched thành ride-assigned và thêm đủ dấu phẩy
         spring.json.type.mapping: >
           ride-assigned:com.cab.booking.core.dto.event.inbound.RideAssignedEvent,
+          com.cab.matching.core.dto.event.outbound.DriverMatchedEvent:com.cab.booking.core.dto.event.inbound.RideAssignedEvent,
           driver-arrived:com.cab.booking.core.dto.event.inbound.DriverArrivedEvent,
           ride-started:com.cab.booking.core.dto.event.inbound.RideStartedEvent,
           ride-finished:com.cab.booking.core.dto.event.inbound.RideFinishedEvent,

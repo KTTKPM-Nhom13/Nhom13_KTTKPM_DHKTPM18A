@@ -1,11 +1,12 @@
 package iuh.fit.pricing_service.service;
 
-import iuh.fit.pricing_service.config.KafkaConfig;
+import iuh.fit.pricing_service.client.EtaClient;
 import iuh.fit.pricing_service.config.PricingConfigProperties;
 import iuh.fit.pricing_service.exception.PricingException;
 import iuh.fit.pricing_service.model.FareEstimate;
 import iuh.fit.pricing_service.model.FareEstimateRequest;
 import iuh.fit.pricing_service.model.FareEstimateResponse;
+import iuh.fit.pricing_service.model.PricingTestResponse;
 import iuh.fit.pricing_service.model.SurgeRule;
 import iuh.fit.pricing_service.producer.SurgeEventProducer;
 import iuh.fit.pricing_service.repository.FareEstimateRepository;
@@ -24,7 +25,7 @@ import java.util.UUID;
 public class PricingService {
 
     private final FareEstimateRepository fareEstimateRepository;
-    private final DistanceCalculatorService distanceCalculator;
+    private final EtaClient etaClient;
     private final SurgePricingService surgePricingService;
     private final SurgeEventProducer surgeEventProducer;
     private final PricingConfigProperties pricingConfig;
@@ -33,47 +34,20 @@ public class PricingService {
     private static final int ESTIMATE_EXPIRY_MINUTES = 15;
 
     public FareEstimateResponse calculateFareEstimate(FareEstimateRequest request) {
-        log.info("Calculating fare estimate for vehicle type: {}, from ({}, {}) to ({}, {})",
-                request.getVehicleType(),
-                request.getPickupLat(), request.getPickupLng(),
-                request.getDropoffLat(), request.getDropoffLng());
-
         String vehicleType = normalizeVehicleType(request.getVehicleType());
-
-        DistanceCalculatorService.EtaResult eta = distanceCalculator.calculateEta(
-                request.getPickupLat(), request.getPickupLng(),
-                request.getDropoffLat(), request.getDropoffLng()
-        );
-        double distance = eta.distanceKm();
-
+        EtaClient.EtaEstimateResponse eta = fetchEta(request);
         int duration = request.getEstimatedDurationMinutes() != null
                 ? request.getEstimatedDurationMinutes()
                 : eta.durationMinutes();
 
         String pickupZone = determineZone(request.getPickupLat(), request.getPickupLng());
         String dropoffZone = determineZone(request.getDropoffLat(), request.getDropoffLng());
-
         BigDecimal surgeMultiplier = surgePricingService.getSurgeMultiplier(pickupZone);
-        log.debug("Surge multiplier for zone {}: {}", pickupZone, surgeMultiplier);
 
-        PricingConfigProperties.VehicleConfig vehicleConfig = getVehicleConfig(vehicleType);
-
-        BigDecimal baseFare = vehicleConfig.getBaseFare();
-        BigDecimal distanceFare = vehicleConfig.getPerKm().multiply(BigDecimal.valueOf(distance));
-        BigDecimal timeFare = vehicleConfig.getPerMinute().multiply(BigDecimal.valueOf(duration));
-
-        BigDecimal subtotal = baseFare.add(distanceFare).add(timeFare);
-        BigDecimal surgeAmount = subtotal.multiply(surgeMultiplier.subtract(BigDecimal.ONE));
-        BigDecimal totalFare = subtotal.add(surgeAmount);
-
-        totalFare = totalFare.max(pricingConfig.getCalculation().getMinimumFare());
-
-        BigDecimal finalTotal = totalFare.setScale(2, RoundingMode.HALF_UP);
+        FareBreakdown fareBreakdown = calculateFare(vehicleType, eta.distanceKm(), duration, surgeMultiplier);
 
         String estimateId = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime expiresAt = now.plusMinutes(ESTIMATE_EXPIRY_MINUTES);
-
         FareEstimate fareEstimate = FareEstimate.builder()
                 .id(estimateId)
                 .pickupZone(pickupZone)
@@ -83,29 +57,28 @@ public class PricingService {
                 .dropoffLat(request.getDropoffLat())
                 .dropoffLng(request.getDropoffLng())
                 .vehicleType(vehicleType)
-                .distanceKm(distance)
+                .distanceKm(eta.distanceKm())
                 .durationMinutes(duration)
-                .baseFare(baseFare.setScale(2, RoundingMode.HALF_UP))
-                .distanceFare(distanceFare.setScale(2, RoundingMode.HALF_UP))
-                .timeFare(timeFare.setScale(2, RoundingMode.HALF_UP))
+                .baseFare(fareBreakdown.baseFare())
+                .distanceFare(fareBreakdown.distanceFare())
+                .timeFare(fareBreakdown.timeFare())
                 .surgeMultiplier(surgeMultiplier.setScale(2, RoundingMode.HALF_UP))
-                .totalFare(finalTotal)
+                .totalFare(fareBreakdown.totalFare())
                 .currency(DEFAULT_CURRENCY)
                 .status(FareEstimate.EstimateStatus.PENDING.name())
                 .createdAt(now)
-                .expiresAt(expiresAt)
+                .expiresAt(now.plusMinutes(ESTIMATE_EXPIRY_MINUTES))
                 .schemaVersion("1.0.0")
                 .build();
 
         fareEstimateRepository.save(fareEstimate);
-        log.info("Fare estimate saved: {} - Total fare: {} {}", estimateId, finalTotal, DEFAULT_CURRENCY);
+        log.info("Fare estimate saved: {} - total fare: {} {}", estimateId,
+                fareBreakdown.totalFare(), DEFAULT_CURRENCY);
 
         return FareEstimateResponse.fromFareEstimate(fareEstimate);
     }
 
     public FareEstimate confirmFare(String estimateId) {
-        log.info("Confirming fare estimate: {}", estimateId);
-
         FareEstimate estimate = fareEstimateRepository.findById(estimateId)
                 .orElseThrow(() -> new PricingException("Fare estimate not found: " + estimateId, "ESTIMATE_NOT_FOUND"));
 
@@ -119,7 +92,6 @@ public class PricingService {
 
         estimate.setStatus(FareEstimate.EstimateStatus.CONFIRMED.name());
         FareEstimate confirmed = fareEstimateRepository.save(estimate);
-
         log.info("Fare confirmed for estimate {}: total fare = {} {}",
                 estimateId, confirmed.getTotalFare(), confirmed.getCurrency());
 
@@ -128,26 +100,9 @@ public class PricingService {
 
     public FareEstimate applyFinalPricing(String rideId, String pickupZone, String dropoffZone,
                                           String vehicleType, double distance, int duration) {
-        log.info("Applying final pricing for ride {} - zone: {}, vehicle: {}, distance: {} km, duration: {} min",
-                rideId, pickupZone, vehicleType, distance, duration);
-
         String normalizedVehicleType = normalizeVehicleType(vehicleType);
-
         BigDecimal surgeMultiplier = surgePricingService.getSurgeMultiplier(pickupZone);
-
-        PricingConfigProperties.VehicleConfig vehicleConfig = getVehicleConfig(normalizedVehicleType);
-
-        BigDecimal baseFare = vehicleConfig.getBaseFare();
-        BigDecimal distanceFare = vehicleConfig.getPerKm().multiply(BigDecimal.valueOf(distance));
-        BigDecimal timeFare = vehicleConfig.getPerMinute().multiply(BigDecimal.valueOf(duration));
-
-        BigDecimal subtotal = baseFare.add(distanceFare).add(timeFare);
-        BigDecimal surgeAmount = subtotal.multiply(surgeMultiplier.subtract(BigDecimal.ONE));
-        BigDecimal totalFare = subtotal.add(surgeAmount).setScale(2, RoundingMode.HALF_UP);
-
-        totalFare = totalFare.max(pricingConfig.getCalculation().getMinimumFare());
-
-        LocalDateTime now = LocalDateTime.now();
+        FareBreakdown fareBreakdown = calculateFare(normalizedVehicleType, distance, duration, surgeMultiplier);
 
         FareEstimate fare = FareEstimate.builder()
                 .id(UUID.randomUUID().toString())
@@ -157,46 +112,104 @@ public class PricingService {
                 .vehicleType(normalizedVehicleType)
                 .distanceKm(distance)
                 .durationMinutes(duration)
-                .baseFare(baseFare.setScale(2, RoundingMode.HALF_UP))
-                .distanceFare(distanceFare.setScale(2, RoundingMode.HALF_UP))
-                .timeFare(timeFare.setScale(2, RoundingMode.HALF_UP))
+                .baseFare(fareBreakdown.baseFare())
+                .distanceFare(fareBreakdown.distanceFare())
+                .timeFare(fareBreakdown.timeFare())
                 .surgeMultiplier(surgeMultiplier.setScale(2, RoundingMode.HALF_UP))
-                .totalFare(totalFare)
+                .totalFare(fareBreakdown.totalFare())
                 .currency(DEFAULT_CURRENCY)
                 .status(FareEstimate.EstimateStatus.CONFIRMED.name())
-                .createdAt(now)
+                .createdAt(LocalDateTime.now())
                 .schemaVersion("1.0.0")
                 .build();
 
         FareEstimate saved = fareEstimateRepository.save(fare);
-        log.info("Final pricing applied for ride {}: fare = {} {}", rideId, totalFare, DEFAULT_CURRENCY);
+        log.info("Final pricing applied for ride {}: fare = {} {}", rideId,
+                fareBreakdown.totalFare(), DEFAULT_CURRENCY);
 
         return saved;
     }
 
     public void updateSurgeForZone(String zoneId, BigDecimal surgeMultiplier) {
-        log.info("Updating surge for zone {}: new multiplier = {}", zoneId, surgeMultiplier);
-
-        if (surgePricingService.shouldUpdateSurge(zoneId, surgeMultiplier)) {
-            String source = SurgeRule.SurgeSource.AUTOMATIC.name();
-            surgePricingService.createOrUpdateSurgeRule(zoneId, surgeMultiplier, source);
-
-            surgeEventProducer.publishSurgeUpdate(zoneId, surgeMultiplier);
-
-            log.info("Surge updated and event published for zone {}", zoneId);
-        } else {
-            log.debug("Surge change below threshold for zone {}, no update needed", zoneId);
+        BigDecimal normalizedMultiplier = surgeMultiplier.setScale(2, RoundingMode.HALF_UP);
+        if (surgePricingService.shouldUpdateSurge(zoneId, normalizedMultiplier)) {
+            surgePricingService.createOrUpdateSurgeRule(
+                    zoneId,
+                    normalizedMultiplier,
+                    SurgeRule.SurgeSource.MANUAL.name()
+            );
+            surgeEventProducer.publishSurgeUpdate(zoneId, normalizedMultiplier);
+            log.info("Manual surge updated and event published for zone {}", zoneId);
         }
     }
 
     public void processDemandSupplyUpdate(String zoneId, int activeDrivers, int pendingRides) {
-        log.debug("Processing demand/supply update for zone {}: drivers={}, rides={}",
-                zoneId, activeDrivers, pendingRides);
+        surgePricingService.updateCurrentZoneMetrics(zoneId, activeDrivers, pendingRides);
+        log.info("Demand/supply metrics cached for zone {}. Surge computation is handled by scheduler.",
+                zoneId);
+    }
 
-        BigDecimal newSurge = surgePricingService.calculateSurgeBasedOnDemandSupply(
-                zoneId, activeDrivers, pendingRides);
+    public PricingTestResponse calculateSimplePrice(Double distanceKm, Double demandIndex) {
+        BigDecimal surgeMultiplier = BigDecimal.valueOf(demandIndex)
+                .max(pricingConfig.getSurge().getMinMultiplier())
+                .min(pricingConfig.getSurge().getMaxMultiplier());
 
-        updateSurgeForZone(zoneId, newSurge);
+        BigDecimal baseFare = pricingConfig.getCalculation().getBaseFare();
+        BigDecimal distanceFare = pricingConfig.getCalculation().getPerKmRate().multiply(BigDecimal.valueOf(distanceKm));
+        BigDecimal subtotal = baseFare.add(distanceFare);
+        BigDecimal totalFare = subtotal.multiply(surgeMultiplier)
+                .max(pricingConfig.getCalculation().getMinimumFare())
+                .setScale(2, RoundingMode.HALF_UP);
+
+        return PricingTestResponse.builder()
+                .distanceKm(distanceKm)
+                .demandIndex(demandIndex)
+                .baseFare(baseFare.setScale(2, RoundingMode.HALF_UP))
+                .distanceFare(distanceFare.setScale(2, RoundingMode.HALF_UP))
+                .surgeMultiplier(surgeMultiplier.setScale(2, RoundingMode.HALF_UP))
+                .totalFare(totalFare)
+                .message("Pricing calculated successfully")
+                .build();
+    }
+
+    private EtaClient.EtaEstimateResponse fetchEta(FareEstimateRequest request) {
+        try {
+            EtaClient.EtaEstimateRequest etaRequest = new EtaClient.EtaEstimateRequest(
+                    request.getPickupLat(),
+                    request.getPickupLng(),
+                    request.getDropoffLat(),
+                    request.getDropoffLng()
+            );
+            EtaClient.EtaEstimateResponse response = etaClient.estimate(etaRequest);
+            if (response == null || response.distanceKm() < 0 || response.durationMinutes() <= 0) {
+                throw new PricingException("ETA Service returned invalid response", "ETA_INVALID_RESPONSE");
+            }
+            return response;
+        } catch (PricingException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("ETA Service call failed: {}", e.getMessage(), e);
+            throw new PricingException("Unable to fetch ETA from ETA Service", "ETA_SERVICE_UNAVAILABLE");
+        }
+    }
+
+    private FareBreakdown calculateFare(String vehicleType, double distance, int duration, BigDecimal surgeMultiplier) {
+        PricingConfigProperties.VehicleConfig vehicleConfig = getVehicleConfig(vehicleType);
+
+        BigDecimal baseFare = vehicleConfig.getBaseFare();
+        BigDecimal distanceFare = vehicleConfig.getPerKm().multiply(BigDecimal.valueOf(distance));
+        BigDecimal timeFare = vehicleConfig.getPerMinute().multiply(BigDecimal.valueOf(duration));
+        BigDecimal subtotal = baseFare.add(distanceFare).add(timeFare);
+        BigDecimal totalFare = subtotal.multiply(surgeMultiplier)
+                .max(pricingConfig.getCalculation().getMinimumFare())
+                .setScale(2, RoundingMode.HALF_UP);
+
+        return new FareBreakdown(
+                baseFare.setScale(2, RoundingMode.HALF_UP),
+                distanceFare.setScale(2, RoundingMode.HALF_UP),
+                timeFare.setScale(2, RoundingMode.HALF_UP),
+                totalFare
+        );
     }
 
     private String normalizeVehicleType(String vehicleType) {
@@ -220,38 +233,11 @@ public class PricingService {
         return String.format("Z%02d%02d", latZone + 50, lngZone + 100);
     }
 
-    public iuh.fit.pricing_service.model.PricingTestResponse calculateSimplePrice(
-            Double distanceKm, Double demandIndex) {
-        
-        log.info("Calculating simple price - distance: {} km, demandIndex: {}", distanceKm, demandIndex);
-
-        BigDecimal baseFare = pricingConfig.getCalculation().getBaseFare();
-        BigDecimal perKmRate = pricingConfig.getCalculation().getPerKmRate();
-        
-        BigDecimal distanceFare = perKmRate.multiply(BigDecimal.valueOf(distanceKm));
-        
-        BigDecimal subtotal = baseFare.add(distanceFare);
-        
-        BigDecimal surgeMultiplier = BigDecimal.valueOf(demandIndex);
-        surgeMultiplier = surgeMultiplier.max(pricingConfig.getSurge().getMinMultiplier());
-        surgeMultiplier = surgeMultiplier.min(pricingConfig.getSurge().getMaxMultiplier());
-        
-        BigDecimal surgeAmount = subtotal.multiply(surgeMultiplier.subtract(BigDecimal.ONE));
-        BigDecimal totalFare = subtotal.add(surgeAmount).setScale(2, RoundingMode.HALF_UP);
-        
-        totalFare = totalFare.max(pricingConfig.getCalculation().getMinimumFare());
-
-        log.info("Simple price calculated - baseFare: {}, distanceFare: {}, surge: {}, total: {}",
-                baseFare, distanceFare, surgeMultiplier, totalFare);
-
-        return iuh.fit.pricing_service.model.PricingTestResponse.builder()
-                .distanceKm(distanceKm)
-                .demandIndex(demandIndex)
-                .baseFare(baseFare.setScale(2, RoundingMode.HALF_UP))
-                .distanceFare(distanceFare.setScale(2, RoundingMode.HALF_UP))
-                .surgeMultiplier(surgeMultiplier.setScale(2, RoundingMode.HALF_UP))
-                .totalFare(totalFare)
-                .message("Pricing calculated successfully")
-                .build();
+    private record FareBreakdown(
+            BigDecimal baseFare,
+            BigDecimal distanceFare,
+            BigDecimal timeFare,
+            BigDecimal totalFare
+    ) {
     }
 }

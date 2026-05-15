@@ -1,0 +1,138 @@
+{
+  "info": {
+    "_postman_id": "cab-booking-extended-flow",
+    "name": "CAB-BOOKING CORE FLOW + REVIEWS",
+    "description": "Extended core flow including Booking, Notification, and Review services with JWT authentication.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.environment.get('run_id')) {",
+          "    const runId = Date.now().toString();",
+          "    pm.environment.set('run_id', runId);",
+          "    pm.environment.set('customer_email', `customer_${runId}@example.com`);",
+          "    pm.environment.set('customer_device_id', `customer-device-${runId}`);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "gateway_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Auth Register",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json();",
+              "pm.environment.set('access_token', json.result.accessToken);",
+              "pm.environment.set('user_id', json.result.user.userId);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Test User\",\n  \"email\": \"{{customer_email}}\",\n  \"password\": \"User@123456\",\n  \"role\": \"CUSTOMER\",\n  \"deviceId\": \"{{customer_device_id}}\"\n}"
+        },
+        "url": { "raw": "{{gateway_url}}/auth/register" }
+      }
+    },
+    {
+      "name": "02 - Create Booking",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Booking Created', function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json();",
+              "pm.environment.set('booking_id', json.result.id);",
+              "pm.environment.set('driver_id', \"DRIVER_MOCK_123\"); // Mock driver for testing review"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+        },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"pickupLocation\": \"12 Nguyen Van Bao\",\n  \"dropoffLocation\": \"Tan Son Nhat\",\n  \"vehicleType\": \"ECONOMY\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": 50000,\n  \"idempotencyKey\": \"booking-{{run_id}}\"\n}"
+        },
+        "url": { "raw": "{{gateway_url}}/booking/api/v1/bookings" }
+      }
+    },
+    {
+      "name": "03 - Check Notifications",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Get Notifications', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+        },
+        "method": "GET",
+        "url": { "raw": "{{gateway_url}}/api/notifications/user/{{user_id}}?page=0&size=10" }
+      }
+    },
+    {
+      "name": "04 - Submit Review",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Review Submitted', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+        },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"rideId\": \"{{booking_id}}\",\n    \"userId\": \"{{user_id}}\",\n    \"driverId\": \"{{driver_id}}\",\n    \"rating\": 5,\n    \"comment\": \"Excellent ride from Postman!\"\n}"
+        },
+        "url": { "raw": "{{gateway_url}}/api/reviews" }
+      }
+    }
+  ]
+}

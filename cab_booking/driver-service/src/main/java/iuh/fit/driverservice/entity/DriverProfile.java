@@ -80,6 +80,9 @@ public class DriverProfile extends BaseEntity {
     @Column(name = "average_rating", precision = 3, scale = 2)
     BigDecimal averageRating = BigDecimal.ZERO;
 
+    @Column(name = "total_reviews", nullable = false)
+    Integer totalReviews = 0;
+
     @Column(name = "total_earnings", precision = 18, scale = 2)
     BigDecimal totalEarnings = BigDecimal.ZERO;
 

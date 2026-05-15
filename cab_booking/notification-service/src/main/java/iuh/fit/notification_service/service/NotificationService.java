@@ -14,6 +14,7 @@ import java.util.List;
 @Slf4j
 public class NotificationService {
     private final NotificationRepository notificationRepository;
+    private final SocketIOService socketIOService;
 
     public void sendNotification(String userId, String title, String message, String type) {
         Notification notification = Notification.builder()
@@ -27,7 +28,13 @@ public class NotificationService {
         
         notificationRepository.save(notification);
         log.info("Notification sent to user {}: {}", userId, message);
-        // Here we could integrate with Firebase (FCM) or Twilio (SMS)
+        
+        // Push real-time notification via Socket.io
+        try {
+            socketIOService.sendNotification(userId, "new_notification", notification);
+        } catch (Exception e) {
+            log.error("Failed to push real-time notification to user {}: {}", userId, e.getMessage());
+        }
     }
 
     public org.springframework.data.domain.Page<Notification> getNotificationsByUserId(String userId, org.springframework.data.domain.Pageable pageable) {

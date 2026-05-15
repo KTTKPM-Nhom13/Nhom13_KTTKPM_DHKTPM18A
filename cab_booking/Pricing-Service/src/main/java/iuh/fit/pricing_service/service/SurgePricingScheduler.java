@@ -1,11 +1,11 @@
 package iuh.fit.pricing_service.service;
 
+import iuh.fit.pricing_service.producer.SurgeEventProducer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -14,63 +14,31 @@ import java.util.Set;
 public class SurgePricingScheduler {
 
     private final SurgePricingService surgePricingService;
+    private final SurgeEventProducer surgeEventProducer;
 
-    private static final int FIXED_RATE_MS = 60000;
-
-    @Scheduled(fixedRateString = "${pricing.surge.cache-ttl-seconds:60}000")
-    public void refreshSurgeCache() {
-        log.debug("Starting scheduled surge cache refresh...");
-
-        try {
-            Map<String, java.math.BigDecimal> allSurge = surgePricingService.getAllSurgeMultipliers();
-
-            Set<String> zoneIds = allSurge.keySet();
-            log.debug("Found {} zones with cached surge multipliers", zoneIds.size());
-
-            for (String zoneId : zoneIds) {
-                try {
-                    java.math.BigDecimal currentSurge = allSurge.get(zoneId);
-                    log.trace("Zone {} has surge multiplier: {}", zoneId, currentSurge);
-                } catch (Exception e) {
-                    log.warn("Error processing zone {} during cache refresh: {}", zoneId, e.getMessage());
-                }
-            }
-
-            log.debug("Completed surge cache refresh for {} zones", zoneIds.size());
-        } catch (Exception e) {
-            log.error("Error during scheduled surge cache refresh: {}", e.getMessage(), e);
+    @Scheduled(fixedDelayString = "${pricing.surge.scheduler-fixed-delay-ms:60000}")
+    public void refreshSurgePricing() {
+        Set<String> zoneIds = surgePricingService.getZonesWithCurrentMetrics();
+        if (zoneIds.isEmpty()) {
+            log.debug("No zones with current demand/supply metrics. Skipping surge pricing cycle.");
+            return;
         }
-    }
 
-    @Scheduled(fixedRate = 300000)
-    public void logSurgeStatistics() {
-        log.info("=== Surge Pricing Statistics ===");
-
-        try {
-            Map<String, java.math.BigDecimal> allSurge = surgePricingService.getAllSurgeMultipliers();
-
-            if (allSurge.isEmpty()) {
-                log.info("No active surge zones found");
-                return;
+        log.info("Starting near real-time surge pricing cycle for {} zones", zoneIds.size());
+        for (String zoneId : zoneIds) {
+            try {
+                SurgePricingService.SurgeComputationResult result = surgePricingService.computeSurgeFromAi(zoneId);
+                if (result.updated()) {
+                    surgeEventProducer.publishSurgeUpdate(zoneId, result.predictedMultiplier());
+                    log.info("SurgePriceUpdated published for zone {}: {} -> {}",
+                            zoneId, result.previousMultiplier(), result.predictedMultiplier());
+                } else {
+                    log.debug("Surge unchanged for zone {}: current={}, predicted={}",
+                            zoneId, result.previousMultiplier(), result.predictedMultiplier());
+                }
+            } catch (Exception e) {
+                log.warn("Surge pricing cycle failed for zone {}: {}", zoneId, e.getMessage(), e);
             }
-
-            long highSurgeZones = allSurge.values().stream()
-                    .filter(s -> s.compareTo(java.math.BigDecimal.ONE) > 0)
-                    .count();
-
-            java.math.BigDecimal maxSurge = allSurge.values().stream()
-                    .max(java.math.BigDecimal::compareTo)
-                    .orElse(java.math.BigDecimal.ONE);
-
-            log.info("Total zones with surge data: {}", allSurge.size());
-            log.info("Zones with active surge (>1.0x): {}", highSurgeZones);
-            log.info("Maximum surge multiplier: {}x", maxSurge);
-
-            if (maxSurge.compareTo(new java.math.BigDecimal("2.0")) > 0) {
-                log.warn("High surge detected - Maximum surge is {}x", maxSurge);
-            }
-        } catch (Exception e) {
-            log.error("Error generating surge statistics: {}", e.getMessage(), e);
         }
     }
 }

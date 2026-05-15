@@ -63,9 +63,14 @@ springdoc:
     operations-sorter: method
     tags-sorter: alpha
 
-google:
-  maps:
-    api-key: ${GOOGLE_MAPS_API_KEY:}
+app:
+  security:
+    public-endpoints: /actuator/**,/swagger-ui/**,/api-docs/**,/swagger-ui.html
+
+services:
+  eta:
+    url: ${ETA_SERVICE_URL:http://eta-service:8088}
+    estimate-path: ${ETA_ESTIMATE_PATH:/internal/eta/estimate}
 
 management:
   endpoints:
@@ -117,4 +122,8 @@ pricing:
     min-multiplier: 1.0
     max-multiplier: 3.0
     update-threshold: 0.1
-    cache-ttl-seconds: 60
+    cache-ttl-seconds: 300
+    metrics-ttl-seconds: 600
+    scheduler-fixed-delay-ms: 60000
+  eta:
+    fallback-duration-minutes: 15
