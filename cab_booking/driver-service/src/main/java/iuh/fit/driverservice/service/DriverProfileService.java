@@ -2,6 +2,7 @@ package iuh.fit.driverservice.service;
 
 import iuh.fit.common.exception.AppException;
 import iuh.fit.common.exception.ErrorCode;
+import iuh.fit.driverservice.dto.event.DriverArrivedEvent;
 import iuh.fit.driverservice.dto.event.DriverLocationPayload;
 import iuh.fit.driverservice.dto.event.DriverStatusEvent;
 import iuh.fit.driverservice.dto.event.RideAcceptRequestedEvent;
@@ -10,9 +11,9 @@ import iuh.fit.driverservice.dto.event.RideAssignedEvent;
 import iuh.fit.driverservice.dto.event.RideCancelledEvent;
 import iuh.fit.driverservice.dto.event.RideCompletedEvent;
 import iuh.fit.driverservice.dto.event.RideFinishedEvent;
-import iuh.fit.driverservice.dto.event.RideProgressEvent;
 import iuh.fit.driverservice.dto.event.RideRejectedEvent;
 import iuh.fit.driverservice.dto.event.RideRejectRequestedEvent;
+import iuh.fit.driverservice.dto.event.RideStartedEvent;
 import iuh.fit.driverservice.dto.request.CompleteDriverRideRequest;
 import iuh.fit.driverservice.dto.request.HandleDriverAssignmentRequest;
 import iuh.fit.driverservice.dto.request.UpdateDriverAvailabilityRequest;
@@ -259,9 +260,9 @@ public class DriverProfileService {
         DriverProfile savedProfile = driverProfileRepository.save(profile);
         writeDriverStatus(savedProfile);
         if (nextStatus == DriverRideStatus.ARRIVED_PICKUP) {
-            publishRideProgress(RIDE_ARRIVED_TOPIC, "RideArrived", savedProfile.getCurrentRideId(), savedProfile.getExternalUserId());
+            publishDriverArrived(savedProfile.getCurrentRideId(), savedProfile.getExternalUserId());
         } else if (nextStatus == DriverRideStatus.IN_PROGRESS) {
-            publishRideProgress(RIDE_STARTED_TOPIC, "RideStarted", savedProfile.getCurrentRideId(), savedProfile.getExternalUserId());
+            publishRideStarted(savedProfile.getCurrentRideId(), savedProfile.getExternalUserId());
         }
         publishDriverStatusChanged(savedProfile, savedProfile.getCurrentRideId(), currentRideStatusName(savedProfile));
         return toCurrentRideResponse(savedProfile);
@@ -281,7 +282,7 @@ public class DriverProfileService {
         profile.setLastOnlineAt(LocalDateTime.now());
         DriverProfile savedProfile = driverProfileRepository.save(profile);
         writeDriverStatus(savedProfile);
-        publishRideProgress(RIDE_ARRIVED_TOPIC, "RideArrived", rideId, savedProfile.getExternalUserId());
+        publishDriverArrived(rideId, savedProfile.getExternalUserId());
         publishDriverStatusChanged(savedProfile, rideId, currentRideStatusName(savedProfile));
         return toCurrentRideResponse(savedProfile);
     }
@@ -300,7 +301,7 @@ public class DriverProfileService {
         profile.setLastOnlineAt(LocalDateTime.now());
         DriverProfile savedProfile = driverProfileRepository.save(profile);
         writeDriverStatus(savedProfile);
-        publishRideProgress(RIDE_STARTED_TOPIC, "RideStarted", rideId, savedProfile.getExternalUserId());
+        publishRideStarted(rideId, savedProfile.getExternalUserId());
         publishDriverStatusChanged(savedProfile, rideId, currentRideStatusName(savedProfile));
         return toCurrentRideResponse(savedProfile);
     }
@@ -570,13 +571,26 @@ public class DriverProfileService {
                         .build());
     }
 
-    private void publishRideProgress(String topic, String type, String rideId, String driverId) {
+    private void publishDriverArrived(String rideId, String driverId) {
         kafkaTemplate.send(
-                topic,
+                RIDE_ARRIVED_TOPIC,
                 rideId,
-                RideProgressEvent.builder()
+                DriverArrivedEvent.builder()
                         .eventId(UUID.randomUUID().toString())
-                        .type(type)
+                        .type(DriverArrivedEvent.EVENT_TYPE)
+                        .rideId(rideId)
+                        .driverId(driverId)
+                        .timestamp(Instant.now().toString())
+                        .build());
+    }
+
+    private void publishRideStarted(String rideId, String driverId) {
+        kafkaTemplate.send(
+                RIDE_STARTED_TOPIC,
+                rideId,
+                RideStartedEvent.builder()
+                        .eventId(UUID.randomUUID().toString())
+                        .type(RideStartedEvent.EVENT_TYPE)
                         .rideId(rideId)
                         .driverId(driverId)
                         .timestamp(Instant.now().toString())

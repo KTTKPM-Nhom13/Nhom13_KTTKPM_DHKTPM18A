@@ -238,7 +238,7 @@ public class BookingServiceImpl implements BookingService {
                             + "], yêu cầu PICKUP.");
         }
 
-        booking.setStatus(BookingStatus.IN_PROGRESS);
+        bookingStateMachine.transitionTo(booking, BookingStatus.IN_PROGRESS);
         booking = bookingRepository.save(booking);
         redisTemplate.opsForValue().set("booking:" + bookingId, booking, Duration.ofHours(2));
 
@@ -263,7 +263,7 @@ public class BookingServiceImpl implements BookingService {
                             + "], yêu cầu IN_PROGRESS.");
         }
 
-        booking.setStatus(BookingStatus.COMPLETED);
+        bookingStateMachine.transitionTo(booking, BookingStatus.COMPLETED);
         booking = bookingRepository.save(booking);
 
         log.info("✅ RideCompleted | bookingId={} | finalFare={} | payment={}",

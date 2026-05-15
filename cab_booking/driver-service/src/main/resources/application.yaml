@@ -21,7 +21,8 @@ spring:
           ride-reject-requested:iuh.fit.driverservice.dto.event.RideRejectRequestedEvent,
           ride-accepted:iuh.fit.driverservice.dto.event.RideAcceptedEvent,
           ride-rejected:iuh.fit.driverservice.dto.event.RideRejectedEvent,
-          ride-progress:iuh.fit.driverservice.dto.event.RideProgressEvent,
+          driver-arrived:iuh.fit.driverservice.dto.event.DriverArrivedEvent,
+          ride-started:iuh.fit.driverservice.dto.event.RideStartedEvent,
           ride-completed:iuh.fit.driverservice.dto.event.RideCompletedEvent,
           ride-finished:iuh.fit.driverservice.dto.event.RideFinishedEvent
     consumer:

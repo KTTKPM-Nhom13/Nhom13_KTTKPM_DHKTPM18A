@@ -9,7 +9,9 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RideProgressEvent {
+public class DriverArrivedEvent {
+    public static final String EVENT_TYPE = "DriverArrived";
+
     private String eventId;
     private String type;
     private String rideId;
