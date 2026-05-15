@@ -26,7 +26,8 @@ spring:
         spring.json.use.type.headers: false
         spring.json.value.default.type: com.cab.matching.core.dto.event.inbound.RideCreatedEvent
         spring.json.type.mapping: >
-          ride.created:com.cab.matching.core.dto.event.inbound.RideCreatedEvent
+          ride.created:com.cab.matching.core.dto.event.inbound.RideCreatedEvent,
+          ride-cancelled:com.cab.matching.core.dto.event.inbound.RideCancelledEvent
 
   data:
     redis:

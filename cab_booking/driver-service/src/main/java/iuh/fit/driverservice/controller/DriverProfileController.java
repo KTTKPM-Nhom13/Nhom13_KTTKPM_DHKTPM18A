@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -71,6 +72,48 @@ public class DriverProfileController {
         return ApiResponse.<DriverCurrentRideResponse>builder()
                 .message("Handled driver assignment successfully")
                 .result(driverProfileService.handleAssignment(currentUserFacade.getCurrentUserId(), request))
+                .build();
+    }
+
+    @PostMapping("/rides/{rideId}/accept")
+    public ApiResponse<DriverCurrentRideResponse> acceptRide(@PathVariable String rideId) {
+        return ApiResponse.<DriverCurrentRideResponse>builder()
+                .message("Ride accept request submitted")
+                .result(driverProfileService.acceptRide(currentUserFacade.getCurrentUserId(), rideId))
+                .build();
+    }
+
+    @PostMapping("/rides/{rideId}/reject")
+    public ApiResponse<DriverCurrentRideResponse> rejectRide(@PathVariable String rideId) {
+        return ApiResponse.<DriverCurrentRideResponse>builder()
+                .message("Ride reject request submitted")
+                .result(driverProfileService.rejectRide(currentUserFacade.getCurrentUserId(), rideId))
+                .build();
+    }
+
+    @PostMapping("/rides/{rideId}/arrive")
+    public ApiResponse<DriverCurrentRideResponse> arriveAtPickup(@PathVariable String rideId) {
+        return ApiResponse.<DriverCurrentRideResponse>builder()
+                .message("Driver arrival submitted")
+                .result(driverProfileService.arriveAtPickup(currentUserFacade.getCurrentUserId(), rideId))
+                .build();
+    }
+
+    @PostMapping("/rides/{rideId}/start")
+    public ApiResponse<DriverCurrentRideResponse> startRide(@PathVariable String rideId) {
+        return ApiResponse.<DriverCurrentRideResponse>builder()
+                .message("Ride start submitted")
+                .result(driverProfileService.startRide(currentUserFacade.getCurrentUserId(), rideId))
+                .build();
+    }
+
+    @PostMapping("/rides/{rideId}/complete")
+    public ApiResponse<DriverCurrentRideResponse> completeRide(
+            @PathVariable String rideId,
+            @Valid @RequestBody CompleteDriverRideRequest request) {
+        return ApiResponse.<DriverCurrentRideResponse>builder()
+                .message("Ride completion submitted")
+                .result(driverProfileService.completeRide(currentUserFacade.getCurrentUserId(), rideId, request))
                 .build();
     }
 

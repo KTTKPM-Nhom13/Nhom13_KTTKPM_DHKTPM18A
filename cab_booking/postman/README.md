@@ -3,6 +3,9 @@
 File chinh de import:
 
 - `CAB_Booking_Postman_Collection.json`
+- `CAB_DRIVER_ACCEPT_KAFKA_FLOW.postman_collection.json` de test luong Kafka async: `ride.assigned` -> driver accept/reject -> `ride.accept.requested` / `ride.reject.requested` -> booking cap nhat state.
+- `CAB_BOUNDARY_MAIN_FLOWS.postman_collection.json` de test boundary refactor moi: Driver ghi status, Ride ghi GPS, Matching doc Redis, Booking update lifecycle.
+- `CAB_BOUNDARY_MAIN_FLOWS_TEST_GUIDE.md` la checklist huong dan chay collection boundary moi.
 
 Collection hien tai da duoc tach lai thanh 2 luong dang ky dung theo code:
 
@@ -17,6 +20,7 @@ Nhung diem da duoc check lai:
 - Luong khach sau dang ky di qua `user-service` voi profile, account, device.
 - Luong tai xe sau dang ky di qua `driver-service` voi profile/KYC, roi moi len `ONLINE`.
 - `PUT /api/drivers/me/profile` hien tai tu dong dua `verificationStatus` sang `APPROVED`, nen sau buoc nay co the test `PATCH /api/drivers/me/availability`.
+- Luong accept Kafka chi dung Gateway cho Auth (`{{gatewayUrl}}/api/auth/...`). Booking va Driver goi truc tiep qua service port (`8084`, `8083`) vi hien tai chi auth-service duoc gan vao gateway.
 
 Thu tu chay goi y:
 

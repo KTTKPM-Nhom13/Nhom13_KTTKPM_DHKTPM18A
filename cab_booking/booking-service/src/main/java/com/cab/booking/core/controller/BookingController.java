@@ -127,37 +127,9 @@ public class BookingController {
 
     // ============================================================
     // API TÀI XẾ (DRIVER)
+    // Các thao tác của tài xế (nhận chuyến, đến điểm đón, bắt đầu, hoàn thành)
+    // bắt buộc phải gọi qua Driver Service. Booking Service chỉ lắng nghe qua Kafka.
     // ============================================================
-
-    /**
-     * Driver App: Nhận cuốc xe (Xử lý Race condition).
-     */
-    @PostMapping("/{id}/assign")
-    public ApiResponse<BookingResponse> assignDriver(@PathVariable UUID id, @RequestParam String driverId) {
-        return ApiResponse.success("Tài xế nhận cuốc thành công",
-                bookingService.assignDriverToBooking(id, driverId));
-    }
-
-    /**
-     * Driver App: Đã đến điểm đón (MATCHING/ASSIGNED -> PICKUP)
-     */
-    @PostMapping("/{id}/arrive")
-    public ApiResponse<BookingResponse> arriveAtPickup(@PathVariable UUID id) {
-        return ApiResponse.success("Đã báo đến điểm đón",
-                bookingService.arriveAtPickup(id));
-    }
-
-    @PostMapping("/{id}/start")
-    public ApiResponse<BookingResponse> startRide(@PathVariable UUID id) {
-        return ApiResponse.success("Bắt đầu chuyến đi thành công",
-                bookingService.startRide(id));
-    }
-
-    @PostMapping("/{id}/complete")
-    public ApiResponse<BookingResponse> completeRide(@PathVariable UUID id) {
-        return ApiResponse.success("Hoàn thành chuyến đi",
-                bookingService.completeRide(id));
-    }
 
     @GetMapping("/driver/{driverId}")
     public ApiResponse<org.springframework.data.domain.Page<BookingResponse>> getDriverHistory(

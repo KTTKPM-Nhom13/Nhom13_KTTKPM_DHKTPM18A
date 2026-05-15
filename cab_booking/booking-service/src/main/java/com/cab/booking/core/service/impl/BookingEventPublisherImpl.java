@@ -47,6 +47,7 @@ public class BookingEventPublisherImpl implements BookingEventPublisher {
                 booking.getAssignedDriverId(),
                 reason
         );
+        kafkaTemplate.send("ride.cancelled", booking.getId().toString(), event);
         kafkaTemplate.send("booking-events", booking.getId().toString(), event);
         log.info("🚀 Published RideCancelledEvent | Topic: booking-events | Key: {}", booking.getId());
     }

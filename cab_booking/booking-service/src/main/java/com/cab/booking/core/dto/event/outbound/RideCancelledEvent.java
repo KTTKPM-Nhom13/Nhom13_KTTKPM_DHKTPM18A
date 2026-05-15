@@ -7,6 +7,7 @@ public record RideCancelledEvent(
         String eventId,
         Instant timestamp,
         String rideId,
+        String bookingId,
         String customerId,
         String driverId,
         String reason
@@ -16,6 +17,7 @@ public record RideCancelledEvent(
                 "RIDE_CANCELLED",
                 java.util.UUID.randomUUID().toString(),
                 Instant.now(),
+                rideId,
                 rideId,
                 customerId,
                 driverId,

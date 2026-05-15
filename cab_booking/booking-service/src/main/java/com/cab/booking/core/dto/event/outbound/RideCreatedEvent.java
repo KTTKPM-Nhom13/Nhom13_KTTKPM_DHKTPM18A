@@ -3,6 +3,7 @@ package com.cab.booking.core.dto.event.outbound;
 import lombok.Builder;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -21,6 +22,10 @@ public record RideCreatedEvent(
         String paymentMethod,
         BigDecimal estimatedFare,
         String promoCode,
+        Integer matchingAttempt,
+        Double searchRadiusKm,
+        Boolean rematch,
+        List<String> excludedDriverIds,
         String timestamp
 ) {
     public static final String EVENT_TYPE = "RideCreated";
