@@ -85,9 +85,10 @@ public class BookingController {
     public ApiResponse<BookingResponse> createRide(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody BookingRequest request) {
+        
         // subject = user UUID được set bởi auth-service
-        // (AuthTokenService.generateAccessToken)
-        String customerId = jwt.getSubject();
+        String customerId = (jwt != null) ? jwt.getSubject() : "f7ee4a2e-236c-4cc7-90db-efc923397cd8"; // Default demo ID
+        
         return ApiResponse.success("Tạo chuyến đi thành công",
                 bookingService.createRide(customerId, request));
     }
