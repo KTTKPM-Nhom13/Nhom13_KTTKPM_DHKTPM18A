@@ -1,6 +1,5 @@
 package com.cab.booking.core.service.impl;
 
-import com.cab.booking.core.dto.event.outbound.RideAcceptedEvent;
 import com.cab.booking.core.dto.event.outbound.RideCreatedEvent;
 import com.cab.booking.core.dto.request.BookingRequest;
 import com.cab.booking.core.dto.response.BookingResponse;
@@ -16,7 +15,6 @@ import iuh.fit.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -38,6 +36,7 @@ import java.util.UUID;
 public class BookingServiceImpl implements BookingService {
 
     private static final String IDEMPOTENCY_KEY_PREFIX = "booking:idempotency:";
+    private static final String BOOKING_CANCELLED_PREFIX = "booking:cancelled:";
     private static final Duration IDEMPOTENCY_TTL = Duration.ofHours(24);
 
     private final BookingRepository bookingRepository;
@@ -128,6 +127,10 @@ public class BookingServiceImpl implements BookingService {
                 .paymentMethod(request.getPaymentMethod())
                 .estimatedFare(verifiedFare)
                 .promoCode(request.getPromoCode())
+                .matchingAttempt(1)
+                .searchRadiusKm(3.0)
+                .rematch(false)
+                .excludedDriverIds(java.util.List.of())
                 .timestamp(Instant.now().toString())
                 .build();
         bookingEventPublisher.publishRideCreated(event);
@@ -144,50 +147,84 @@ public class BookingServiceImpl implements BookingService {
     }
 
     // ================================================================
-    // NHẬN CUỐC (RACE CONDITION HANDLING) — MATCHING → ASSIGNED
+    // DRIVER ACCEPT RIDE — ASSIGNED → ACCEPTED
     // ================================================================
     @Override
     @Transactional
-    public BookingResponse assignDriverToBooking(UUID bookingId, String driverId) {
+    public BookingResponse acceptRide(UUID bookingId, String driverId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
 
-        if (booking.getStatus() != BookingStatus.MATCHING) {
+        if (booking.getStatus() != BookingStatus.ASSIGNED) {
             throw new AppException(ErrorCode.INVALID_STATE);
         }
 
-        // Dùng State Machine để validate và đổi trạng thái sang ASSIGNED
-        bookingStateMachine.transitionTo(booking, BookingStatus.ASSIGNED);
-        booking.setAssignedDriverId(driverId);
-
-        try {
-            booking = bookingRepository.save(booking);
-            log.info("✅ Driver {} accepted booking {}", driverId, bookingId);
-        } catch (ObjectOptimisticLockingFailureException e) {
-            // Lỗi xảy ra khi 2 tài xế cùng lúc nhận cuốc (version không khớp)
-            log.warn("⚠️ Race condition detected: Driver {} failed to accept booking {} (Already accepted by another)", driverId, bookingId);
-            throw new AppException(ErrorCode.BOOKING_ALREADY_ACCEPTED);
+        if (booking.getAssignedDriverId() == null || !booking.getAssignedDriverId().equals(driverId)) {
+            log.warn("Driver {} attempted to accept booking {} assigned to {}", driverId, bookingId, booking.getAssignedDriverId());
+            throw new IllegalArgumentException("Tài xế không có quyền nhận cuốc xe này.");
         }
 
-        // BƯỚC 5: Gửi Kafka event RideAcceptedEvent
-        RideAcceptedEvent event = RideAcceptedEvent.builder()
-                .eventId(UUID.randomUUID().toString())
-                .type(RideAcceptedEvent.EVENT_TYPE)
-            .rideId(booking.getId().toString())
-                .customerId(booking.getCustomerId())
-                .driverId(driverId)
-                .status(booking.getStatus())
-                .timestamp(Instant.now().toString())
-                .build();
-        bookingEventPublisher.publishRideAccepted(event);
+        // Dùng State Machine để validate và đổi trạng thái sang ACCEPTED
+        bookingStateMachine.transitionTo(booking, BookingStatus.ACCEPTED);
 
+        booking = bookingRepository.save(booking);
+        log.info("✅ Driver {} accepted booking {}", driverId, bookingId);
+
+        // BƯỚC 5: Gửi Kafka event RideAcceptedEvent (publish cho downstream services nếu cần)
         redisTemplate.opsForValue().set("booking:" + bookingId, booking, Duration.ofHours(2));
 
         return BookingResponse.fromEntity(booking);
     }
 
+    @Override
+    @Transactional
+    public BookingResponse rejectAssignedRide(UUID bookingId, String driverId, String reason) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+
+        if (booking.getStatus() != BookingStatus.ASSIGNED) {
+            throw new AppException(ErrorCode.INVALID_STATE);
+        }
+
+        if (booking.getAssignedDriverId() == null || !booking.getAssignedDriverId().equals(driverId)) {
+            log.warn("Driver {} attempted to reject booking {} assigned to {}", driverId, bookingId, booking.getAssignedDriverId());
+            throw new IllegalArgumentException("Tai xe khong co quyen tu choi cuoc xe nay.");
+        }
+
+        booking.setAssignedDriverId(null);
+        bookingStateMachine.transitionTo(booking, BookingStatus.MATCHING);
+        booking = bookingRepository.save(booking);
+        redisTemplate.opsForValue().set("booking:" + bookingId, booking, Duration.ofHours(2));
+
+        RideCreatedEvent event = RideCreatedEvent.builder()
+                .eventId(UUID.randomUUID().toString())
+                .type(RideCreatedEvent.EVENT_TYPE)
+                .rideId(booking.getId().toString())
+                .customerId(booking.getCustomerId())
+                .customerNote(booking.getCustomerNote())
+                .pickup(coordinateMap(booking.getPickupLat(), booking.getPickupLng()))
+                .dropoff(coordinateMap(booking.getDropoffLat(), booking.getDropoffLng()))
+                .vehicleType(booking.getVehicleType())
+                .paymentMethod(booking.getPaymentMethod())
+                .estimatedFare(booking.getEstimatedFare())
+                .promoCode(booking.getPromoCode())
+                .matchingAttempt(1)
+                .searchRadiusKm(3.0)
+                .rematch(true)
+                .excludedDriverIds(java.util.List.of(driverId))
+                .timestamp(Instant.now().toString())
+                .build();
+        bookingEventPublisher.publishRideCreated(event);
+
+        log.info("Driver {} rejected booking {}. Booking moved back to MATCHING. Reason={}",
+                driverId,
+                bookingId,
+                reason);
+        return BookingResponse.fromEntity(booking);
+    }
+
     // ================================================================
-    // START RIDE — ASSIGNED → IN_PROGRESS
+    // START RIDE — PICKUP → IN_PROGRESS
     // ================================================================
     @Override
     @Transactional
@@ -195,13 +232,13 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking: " + bookingId));
 
-        if (booking.getStatus() != BookingStatus.ASSIGNED) {
+        if (booking.getStatus() != BookingStatus.PICKUP) {
             throw new IllegalStateException(
                     "Không thể bắt đầu chuyến đi: trạng thái hiện tại là [" + booking.getStatus()
-                            + "], yêu cầu ASSIGNED.");
+                            + "], yêu cầu PICKUP.");
         }
 
-        booking.setStatus(BookingStatus.IN_PROGRESS);
+        bookingStateMachine.transitionTo(booking, BookingStatus.IN_PROGRESS);
         booking = bookingRepository.save(booking);
         redisTemplate.opsForValue().set("booking:" + bookingId, booking, Duration.ofHours(2));
 
@@ -226,7 +263,7 @@ public class BookingServiceImpl implements BookingService {
                             + "], yêu cầu IN_PROGRESS.");
         }
 
-        booking.setStatus(BookingStatus.COMPLETED);
+        bookingStateMachine.transitionTo(booking, BookingStatus.COMPLETED);
         booking = bookingRepository.save(booking);
 
         log.info("✅ RideCompleted | bookingId={} | finalFare={} | payment={}",
@@ -259,6 +296,13 @@ public class BookingServiceImpl implements BookingService {
         return coords != null ? coords.get("lng") : null;
     }
 
+    private Map<String, Double> coordinateMap(Double lat, Double lng) {
+        Map<String, Double> coordinates = new java.util.HashMap<>();
+        coordinates.put("lat", lat);
+        coordinates.put("lng", lng);
+        return coordinates;
+    }
+
     // ================================================================
     // CÁC API BỔ SUNG CHO KHÁCH HÀNG & TÀI XẾ
     // ================================================================
@@ -275,6 +319,7 @@ public class BookingServiceImpl implements BookingService {
         java.util.List<BookingStatus> activeStatuses = java.util.List.of(
                 BookingStatus.MATCHING, 
                 BookingStatus.ASSIGNED, 
+                BookingStatus.ACCEPTED,
                 BookingStatus.PICKUP, 
                 BookingStatus.IN_PROGRESS
         );
@@ -292,6 +337,7 @@ public class BookingServiceImpl implements BookingService {
         bookingStateMachine.transitionTo(booking, BookingStatus.CANCELLED);
         booking = bookingRepository.save(booking);
         redisTemplate.opsForValue().set("booking:" + bookingId, booking, Duration.ofHours(2));
+        redisTemplate.opsForValue().set(BOOKING_CANCELLED_PREFIX + bookingId, "true", Duration.ofHours(2));
 
         // TODO: Cần kiểm tra xem có tài xế chưa, nếu có thì có logic phạt phí huỷ không? (Optional)
         bookingEventPublisher.publishRideCancelled(booking, reason);
@@ -306,7 +352,7 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
 
-        if (booking.getStatus() != BookingStatus.ASSIGNED) {
+        if (booking.getStatus() != BookingStatus.ACCEPTED) {
             throw new AppException(ErrorCode.INVALID_STATE);
         }
 

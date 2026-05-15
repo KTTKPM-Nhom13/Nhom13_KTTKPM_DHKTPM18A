@@ -9,7 +9,9 @@ public interface BookingService {
     
     BookingResponse createRide(String customerId, BookingRequest request);
     
-    BookingResponse assignDriverToBooking(UUID bookingId, String driverId);
+    BookingResponse acceptRide(UUID bookingId, String driverId);
+
+    BookingResponse rejectAssignedRide(UUID bookingId, String driverId, String reason);
     
     BookingResponse startRide(UUID bookingId);
     
