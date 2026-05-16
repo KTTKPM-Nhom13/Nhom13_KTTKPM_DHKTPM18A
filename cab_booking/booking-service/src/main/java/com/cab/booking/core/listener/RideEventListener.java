@@ -16,6 +16,7 @@ import com.cab.booking.core.entity.Booking;
 import com.cab.booking.core.enums.BookingStatus;
 import com.cab.booking.core.repository.BookingRepository;
 import com.cab.booking.core.service.BookingService;
+import com.cab.booking.core.statemachine.BookingStateMachine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -31,6 +32,7 @@ public class RideEventListener {
 
     private final BookingRepository bookingRepository;
     private final BookingService bookingService;
+    private final BookingStateMachine bookingStateMachine;
 
     @KafkaListener(topics = "ride.assigned", groupId = "booking-service-group")
     @Transactional
@@ -145,7 +147,7 @@ public class RideEventListener {
             UUID rideId = UUID.fromString(event.rideId());
             Booking booking = bookingRepository.findById(rideId).orElse(null);
             if (booking != null && booking.getStatus() == BookingStatus.ACCEPTED) {
-                booking.setStatus(BookingStatus.PICKUP);
+                bookingStateMachine.transitionTo(booking, BookingStatus.PICKUP);
                 bookingRepository.save(booking);
                 log.info("Booking {} moved to PICKUP", booking.getId());
             }
@@ -161,7 +163,7 @@ public class RideEventListener {
             UUID rideId = UUID.fromString(event.rideId());
             Booking booking = bookingRepository.findById(rideId).orElse(null);
             if (booking != null && booking.getStatus() == BookingStatus.PICKUP) {
-                booking.setStatus(BookingStatus.IN_PROGRESS);
+                bookingStateMachine.transitionTo(booking, BookingStatus.IN_PROGRESS);
                 bookingRepository.save(booking);
                 log.info("Booking {} moved to IN_PROGRESS", booking.getId());
             }
@@ -177,7 +179,7 @@ public class RideEventListener {
             UUID rideId = UUID.fromString(event.getRideId());
             Booking booking = bookingRepository.findById(rideId).orElse(null);
             if (booking != null && booking.getStatus() == BookingStatus.IN_PROGRESS) {
-                booking.setStatus(BookingStatus.COMPLETED);
+                bookingStateMachine.transitionTo(booking, BookingStatus.COMPLETED);
                 bookingRepository.save(booking);
                 log.info("Booking {} moved to COMPLETED", booking.getId());
             }
@@ -193,7 +195,7 @@ public class RideEventListener {
             UUID rideId = UUID.fromString(event.getRideId());
             Booking booking = bookingRepository.findById(rideId).orElse(null);
             if (booking != null && booking.getStatus() == BookingStatus.IN_PROGRESS) {
-                booking.setStatus(BookingStatus.COMPLETED);
+                bookingStateMachine.transitionTo(booking, BookingStatus.COMPLETED);
                 bookingRepository.save(booking);
                 log.info("Booking {} moved to COMPLETED", booking.getId());
             }
