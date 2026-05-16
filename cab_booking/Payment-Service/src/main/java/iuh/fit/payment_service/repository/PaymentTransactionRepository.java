@@ -1,12 +1,15 @@
 package iuh.fit.payment_service.repository;
 
 import iuh.fit.payment_service.entity.PaymentTransaction;
+import iuh.fit.payment_service.enums.PaymentMethod;
 import iuh.fit.payment_service.enums.PaymentStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -33,6 +36,20 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
 
     @Query("SELECT p FROM PaymentTransaction p WHERE p.status IN :statuses ORDER BY p.createdAt DESC")
     List<PaymentTransaction> findByStatusInOrderByCreatedAtDesc(@Param("statuses") List<PaymentStatus> statuses);
+
+    @Query("""
+            SELECT p FROM PaymentTransaction p
+            WHERE p.status = :status
+              AND p.paymentMethod = :paymentMethod
+              AND p.createdAt < :createdBefore
+            ORDER BY p.createdAt DESC
+            """)
+    List<PaymentTransaction> findStalePendingByPaymentMethod(
+            @Param("status") PaymentStatus status,
+            @Param("paymentMethod") PaymentMethod paymentMethod,
+            @Param("createdBefore") Instant createdBefore,
+            Pageable pageable
+    );
 
     @Query("SELECT COUNT(p) > 0 FROM PaymentTransaction p WHERE p.idempotencyKey = :key AND p.status = :status")
     boolean existsByIdempotencyKeyAndStatus(

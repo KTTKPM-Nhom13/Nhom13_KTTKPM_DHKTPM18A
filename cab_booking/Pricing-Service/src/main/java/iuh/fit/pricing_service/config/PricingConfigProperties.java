@@ -15,6 +15,8 @@ public class PricingConfigProperties {
     private Calculation calculation = new Calculation();
     private Map<String, VehicleConfig> vehicle = new java.util.HashMap<>();
     private Surge surge = new Surge();
+    private Weather weather = new Weather();
+    private Cache cache = new Cache();
     private Eta eta = new Eta();
 
     @Data
@@ -23,6 +25,11 @@ public class PricingConfigProperties {
         private BigDecimal perKmRate = new BigDecimal("1.50");
         private BigDecimal perMinuteRate = new BigDecimal("0.25");
         private BigDecimal minimumFare = new BigDecimal("5.00");
+        private BigDecimal platformFee = BigDecimal.ZERO;
+        private BigDecimal airportFee = BigDecimal.ZERO;
+        private BigDecimal tollFee = BigDecimal.ZERO;
+        private String currency = "VND";
+        private String configVersion = "v1";
     }
 
     @Data
@@ -42,6 +49,24 @@ public class PricingConfigProperties {
         private int cacheTtlSeconds = 60;
         private long schedulerFixedDelayMs = 60000;
         private int metricsTtlSeconds = 600;
+        private BigDecimal highDemandRatio = new BigDecimal("1.5");
+        private BigDecimal veryHighDemandRatio = new BigDecimal("3.0");
+        private BigDecimal highDemandAdjustment = new BigDecimal("0.2");
+        private BigDecimal veryHighDemandAdjustment = new BigDecimal("0.5");
+        private BigDecimal rushHourAdjustment = new BigDecimal("0.2");
+        private BigDecimal nightAdjustment = new BigDecimal("0.1");
+        private BigDecimal manualAdjustment = BigDecimal.ZERO;
+    }
+
+    @Data
+    public static class Weather {
+        private BigDecimal badWeatherAdjustment = new BigDecimal("0.2");
+    }
+
+    @Data
+    public static class Cache {
+        private int weatherTtlSeconds = 1800;
+        private int routeTtlSeconds = 300;
     }
 
     @Data

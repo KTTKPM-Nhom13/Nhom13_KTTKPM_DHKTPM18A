@@ -1,5 +1,6 @@
 package iuh.fit.payment_service.consumer;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import iuh.fit.payment_service.dto.event.BookingFailedEvent;
 import iuh.fit.payment_service.service.PaymentCompensationService;
 import iuh.fit.payment_service.service.PaymentSagaService;
@@ -19,6 +20,7 @@ public class BookingFailedConsumer {
 
     private final PaymentSagaService paymentSagaService;
     private final PaymentCompensationService compensationService;
+    private final ObjectMapper objectMapper;
 
     @KafkaListener(
             topics = "booking.failed",
@@ -26,16 +28,17 @@ public class BookingFailedConsumer {
             containerFactory = "kafkaListenerContainerFactory"
     )
     public void consumeBookingFailedEvent(
-            @Payload BookingFailedEvent event,
+            @Payload Object payload,
             @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
             @Header(KafkaHeaders.OFFSET) long offset,
             @Header(KafkaHeaders.RECEIVED_KEY) String key,
             Acknowledgment acknowledgment) {
 
-        log.info("[Compensate] Received booking.failed - key={}, partition={}, offset={}, rideId={}, reason={}",
-            key, partition, offset, event.getRideId(), event.getReason());
-
         try {
+            BookingFailedEvent event = objectMapper.convertValue(payload, BookingFailedEvent.class);
+            log.info("[Compensate] Received booking.failed - key={}, partition={}, offset={}, rideId={}, reason={}",
+                key, partition, offset, event.getRideId(), event.getReason());
+
             String bookingId = event.getRideId();
             if (bookingId == null || bookingId.isBlank()) {
                 log.warn("[Compensate] booking.failed event has null/blank rideId, skipping");
@@ -47,8 +50,8 @@ public class BookingFailedConsumer {
             acknowledgment.acknowledge();
             log.info("[Compensate] Compensation triggered for bookingId={}", bookingId);
         } catch (Exception e) {
-            log.error("[Compensate] Error processing booking.failed - rideId={}: {}",
-                    event.getRideId(), e.getMessage(), e);
+            log.error("[Compensate] Error processing booking.failed - key={}, partition={}, offset={}: {}",
+                    key, partition, offset, e.getMessage(), e);
             acknowledgment.acknowledge();
         }
     }

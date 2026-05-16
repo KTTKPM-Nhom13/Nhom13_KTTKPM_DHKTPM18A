@@ -46,11 +46,31 @@ public class FareEstimate {
 
     private BigDecimal timeFare;
 
+    private BigDecimal platformFee;
+
+    private BigDecimal zoneFee;
+
+    private BigDecimal airportFee;
+
+    private BigDecimal tollFee;
+
+    private BigDecimal discountAmount;
+
     private BigDecimal surgeMultiplier;
 
     private BigDecimal totalFare;
 
     private String currency;
+
+    private String pricingConfigVersion;
+
+    private String distanceSource;
+
+    private String weatherCondition;
+
+    private String weatherSource;
+
+    private Boolean fallbackUsed;
 
     private String status;
 

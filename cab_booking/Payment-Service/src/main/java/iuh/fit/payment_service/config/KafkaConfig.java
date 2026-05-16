@@ -3,6 +3,7 @@ package iuh.fit.payment_service.config;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.errors.SerializationException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,13 +12,23 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.*;
+import org.springframework.kafka.listener.CommonErrorHandler;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.serializer.DeserializationException;
+import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
+import org.springframework.messaging.converter.MessageConversionException;
+import org.springframework.messaging.handler.annotation.support.MethodArgumentNotValidException;
+import org.springframework.messaging.handler.invocation.MethodArgumentResolutionException;
+import org.springframework.util.backoff.FixedBackOff;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
+@Slf4j
 public class KafkaConfig {
 
     public static final String TOPIC_RIDE_FINISHED = "ride.finished";
@@ -57,7 +68,8 @@ public class KafkaConfig {
         configProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         configProps.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         configProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        configProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
+        configProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
+        configProps.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS, JsonDeserializer.class);
         configProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         configProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         configProps.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
@@ -75,7 +87,26 @@ public class KafkaConfig {
                 org.springframework.kafka.listener.ContainerProperties.AckMode.MANUAL_IMMEDIATE
         );
         factory.setConcurrency(3);
+        factory.setCommonErrorHandler(kafkaErrorHandler());
         return factory;
+    }
+
+    @Bean
+    public CommonErrorHandler kafkaErrorHandler() {
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler((record, exception) -> {
+            log.error("[Kafka] Skipping poisoned record after retries - topic={}, partition={}, offset={}, key={}, cause={}",
+                    record.topic(), record.partition(), record.offset(), record.key(), exception.getMessage(), exception);
+        }, new FixedBackOff(1000L, 2L));
+        errorHandler.setCommitRecovered(true);
+        errorHandler.addNotRetryableExceptions(
+                DeserializationException.class,
+                SerializationException.class,
+                MessageConversionException.class,
+                MethodArgumentResolutionException.class,
+                MethodArgumentNotValidException.class,
+                ClassCastException.class
+        );
+        return errorHandler;
     }
 
     @Bean

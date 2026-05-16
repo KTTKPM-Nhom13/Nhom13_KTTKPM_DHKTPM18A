@@ -81,4 +81,27 @@ public class SurgeEventProducer {
             log.error("Failed to publish surge alert for zone {}: {}", zoneId, e.getMessage(), e);
         }
     }
+
+    public void publishEstimateEvent(String topic, String eventType, String estimateId, BigDecimal totalFare,
+                                     String currency, BigDecimal surgeMultiplier, String pricingConfigVersion) {
+        String eventId = UUID.randomUUID().toString();
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("event_id", eventId);
+        payload.put("event_type", eventType);
+        payload.put("estimate_id", estimateId);
+        payload.put("total_fare", totalFare);
+        payload.put("currency", currency);
+        payload.put("surge_multiplier", surgeMultiplier);
+        payload.put("pricing_config_version", pricingConfigVersion);
+        payload.put("timestamp", Instant.now().toString());
+        payload.put("schema_version", SCHEMA_VERSION);
+
+        try {
+            kafkaTemplate.send(topic, estimateId, payload);
+            log.debug("Published pricing estimate event {} for estimate {}", eventType, estimateId);
+        } catch (Exception e) {
+            log.error("Failed to publish pricing estimate event {} for estimate {}: {}",
+                    eventType, estimateId, e.getMessage(), e);
+        }
+    }
 }

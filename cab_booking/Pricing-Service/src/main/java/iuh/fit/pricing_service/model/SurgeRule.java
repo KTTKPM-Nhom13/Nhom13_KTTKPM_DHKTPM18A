@@ -55,7 +55,6 @@ public class SurgeRule {
     public enum SurgeSource {
         AUTOMATIC,
         MANUAL,
-        AI_PREDICTED,
         EVENT_BASED
     }
 }

@@ -1,21 +1,272 @@
 {
   "info": {
     "_postman_id": "f5e9d9e0-1234-4567-89ab-cdef01234567",
-    "name": "Pricing Service Collection",
-    "description": "Collection to test Mapbox, Open-Meteo, and internal Pricing Service APIs with JWT.",
+    "name": "Pricing Service - Rule Based Flow",
+    "description": "End-to-end Pricing Service tests aligned with the rule-based design: external APIs, config, demand/supply metrics, surge rules, fare estimate, quote locking, duplicate confirm protection, and fallback-observable response fields.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "External APIs",
+      "name": "00 - Auth By Role",
       "item": [
         {
-          "name": "Test Mapbox API",
+          "name": "Register USER - sample customer account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('USER register returns token or account already exists', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 409]); });",
+                  "if (pm.response.code === 200) { const json = pm.response.json(); pm.collectionVariables.set('JWT_TOKEN', json.result.accessToken); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Nguyen Van A\",\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\",\n  \"role\": \"USER\",\n  \"phoneNumber\": \"0901234567\",\n  \"avatarUrl\": \"https://example.com/avatars/vana.png\",\n  \"deviceId\": \"web-chrome-vana-01\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Mozilla/5.0 Chrome/124.0\",\n  \"appVersion\": \"1.0.0\"\n}"
+            },
+            "url": {
+              "raw": "{{AUTH_URL}}/auth/register",
+              "host": [
+                "{{AUTH_URL}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login USER - store JWT_TOKEN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('USER login succeeds', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json(); pm.collectionVariables.set('JWT_TOKEN', json.result.accessToken); pm.collectionVariables.set('user_role', json.result.user.role);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\",\n  \"deviceId\": \"web-chrome-vana-01\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Mozilla/5.0 Chrome/124.0\",\n  \"appVersion\": \"1.0.0\"\n}"
+            },
+            "url": {
+              "raw": "{{AUTH_URL}}/auth/login",
+              "host": [
+                "{{AUTH_URL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register DRIVER - sample driver account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('DRIVER register returns token or account already exists', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 409]); });",
+                  "if (pm.response.code === 200) { const json = pm.response.json(); pm.collectionVariables.set('DRIVER_JWT_TOKEN', json.result.accessToken); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Tran Van Driver\",\n  \"email\": \"{{driver_email}}\",\n  \"password\": \"{{driver_password}}\",\n  \"role\": \"DRIVER\",\n  \"phoneNumber\": \"0907654321\",\n  \"avatarUrl\": \"https://example.com/avatars/driver.png\",\n  \"deviceId\": \"web-chrome-driver-01\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Mozilla/5.0 Chrome/124.0\",\n  \"appVersion\": \"1.0.0\"\n}"
+            },
+            "url": {
+              "raw": "{{AUTH_URL}}/auth/register",
+              "host": [
+                "{{AUTH_URL}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login DRIVER - store DRIVER_JWT_TOKEN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('DRIVER login succeeds', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json(); pm.collectionVariables.set('DRIVER_JWT_TOKEN', json.result.accessToken); pm.collectionVariables.set('driver_role', json.result.user.role);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{driver_email}}\",\n  \"password\": \"{{driver_password}}\",\n  \"deviceId\": \"web-chrome-driver-01\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Mozilla/5.0 Chrome/124.0\",\n  \"appVersion\": \"1.0.0\"\n}"
+            },
+            "url": {
+              "raw": "{{AUTH_URL}}/auth/login",
+              "host": [
+                "{{AUTH_URL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login ADMIN - store ADMIN_JWT_TOKEN (requires seeded admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ADMIN login succeeds when admin account exists', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json(); pm.expect(json.result.user.role).to.eql('ADMIN'); pm.collectionVariables.set('ADMIN_JWT_TOKEN', json.result.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\",\n  \"deviceId\": \"web-chrome-admin-01\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Mozilla/5.0 Chrome/124.0\",\n  \"appVersion\": \"1.0.0\"\n}"
+            },
+            "url": {
+              "raw": "{{AUTH_URL}}/auth/login",
+              "host": [
+                "{{AUTH_URL}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Debug USER Token - fallback only",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Debug USER token returned', function () { pm.response.to.have.status(200); });",
+                  "pm.collectionVariables.set('JWT_TOKEN', pm.response.text());"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "https://api.mapbox.com/directions-matrix/v1/mapbox/driving/106.6297,10.8231;106.6601,10.7626?annotations=distance,duration&access_token={{MAPBOX_API_KEY}}",
+              "raw": "{{AUTH_URL}}/auth/token",
+              "host": [
+                "{{AUTH_URL}}"
+              ],
+              "path": [
+                "auth",
+                "token"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "01 - External API Smoke",
+      "item": [
+        {
+          "name": "Mapbox Matrix - Distance Duration",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Mapbox responded', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 401, 403]);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Mapbox has code/distances/durations', function () {",
+                  "    pm.expect(json.code).to.exist;",
+                  "    pm.expect(json.distances).to.be.an('array');",
+                  "    pm.expect(json.durations).to.be.an('array');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.mapbox.com/directions-matrix/v1/mapbox/driving/{{pickup_lng}},{{pickup_lat}};{{dropoff_lng}},{{dropoff_lat}}?annotations=distance,duration&access_token={{MAPBOX_API_KEY}}",
               "protocol": "https",
               "host": [
                 "api",
@@ -27,7 +278,7 @@
                 "v1",
                 "mapbox",
                 "driving",
-                "106.6297,10.8231;106.6601,10.7626"
+                "{{pickup_lng}},{{pickup_lat}};{{dropoff_lng}},{{dropoff_lat}}"
               ],
               "query": [
                 {
@@ -44,12 +295,30 @@
           "response": []
         },
         {
-          "name": "Test Open-Meteo API",
+          "name": "Open-Meteo - Current Weather",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Open-Meteo responded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "pm.test('Weather current data exists', function () {",
+                  "  pm.expect(json.current).to.exist;",
+                  "  pm.expect(json.current.weather_code).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "https://api.open-meteo.com/v1/forecast?latitude=10.8231&longitude=106.6297&current=temperature_2m,weather_code",
+              "raw": "https://api.open-meteo.com/v1/forecast?latitude={{pickup_lat}}&longitude={{pickup_lng}}&current=temperature_2m,weather_code",
               "protocol": "https",
               "host": [
                 "api",
@@ -63,11 +332,11 @@
               "query": [
                 {
                   "key": "latitude",
-                  "value": "10.8231"
+                  "value": "{{pickup_lat}}"
                 },
                 {
                   "key": "longitude",
-                  "value": "106.6297"
+                  "value": "{{pickup_lng}}"
                 },
                 {
                   "key": "current",
@@ -81,54 +350,129 @@
       ]
     },
     {
-      "name": "Pricing Service APIs (JWT Required)",
+      "name": "02 - USER Pricing Flow",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{JWT_TOKEN}}",
+            "type": "string"
+          }
+        ]
+      },
       "item": [
         {
-          "name": "Test Mapbox Connection API",
+          "name": "02 - Get Rule-Based Pricing Config",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Config returned', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.calculation.currency).to.eql('VND');",
+                  "  pm.expect(json.surge.defaultMultiplier).to.exist;",
+                  "  pm.expect(json.weather.badWeatherAdjustment).to.exist;",
+                  "  pm.expect(json.cache.routeTtlSeconds).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{JWT_TOKEN}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "estimate-cache-{{$timestamp}}"
+              }
+            ],
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/test-mapbox",
+              "raw": "{{BASE_URL}}/api/pricing/config",
               "host": [
                 "{{BASE_URL}}"
               ],
               "path": [
                 "api",
                 "pricing",
-                "test-mapbox"
+                "config"
               ]
             }
           },
           "response": []
         },
         {
-          "name": "Get Fare Estimate API",
+          "name": "04 - Get Surge Multiplier After Metrics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Surge multiplier returned', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.zone_id).to.eql(pm.collectionVariables.get('pickup_zone'));",
+                  "  pm.expect(Number(json.surge_multiplier)).to.be.at.least(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{JWT_TOKEN}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/estimate?pickupLat=10.8231&pickupLng=106.6297&dropoffLat=10.7626&dropoffLng=106.6601&vehicleType=ECONOMY",
+              "raw": "{{BASE_URL}}/api/pricing/surge/{{pickup_zone}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "surge",
+                "{{pickup_zone}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "06 - Estimate Fare And Store Quote Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Fare estimate generated', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.estimateId).to.be.a('string');",
+                  "  pm.expect(json.currency).to.eql('VND');",
+                  "  pm.expect(Number(json.distanceKm)).to.be.above(0);",
+                  "  pm.expect(Number(json.durationMinutes)).to.be.above(0);",
+                  "  pm.expect(Number(json.totalFare)).to.be.above(0);",
+                  "  pm.expect(json.pricingConfigVersion).to.exist;",
+                  "  pm.expect(json.distanceSource).to.be.oneOf(['MAPBOX', 'MAPBOX_CACHE', 'HAVERSINE_FALLBACK']);",
+                  "  pm.expect(json.weatherSource).to.be.oneOf(['OPEN_METEO', 'OPEN_METEO_CACHE', 'FALLBACK_UNAVAILABLE']);",
+                  "});",
+                  "const estimate = pm.response.json();",
+                  "pm.collectionVariables.set('estimate_id', estimate.estimateId);",
+                  "pm.collectionVariables.set('estimated_fare', estimate.totalFare);",
+                  "pm.collectionVariables.set('surge_multiplier', estimate.surgeMultiplier);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/estimate?pickupLat={{pickup_lat}}&pickupLng={{pickup_lng}}&dropoffLat={{dropoff_lat}}&dropoffLng={{dropoff_lng}}&vehicleType={{vehicle_type}}",
               "host": [
                 "{{BASE_URL}}"
               ],
@@ -140,23 +484,23 @@
               "query": [
                 {
                   "key": "pickupLat",
-                  "value": "10.8231"
+                  "value": "{{pickup_lat}}"
                 },
                 {
                   "key": "pickupLng",
-                  "value": "106.6297"
+                  "value": "{{pickup_lng}}"
                 },
                 {
                   "key": "dropoffLat",
-                  "value": "10.7626"
+                  "value": "{{dropoff_lat}}"
                 },
                 {
                   "key": "dropoffLng",
-                  "value": "106.6601"
+                  "value": "{{dropoff_lng}}"
                 },
                 {
                   "key": "vehicleType",
-                  "value": "ECONOMY"
+                  "value": "{{vehicle_type}}"
                 }
               ]
             }
@@ -164,18 +508,191 @@
           "response": []
         },
         {
-          "name": "Calculate Simple Price API",
+          "name": "07 - Estimate Same Route Again To Exercise Cache",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Second fare estimate generated', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.estimateId).to.be.a('string');",
+                  "  pm.expect(json.currency).to.eql('VND');",
+                  "  pm.expect(json.distanceSource).to.be.oneOf(['MAPBOX', 'MAPBOX_CACHE', 'HAVERSINE_FALLBACK']);",
+                  "  pm.expect(json.weatherSource).to.be.oneOf(['OPEN_METEO', 'OPEN_METEO_CACHE', 'FALLBACK_UNAVAILABLE']);",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/estimate?pickupLat={{pickup_lat}}&pickupLng={{pickup_lng}}&dropoffLat={{dropoff_lat}}&dropoffLng={{dropoff_lng}}&vehicleType={{vehicle_type}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "estimate"
+              ],
+              "query": [
                 {
-                  "key": "token",
-                  "value": "{{JWT_TOKEN}}",
-                  "type": "string"
+                  "key": "pickupLat",
+                  "value": "{{pickup_lat}}"
+                },
+                {
+                  "key": "pickupLng",
+                  "value": "{{pickup_lng}}"
+                },
+                {
+                  "key": "dropoffLat",
+                  "value": "{{dropoff_lat}}"
+                },
+                {
+                  "key": "dropoffLng",
+                  "value": "{{dropoff_lng}}"
+                },
+                {
+                  "key": "vehicleType",
+                  "value": "{{vehicle_type}}"
                 }
               ]
-            },
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08 - Confirm Fare Estimate Atomically",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Fare estimate confirmed', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.id).to.eql(pm.collectionVariables.get('estimate_id'));",
+                  "  pm.expect(json.status).to.eql('CONFIRMED');",
+                  "  pm.expect(json.currency).to.eql('VND');",
+                  "  pm.expect(Number(json.totalFare)).to.eql(Number(pm.collectionVariables.get('estimated_fare')));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/confirm/{{estimate_id}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "confirm",
+                "{{estimate_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09 - Confirm Same Estimate Again Should Fail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Duplicate confirm rejected', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.error).to.eql('INVALID_STATUS');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/confirm/{{estimate_id}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "confirm",
+                "{{estimate_id}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10 - Confirm Missing Estimate Should Fail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing estimate rejected', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.error).to.eql('ESTIMATE_NOT_FOUND');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/confirm/missing-estimate-id",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "confirm",
+                "missing-estimate-id"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "11 - Calculate Simple Price Compatibility API",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Simple price calculated', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(Number(json.distanceKm)).to.eql(Number(pm.collectionVariables.get('simple_distance_km')));",
+                  "  pm.expect(Number(json.totalFare)).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
             "method": "POST",
             "header": [
               {
@@ -185,7 +702,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"distanceKm\": 5.5,\n  \"demandIndex\": 1.2\n}"
+              "raw": "{\n  \"distanceKm\": {{simple_distance_km}},\n  \"demandIndex\": {{simple_demand_index}}\n}"
             },
             "url": {
               "raw": "{{BASE_URL}}/api/pricing/calculate",
@@ -202,114 +719,22 @@
           "response": []
         },
         {
-          "name": "Confirm Fare Estimate API",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{JWT_TOKEN}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{BASE_URL}}/api/pricing/confirm/YOUR_ESTIMATE_ID",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "confirm",
-                "YOUR_ESTIMATE_ID"
-              ]
+          "name": "12 - Get All Surge Multipliers",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('All surge response is an object', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json()).to.be.an('object');",
+                  "});"
+                ]
+              }
             }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Surge Multiplier for Zone API",
+          ],
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{JWT_TOKEN}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{BASE_URL}}/api/pricing/surge/Z123",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "surge",
-                "Z123"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Update Surge Multiplier API",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{JWT_TOKEN}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{BASE_URL}}/api/pricing/surge/Z123?multiplier=1.5",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "surge",
-                "Z123"
-              ],
-              "query": [
-                {
-                  "key": "multiplier",
-                  "value": "1.5"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get All Surge Multipliers API",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{JWT_TOKEN}}",
-                  "type": "string"
-                }
-              ]
-            },
             "method": "GET",
             "header": [],
             "url": {
@@ -328,22 +753,142 @@
           "response": []
         },
         {
-          "name": "Update Demand Supply API",
+          "name": "Invalid Coordinates Should Return 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid coordinate rejected', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/estimate?pickupLat=999&pickupLng={{pickup_lng}}&dropoffLat={{dropoff_lat}}&dropoffLng={{dropoff_lng}}&vehicleType={{vehicle_type}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "estimate"
+              ],
+              "query": [
                 {
-                  "key": "token",
-                  "value": "{{JWT_TOKEN}}",
-                  "type": "string"
+                  "key": "pickupLat",
+                  "value": "999"
+                },
+                {
+                  "key": "pickupLng",
+                  "value": "{{pickup_lng}}"
+                },
+                {
+                  "key": "dropoffLat",
+                  "value": "{{dropoff_lat}}"
+                },
+                {
+                  "key": "dropoffLng",
+                  "value": "{{dropoff_lng}}"
+                },
+                {
+                  "key": "vehicleType",
+                  "value": "{{vehicle_type}}"
                 }
               ]
-            },
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 - ADMIN/Internal Pricing Flow",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{ADMIN_JWT_TOKEN}}",
+            "type": "string"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Test Mapbox Connection Through Pricing Service",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Diagnostic endpoint is available to admins or forbidden for normal tokens', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 400, 403]);",
+                  "});",
+                  "if (pm.response.code !== 403) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Diagnostic response has expected fields', function () {",
+                  "    pm.expect(json).to.have.property('success');",
+                  "    pm.expect(json).to.have.property('api_key_used');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "estimate-{{$timestamp}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/test-mapbox",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "test-mapbox"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03 - Seed Demand Supply Metrics For Pickup Zone",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Demand/supply accepted', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.zone_id).to.eql(pm.collectionVariables.get('pickup_zone'));",
+                  "  pm.expect(json.active_drivers).to.eql(Number(pm.collectionVariables.get('active_drivers')));",
+                  "  pm.expect(json.pending_rides).to.eql(Number(pm.collectionVariables.get('pending_rides')));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
             "method": "POST",
             "header": [],
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/demand-supply?zoneId=Z123&activeDrivers=20&pendingRides=30",
+              "raw": "{{BASE_URL}}/api/pricing/demand-supply?zoneId={{pickup_zone}}&activeDrivers={{active_drivers}}&pendingRides={{pending_rides}}",
               "host": [
                 "{{BASE_URL}}"
               ],
@@ -355,15 +900,98 @@
               "query": [
                 {
                   "key": "zoneId",
-                  "value": "Z123"
+                  "value": "{{pickup_zone}}"
                 },
                 {
                   "key": "activeDrivers",
-                  "value": "20"
+                  "value": "{{active_drivers}}"
                 },
                 {
                   "key": "pendingRides",
-                  "value": "30"
+                  "value": "{{pending_rides}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "05 - Manual Surge Override",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Manual surge update accepted', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.zone_id).to.eql(pm.collectionVariables.get('pickup_zone'));",
+                  "  pm.expect(Number(json.surge_multiplier)).to.eql(Number(pm.collectionVariables.get('manual_surge')));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/surge/{{pickup_zone}}?multiplier={{manual_surge}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "surge",
+                "{{pickup_zone}}"
+              ],
+              "query": [
+                {
+                  "key": "multiplier",
+                  "value": "{{manual_surge}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid Surge Multiplier Still Clamped By Service",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Surge update request handled', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.zone_id).to.eql(pm.collectionVariables.get('pickup_zone'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/pricing/surge/{{pickup_zone}}?multiplier=99",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "api",
+                "pricing",
+                "surge",
+                "{{pickup_zone}}"
+              ],
+              "query": [
+                {
+                  "key": "multiplier",
+                  "value": "99"
                 }
               ]
             }
@@ -395,18 +1023,133 @@
   ],
   "variable": [
     {
+      "key": "AUTH_URL",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
       "key": "BASE_URL",
       "value": "http://localhost:8088",
       "type": "string"
     },
     {
       "key": "JWT_TOKEN",
-      "value": "YOUR_JWT_TOKEN_HERE",
+      "value": "",
       "type": "string"
     },
     {
       "key": "MAPBOX_API_KEY",
       "value": "YOUR_MAPBOX_API_KEY_HERE",
+      "type": "string"
+    },
+    {
+      "key": "pickup_lat",
+      "value": "10.8231",
+      "type": "string"
+    },
+    {
+      "key": "pickup_lng",
+      "value": "106.6297",
+      "type": "string"
+    },
+    {
+      "key": "dropoff_lat",
+      "value": "10.7626",
+      "type": "string"
+    },
+    {
+      "key": "dropoff_lng",
+      "value": "106.6601",
+      "type": "string"
+    },
+    {
+      "key": "pickup_zone",
+      "value": "Z60206",
+      "type": "string"
+    },
+    {
+      "key": "vehicle_type",
+      "value": "ECONOMY",
+      "type": "string"
+    },
+    {
+      "key": "active_drivers",
+      "value": "10",
+      "type": "string"
+    },
+    {
+      "key": "pending_rides",
+      "value": "30",
+      "type": "string"
+    },
+    {
+      "key": "manual_surge",
+      "value": "1.5",
+      "type": "string"
+    },
+    {
+      "key": "simple_distance_km",
+      "value": "5.5",
+      "type": "string"
+    },
+    {
+      "key": "simple_demand_index",
+      "value": "1.2",
+      "type": "string"
+    },
+    {
+      "key": "estimate_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "estimated_fare",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "surge_multiplier",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "DRIVER_JWT_TOKEN",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ADMIN_JWT_TOKEN",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_email",
+      "value": "vana@example.com",
+      "type": "string"
+    },
+    {
+      "key": "user_password",
+      "value": "12345678",
+      "type": "string"
+    },
+    {
+      "key": "driver_email",
+      "value": "driver.pricing@example.com",
+      "type": "string"
+    },
+    {
+      "key": "driver_password",
+      "value": "12345678",
+      "type": "string"
+    },
+    {
+      "key": "admin_email",
+      "value": "admin@example.com",
+      "type": "string"
+    },
+    {
+      "key": "admin_password",
+      "value": "12345678",
       "type": "string"
     }
   ]

@@ -1,5 +1,6 @@
 package iuh.fit.pricing_service.controller;
 
+import iuh.fit.pricing_service.config.PricingConfigProperties;
 import iuh.fit.pricing_service.model.FareEstimate;
 import iuh.fit.pricing_service.model.FareEstimateResponse;
 import iuh.fit.pricing_service.model.PricingTestRequest;
@@ -37,6 +38,7 @@ public class PricingController {
 
     private final PricingService pricingService;
     private final SurgePricingService surgePricingService;
+    private final PricingConfigProperties pricingConfig;
 
     @PostMapping("/calculate")
     @Operation(
@@ -107,7 +109,9 @@ public class PricingController {
             @RequestParam @NotBlank String vehicleType,
 
             @Parameter(description = "Estimated duration in minutes (optional)")
-            @RequestParam(required = false) Integer estimatedDurationMinutes) {
+            @RequestParam(required = false) Integer estimatedDurationMinutes,
+
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
 
         log.info("Received fare estimate request - pickup: ({}, {}), dropoff: ({}, {}), vehicle: {}, duration: {}",
                 pickupLat, pickupLng, dropoffLat, dropoffLng, vehicleType, estimatedDurationMinutes);
@@ -121,7 +125,7 @@ public class PricingController {
                 .estimatedDurationMinutes(estimatedDurationMinutes)
                 .build();
 
-        FareEstimateResponse response = pricingService.calculateFareEstimate(request);
+        FareEstimateResponse response = pricingService.calculateFareEstimate(request, idempotencyKey);
 
         log.info("Fare estimate generated - estimateId: {}, totalFare: {} {}",
                 response.getEstimateId(), response.getTotalFare(), response.getCurrency());
@@ -176,7 +180,7 @@ public class PricingController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/surge/{zoneId}")
+    @RequestMapping(value = "/surge/{zoneId}", method = {RequestMethod.POST, RequestMethod.PUT})
     @Operation(
             summary = "Update surge multiplier for zone",
             description = "Manually update the surge multiplier for a specific zone"
@@ -201,6 +205,23 @@ public class PricingController {
                 "message", "Surge multiplier updated and event published"
         );
 
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/config")
+    @Operation(
+            summary = "Get pricing configuration",
+            description = "Retrieve current rule-based pricing configuration"
+    )
+    public ResponseEntity<Map<String, Object>> getPricingConfig() {
+        Map<String, Object> response = Map.of(
+                "calculation", pricingConfig.getCalculation(),
+                "vehicle", pricingConfig.getVehicle(),
+                "surge", pricingConfig.getSurge(),
+                "weather", pricingConfig.getWeather(),
+                "cache", pricingConfig.getCache(),
+                "eta", pricingConfig.getEta()
+        );
         return ResponseEntity.ok(response);
     }
 

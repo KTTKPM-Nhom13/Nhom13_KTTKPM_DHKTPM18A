@@ -27,7 +27,7 @@ public class SurgePricingScheduler {
         log.info("Starting near real-time surge pricing cycle for {} zones", zoneIds.size());
         for (String zoneId : zoneIds) {
             try {
-                SurgePricingService.SurgeComputationResult result = surgePricingService.computeSurgeFromAi(zoneId);
+                SurgePricingService.SurgeComputationResult result = surgePricingService.computeSurgeFromRules(zoneId);
                 if (result.updated()) {
                     surgeEventProducer.publishSurgeUpdate(zoneId, result.predictedMultiplier());
                     log.info("SurgePriceUpdated published for zone {}: {} -> {}",

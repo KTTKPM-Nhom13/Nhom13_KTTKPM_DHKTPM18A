@@ -1,6 +1,5 @@
 package iuh.fit.pricing_service.service;
 
-import iuh.fit.pricing_service.client.SurgePricingAiClient;
 import iuh.fit.pricing_service.config.PricingConfigProperties;
 import iuh.fit.pricing_service.model.SurgeRule;
 import iuh.fit.pricing_service.repository.SurgeRuleRepository;
@@ -13,6 +12,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,12 +28,14 @@ public class SurgePricingService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final PricingConfigProperties pricingConfig;
     private final SurgeRuleRepository surgeRuleRepository;
-    private final SurgePricingAiClient surgePricingAiClient;
+    private final RuleBasedSurgeCalculator ruleBasedSurgeCalculator;
 
     private static final String SURGE_KEY_PREFIX = "pricing:surge:zone:";
     private static final String METRICS_KEY_PREFIX = "pricing:metrics:zone:";
     private static final String FEATURE_KEY_PREFIX = "pricing:features:zone:";
     private static final String ACTIVE_ZONES_KEY = "pricing:metrics:active-zones";
+    private static final String RIDE_ZONE_KEY_PREFIX = "pricing:ride-zone:";
+    private static final String DRIVER_ZONE_KEY_PREFIX = "pricing:driver-zone:";
 
     public BigDecimal getSurgeMultiplier(String zoneId) {
         String cacheKey = surgeKey(zoneId);
@@ -78,6 +80,92 @@ public class SurgePricingService {
         }
     }
 
+    public void incrementZoneMetrics(String zoneId, int activeDriversDelta, int pendingRidesDelta) {
+        ZoneMetrics current = getCurrentZoneMetrics(zoneId)
+                .orElse(new ZoneMetrics(zoneId, 0, 0, Instant.now()));
+        int activeDrivers = Math.max(0, current.activeDrivers() + activeDriversDelta);
+        int pendingRides = Math.max(0, current.pendingRides() + pendingRidesDelta);
+        updateCurrentZoneMetrics(zoneId, activeDrivers, pendingRides);
+    }
+
+    public void rememberRideZone(String rideId, String zoneId) {
+        if (rideId == null || rideId.isBlank() || zoneId == null || zoneId.isBlank()) {
+            return;
+        }
+        try {
+            redisTemplate.opsForValue().set(
+                    rideZoneKey(rideId),
+                    zoneId,
+                    Duration.ofSeconds(pricingConfig.getSurge().getMetricsTtlSeconds())
+            );
+        } catch (Exception e) {
+            log.warn("Failed to cache ride-zone mapping for ride {}: {}", rideId, e.getMessage());
+        }
+    }
+
+    public Optional<String> getRememberedRideZone(String rideId) {
+        if (rideId == null || rideId.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            Object zoneId = redisTemplate.opsForValue().get(rideZoneKey(rideId));
+            return zoneId == null ? Optional.empty() : Optional.of(zoneId.toString());
+        } catch (Exception e) {
+            log.warn("Failed to read ride-zone mapping for ride {}: {}", rideId, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    public void forgetRideZone(String rideId) {
+        if (rideId == null || rideId.isBlank()) {
+            return;
+        }
+        try {
+            redisTemplate.delete(rideZoneKey(rideId));
+        } catch (Exception e) {
+            log.warn("Failed to delete ride-zone mapping for ride {}: {}", rideId, e.getMessage());
+        }
+    }
+
+    public void rememberDriverZone(String driverId, String zoneId) {
+        if (driverId == null || driverId.isBlank() || zoneId == null || zoneId.isBlank()) {
+            return;
+        }
+        try {
+            redisTemplate.opsForValue().set(
+                    driverZoneKey(driverId),
+                    zoneId,
+                    Duration.ofSeconds(pricingConfig.getSurge().getMetricsTtlSeconds())
+            );
+        } catch (Exception e) {
+            log.warn("Failed to cache driver-zone mapping for driver {}: {}", driverId, e.getMessage());
+        }
+    }
+
+    public Optional<String> getRememberedDriverZone(String driverId) {
+        if (driverId == null || driverId.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            Object zoneId = redisTemplate.opsForValue().get(driverZoneKey(driverId));
+            return zoneId == null ? Optional.empty() : Optional.of(zoneId.toString());
+        } catch (Exception e) {
+            log.warn("Failed to read driver-zone mapping for driver {}: {}", driverId, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    public void forgetDriverZone(String driverId) {
+        if (driverId == null || driverId.isBlank()) {
+            return;
+        }
+        try {
+            redisTemplate.delete(driverZoneKey(driverId));
+        } catch (Exception e) {
+            log.warn("Failed to delete driver-zone mapping for driver {}: {}", driverId, e.getMessage());
+        }
+    }
+
     public Optional<ZoneMetrics> getCurrentZoneMetrics(String zoneId) {
         try {
             Map<Object, Object> values = redisTemplate.opsForHash().entries(metricsKey(zoneId));
@@ -113,13 +201,24 @@ public class SurgePricingService {
         return zoneIds;
     }
 
-    public SurgeComputationResult computeSurgeFromAi(String zoneId) {
-        ZoneMetrics metrics = getCurrentZoneMetrics(zoneId)
-                .orElseThrow(() -> new IllegalStateException("No current metrics found for zone " + zoneId));
+    public SurgeComputationResult computeSurgeFromRules(String zoneId) {
+        return computeSurgeFromRules(zoneId, false, LocalTime.now());
+    }
 
-        Map<String, Object> features = fetchHistoricalAndContextFeatures(zoneId);
-        SurgePredictionRequest request = new SurgePredictionRequest(zoneId, metrics, features, Instant.now());
-        BigDecimal predictedSurge = clampSurge(surgePricingAiClient.predictSurgeFactor(request));
+    public SurgeComputationResult computeSurgeFromRules(String zoneId, boolean badWeather, LocalTime requestTime) {
+        ZoneMetrics metrics = getCurrentZoneMetrics(zoneId)
+                .orElse(new ZoneMetrics(zoneId, 0, 0, Instant.now()));
+
+        RuleBasedSurgeCalculator.SurgeCalculation calculation = ruleBasedSurgeCalculator.calculate(
+                new RuleBasedSurgeCalculator.SurgeInput(
+                        zoneId,
+                        metrics.activeDrivers(),
+                        metrics.pendingRides(),
+                        badWeather,
+                        requestTime
+                )
+        );
+        BigDecimal predictedSurge = clampSurge(calculation.finalMultiplier());
         BigDecimal previousSurge = getSurgeMultiplier(zoneId);
 
         if (!shouldUpdateSurge(previousSurge, predictedSurge)) {
@@ -248,19 +347,19 @@ public class SurgePricingService {
         return METRICS_KEY_PREFIX + zoneId;
     }
 
+    private String rideZoneKey(String rideId) {
+        return RIDE_ZONE_KEY_PREFIX + rideId;
+    }
+
+    private String driverZoneKey(String driverId) {
+        return DRIVER_ZONE_KEY_PREFIX + driverId;
+    }
+
     public record ZoneMetrics(
             String zoneId,
             int activeDrivers,
             int pendingRides,
             Instant updatedAt
-    ) {
-    }
-
-    public record SurgePredictionRequest(
-            String zoneId,
-            ZoneMetrics metrics,
-            Map<String, Object> historicalAndContextFeatures,
-            Instant requestedAt
     ) {
     }
 

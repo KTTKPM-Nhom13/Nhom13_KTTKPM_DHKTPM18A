@@ -1,5 +1,6 @@
 package iuh.fit.payment_service.consumer;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import iuh.fit.payment_service.dto.event.RideFinishedEvent;
 import iuh.fit.payment_service.dto.request.ChargePaymentRequest;
 import iuh.fit.payment_service.enums.PaymentMethod;
@@ -21,6 +22,7 @@ import java.math.BigDecimal;
 public class RideFinishedConsumer {
 
     private final PaymentSagaService paymentSagaService;
+    private final ObjectMapper objectMapper;
 
     @KafkaListener(
             topics = "ride.finished",
@@ -28,21 +30,22 @@ public class RideFinishedConsumer {
             containerFactory = "kafkaListenerContainerFactory"
     )
     public void consumeRideFinishedEvent(
-            @Payload RideFinishedEvent event,
+            @Payload Object payload,
             @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
             @Header(KafkaHeaders.OFFSET) long offset,
             @Header(KafkaHeaders.RECEIVED_KEY) String key,
             Acknowledgment acknowledgment) {
 
-        log.info("[Consumer] Received ride.finished - key={}, partition={}, offset={}, eventType={}, rideId={}, finalFare={}",
-            key, partition, offset, event.getEventType(), event.getRideId(), event.getFinalFare());
-
         try {
+            RideFinishedEvent event = objectMapper.convertValue(payload, RideFinishedEvent.class);
+            log.info("[Consumer] Received ride.finished - key={}, partition={}, offset={}, eventType={}, rideId={}, finalFare={}",
+                key, partition, offset, event.getEventType(), event.getRideId(), event.getFinalFare());
             processPaymentFromRideFinished(event);
             acknowledgment.acknowledge();
             log.info("[Consumer] Successfully processed ride.finished - key={}", key);
         } catch (Exception e) {
-            log.error("[Consumer] Error processing ride.finished event - key={}", key, e);
+            log.error("[Consumer] Error processing ride.finished event - key={}, partition={}, offset={}",
+                    key, partition, offset, e);
             acknowledgment.acknowledge();
         }
     }

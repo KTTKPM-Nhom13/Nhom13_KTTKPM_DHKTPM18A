@@ -43,7 +43,7 @@ curl "http://localhost:8083/api/pricing/estimate?pickupLat=10.76&pickupLng=106.7
   "timeFare": 3.0,
   "surgeMultiplier": 1.0,
   "totalFare": 11.44,
-  "currency": "USD",
+  "currency": "VND",
   "expiresAt": "2026-05-07T01:52:44.672277434",
   "message": "Fare estimate generated successfully"
 }
@@ -93,7 +93,7 @@ curl -X POST "http://localhost:8083/api/pricing/confirm/f1365e9d-074c-4b24-90d3-
   "bookingId": "BK-550e8400-e29b-41d4-a716-446655440000",
   "estimateId": "f1365e9d-074c-4b24-90d3-d7762235755d",
   "finalFare": 11.44,
-  "currency": "USD",
+  "currency": "VND",
   "status": "CONFIRMED",
   "createdAt": "2026-05-07T08:39:00.000000000",
   "message": "Booking confirmed successfully"

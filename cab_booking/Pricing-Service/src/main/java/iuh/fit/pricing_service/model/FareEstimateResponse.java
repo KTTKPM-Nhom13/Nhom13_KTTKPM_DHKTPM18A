@@ -32,11 +32,31 @@ public class FareEstimateResponse {
 
     private BigDecimal timeFare;
 
+    private BigDecimal platformFee;
+
+    private BigDecimal zoneFee;
+
+    private BigDecimal airportFee;
+
+    private BigDecimal tollFee;
+
+    private BigDecimal discountAmount;
+
     private BigDecimal surgeMultiplier;
 
     private BigDecimal totalFare;
 
     private String currency;
+
+    private String pricingConfigVersion;
+
+    private String distanceSource;
+
+    private String weatherCondition;
+
+    private String weatherSource;
+
+    private Boolean fallbackUsed;
 
     private LocalDateTime expiresAt;
 
@@ -53,9 +73,19 @@ public class FareEstimateResponse {
                 .baseFare(estimate.getBaseFare())
                 .distanceFare(estimate.getDistanceFare())
                 .timeFare(estimate.getTimeFare())
+                .platformFee(estimate.getPlatformFee())
+                .zoneFee(estimate.getZoneFee())
+                .airportFee(estimate.getAirportFee())
+                .tollFee(estimate.getTollFee())
+                .discountAmount(estimate.getDiscountAmount())
                 .surgeMultiplier(estimate.getSurgeMultiplier())
                 .totalFare(estimate.getTotalFare())
                 .currency(estimate.getCurrency())
+                .pricingConfigVersion(estimate.getPricingConfigVersion())
+                .distanceSource(estimate.getDistanceSource())
+                .weatherCondition(estimate.getWeatherCondition())
+                .weatherSource(estimate.getWeatherSource())
+                .fallbackUsed(estimate.getFallbackUsed())
                 .expiresAt(estimate.getExpiresAt())
                 .message("Fare estimate generated successfully")
                 .build();

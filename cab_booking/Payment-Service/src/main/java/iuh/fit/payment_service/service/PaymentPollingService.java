@@ -9,6 +9,7 @@ import iuh.fit.payment_service.enums.PaymentStatus;
 import iuh.fit.payment_service.repository.PaymentTransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,19 +34,18 @@ public class PaymentPollingService {
     @Scheduled(fixedDelayString = "${app.payment.polling.interval-ms:120000}", initialDelayString = "${app.payment.polling.initial-delay-ms:60000}")
     public void pollPendingTransactions() {
         Instant cutoff = Instant.now().minusSeconds(STALE_THRESHOLD_MINUTES * 60L);
-        List<PaymentTransaction> stalePending = paymentRepository
-                .findByStatusInOrderByCreatedAtDesc(List.of(PaymentStatus.PENDING));
-
-        List<PaymentTransaction> toPoll = stalePending.stream()
-                .filter(t -> t.getCreatedAt().isBefore(cutoff))
-                .limit(BATCH_SIZE)
-                .toList();
+        List<PaymentTransaction> toPoll = paymentRepository.findStalePendingByPaymentMethod(
+                PaymentStatus.PENDING,
+                PaymentMethod.MOMO,
+                cutoff,
+                PageRequest.of(0, BATCH_SIZE)
+        );
 
         if (toPoll.isEmpty()) {
             return;
         }
 
-        log.info("[Poll] Found {} stale PENDING transactions to poll", toPoll.size());
+        log.info("[Poll] Found {} stale PENDING MoMo transactions to poll", toPoll.size());
         for (PaymentTransaction transaction : toPoll) {
             try {
                 pollTransaction(transaction);
@@ -61,7 +61,8 @@ public class PaymentPollingService {
                 transaction.getTransactionId(), transaction.getStatus(), transaction.getCreatedAt());
 
         if (transaction.getPaymentMethod() != PaymentMethod.MOMO) {
-            log.debug("[Poll] Skipping non-MoMo transaction txnId={}", transaction.getTransactionId());
+            log.debug("[Poll] Skipping non-MoMo transaction txnId={}, method={}",
+                    transaction.getTransactionId(), transaction.getPaymentMethod());
             return;
         }
 

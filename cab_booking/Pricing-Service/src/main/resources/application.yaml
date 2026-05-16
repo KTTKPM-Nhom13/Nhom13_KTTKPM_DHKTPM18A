@@ -74,6 +74,9 @@ services:
     estimate-path: ${ETA_ESTIMATE_PATH:/internal/eta/estimate}
 
 management:
+  tracing:
+    sampling:
+      probability: 1.0
   endpoints:
     web:
       exposure:
@@ -86,6 +89,48 @@ management:
       enabled: true
     redis:
       enabled: true
+    circuitbreakers:
+      enabled: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      mapbox:
+        sliding-window-size: 20
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+      openMeteo:
+        sliding-window-size: 20
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+  timelimiter:
+    instances:
+      mapbox:
+        timeout-duration: 3s
+      openMeteo:
+        timeout-duration: 3s
+  retry:
+    instances:
+      mapbox:
+        max-attempts: 2
+        wait-duration: 200ms
+      openMeteo:
+        max-attempts: 2
+        wait-duration: 200ms
+  ratelimiter:
+    instances:
+      mapbox:
+        limit-for-period: 50
+        limit-refresh-period: 1s
+        timeout-duration: 0s
+      openMeteo:
+        limit-for-period: 50
+        limit-refresh-period: 1s
+        timeout-duration: 0s
 
 logging:
   level:
@@ -98,26 +143,31 @@ logging:
 
 pricing:
   calculation:
-    base-fare: 2.50
-    per-km-rate: 1.50
-    per-minute-rate: 0.25
-    minimum-fare: 5.00
+    base-fare: 12000
+    per-km-rate: 8500
+    per-minute-rate: 1200
+    minimum-fare: 25000
+    platform-fee: 2000
+    airport-fee: 0
+    toll-fee: 0
+    currency: VND
+    config-version: v1
   vehicle:
     economy:
       multiplier: 1.0
-      base-fare: 2.50
-      per-km: 1.50
-      per-minute: 0.20
+      base-fare: 12000
+      per-km: 8500
+      per-minute: 1200
     comfort:
       multiplier: 1.5
-      base-fare: 5.00
-      per-km: 2.50
-      per-minute: 0.40
+      base-fare: 18000
+      per-km: 12000
+      per-minute: 1600
     premium:
       multiplier: 2.0
-      base-fare: 10.00
-      per-km: 4.00
-      per-minute: 0.75
+      base-fare: 30000
+      per-km: 18000
+      per-minute: 2500
   surge:
     default-multiplier: 1.0
     min-multiplier: 1.0
@@ -126,6 +176,20 @@ pricing:
     cache-ttl-seconds: 300
     metrics-ttl-seconds: 600
     scheduler-fixed-delay-ms: 60000
+    high-demand-ratio: 1.5
+    very-high-demand-ratio: 3.0
+    high-demand-adjustment: 0.2
+    very-high-demand-adjustment: 0.5
+    rush-hour-adjustment: 0.2
+    night-adjustment: 0.1
+    manual-adjustment: 0.0
+  weather:
+    bad-weather-adjustment: 0.2
+  cache:
+    weather-ttl-seconds: 1800
+    route-ttl-seconds: 300
+  estimate:
+    expiry-scheduler-fixed-delay-ms: 60000
   eta:
     fallback-duration-minutes: 15
 
