@@ -4,6 +4,8 @@ import com.nimbusds.jose.jwk.JWK;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
@@ -20,10 +22,21 @@ public final class JwtSupport {
         return NimbusJwtDecoder.withPublicKey(loadPublicKey()).build();
     }
 
+    public static ReactiveJwtDecoder createReactiveJwtDecoder() throws Exception {
+        return NimbusReactiveJwtDecoder.withPublicKey(loadPublicKey()).build();
+    }
+
     public static RSAPublicKey loadPublicKey() throws Exception {
-        String privateKeyPem = System.getenv("JWT_PRIVATE_KEY");
-        if (privateKeyPem != null && !privateKeyPem.isBlank()) {
-            return derivePublicKey(privateKeyPem);
+        try {
+            ClassPathResource publicKeyResource = new ClassPathResource("certs/public_key.pem");
+            if (publicKeyResource.exists()) {
+                String publicPem = new String(publicKeyResource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                if (!publicPem.isBlank()) {
+                    return JWK.parseFromPEMEncodedObjects(publicPem).toRSAKey().toRSAPublicKey();
+                }
+            }
+        } catch (Exception ignored) {
+            // Fall back to private_key.pem or env if public key is not present.
         }
 
         try {
@@ -35,12 +48,11 @@ public final class JwtSupport {
                 }
             }
         } catch (Exception ignored) {
-            // Fall back to public_key.pem for services that only ship the public key.
+            // Fall back to env key if classpath keys are missing.
         }
 
-        ClassPathResource resource = new ClassPathResource("certs/public_key.pem");
-        String pem = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        return JWK.parseFromPEMEncodedObjects(pem).toRSAKey().toRSAPublicKey();
+        // Require classpath resource files under `certs/` (do not fall back to env).
+        throw new IllegalStateException("No JWT public/private key available on classpath (certs/public_key.pem or certs/private_key.pem)");
     }
 
     private static RSAPublicKey derivePublicKey(String privateKeyPem) throws Exception {

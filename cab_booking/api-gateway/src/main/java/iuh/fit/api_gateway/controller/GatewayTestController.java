@@ -47,7 +47,7 @@ public class GatewayTestController {
         )));
     }
 
-    @GetMapping("/verify")
+    @PostMapping("/gateway/verify")
     public Map<String, Object> testVerify(@RequestBody String token) {
         Jwt jwt = jwtDecoder.decode(token);
         return

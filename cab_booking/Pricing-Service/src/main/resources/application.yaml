@@ -194,7 +194,7 @@ pricing:
     fallback-duration-minutes: 15
 
 mapbox:
-  api-key: ${MAPBOX_API_KEY}
+  api-key: ${MAPBOX_API_KEY:dummy_mapbox_key}
 
 feign:
   client:

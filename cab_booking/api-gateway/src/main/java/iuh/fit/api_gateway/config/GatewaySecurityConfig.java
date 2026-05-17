@@ -3,10 +3,13 @@ package iuh.fit.api_gateway.config;
 import iuh.fit.common.config.JwtSupport;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
@@ -20,19 +23,20 @@ public class GatewaySecurityConfig {
     private static final String[] PUBLIC_URLS = {
             "/auth/**",
             "/api/auth/**",
-            "/api/users/**",
-            "/api/drivers/**",
+            // "/api/users/**",
+            // "/api/drivers/**",
+            "/gateway/**",
             "/eureka/**",
-            "/eta/**",
-            "/api/eta/**",
-            "/api/notifications/**",
-            "/api/reviews/**",
-            "/api/pricing/**",
-            "/pricing/**"
+            // "/eta/**",
+            // "/api/eta/**",
+            // "/api/notifications/**",
+            // "/api/reviews/**",
+            // "/api/pricing/**",
+            // "/pricing/**"
     };
 
     @Bean
-    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) throws Exception {
+    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http, ReactiveJwtDecoder reactiveJwtDecoder) throws Exception {
         http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -41,7 +45,20 @@ public class GatewaySecurityConfig {
                         .pathMatchers(PUBLIC_URLS).permitAll()
                         .pathMatchers("/api/notifications/**").permitAll()
                         .pathMatchers("/api/reviews/**").permitAll()
-                        .anyExchange().authenticated());
+                        .anyExchange().authenticated())
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtDecoder(reactiveJwtDecoder)));
+
+        return http.build();
+    }
+
+    @Order(1)
+    @Bean
+    public SecurityWebFilterChain publicSecurityWebFilterChain(ServerHttpSecurity http) throws Exception {
+        http
+                .securityMatcher(ServerWebExchangeMatchers.pathMatchers(PUBLIC_URLS))
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .authorizeExchange(ex -> ex.anyExchange().permitAll());
 
         return http.build();
     }
@@ -61,6 +78,11 @@ public class GatewaySecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
+    }
+
+    @Bean
+    public ReactiveJwtDecoder reactiveJwtDecoder() throws Exception {
+        return JwtSupport.createReactiveJwtDecoder();
     }
 
     @Bean
