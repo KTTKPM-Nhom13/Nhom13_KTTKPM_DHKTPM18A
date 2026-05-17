@@ -21,7 +21,7 @@ public class PricingSecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(parsePublicEndpoints()).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/pricing/estimate").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/pricing/estimate").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/pricing/confirm/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/pricing/calculate").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/pricing/surge/**").authenticated()

@@ -39,6 +39,18 @@ spring:
           predicates:
             - Path=/api/notifications/**
 
+        # Socket.IO WebSockets Route
+        - id: notification-service-websocket
+          uri: ws://notification-service:9093
+          predicates:
+            - Path=/socket.io/**
+
+        # Socket.IO HTTP Polling Fallback
+        - id: notification-service-socketio-http
+          uri: http://notification-service:9093
+          predicates:
+            - Path=/socket.io/**
+
         - id: user-service
           uri: lb://user-service
           predicates:

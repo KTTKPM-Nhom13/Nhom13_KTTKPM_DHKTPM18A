@@ -31,7 +31,7 @@ public class GatewaySecurityConfig {
             // "/api/eta/**",
             // "/api/notifications/**",
             // "/api/reviews/**",
-            // "/api/pricing/**",
+            "/api/pricing/**",
             // "/pricing/**"
     };
 

@@ -18,7 +18,7 @@ public class RideEventConsumer {
     private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
 
-    @KafkaListener(topics = {"ride.created", "ride.assigned", "ride.finished", "ride.arrived", "ride.started", "booking-events", "pricing.surge.updated"}, groupId = "notification-group")
+    @KafkaListener(topics = {"ride.created", "ride.assigned", "ride.accepted", "ride.rejected", "ride.finished", "ride.arrived", "ride.started", "booking-events", "booking.timeout", "payment.completed", "pricing.surge.updated"}, groupId = "notification-group")
     public void consumeRideEvents(String message, @Header(KafkaHeaders.RECEIVED_TOPIC) String topic) {
         log.info("Consumed raw event from topic {}: {}", topic, message);
         
@@ -54,8 +54,20 @@ public class RideEventConsumer {
                         notificationMessage = "Đang tìm tài xế gần nhất cho bạn...";
                         break;
                     case "ride.assigned":
+                    case "ride.accepted":
                         String driverId = String.valueOf(event.getOrDefault("driverId", "unknown"));
                         notificationMessage = String.format("Đã tìm thấy tài xế! Tài xế đang đến điểm đón của bạn.");
+                        break;
+                    case "ride.rejected":
+                        notificationMessage = "Tài xế đã từ chối. Đang tìm tài xế khác cho bạn...";
+                        break;
+                    case "booking.timeout":
+                        notificationMessage = "Rất tiếc, hiện tại không tìm thấy tài xế nào xung quanh. Vui lòng thử lại sau ít phút.";
+                        title = "Booking Timeout";
+                        break;
+                    case "payment.completed":
+                        notificationMessage = "Thanh toán thành công! Chúc bạn một ngày tốt lành.";
+                        title = "Payment Successful";
                         break;
                     case "ride.finished":
                         notificationMessage = "Chuyến đi đã hoàn thành. Cảm ơn bạn đã sử dụng dịch vụ!";

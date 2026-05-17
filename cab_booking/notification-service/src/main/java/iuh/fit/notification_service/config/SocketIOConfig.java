@@ -11,7 +11,7 @@ public class SocketIOConfig {
     @Value("${socket-server.host:localhost}")
     private String host;
 
-    @Value("${socket-server.port:9092}")
+    @Value("${socket-server.port:9093}")
     private Integer port;
 
     @Bean

@@ -171,6 +171,16 @@ public class BookingServiceImpl implements BookingService {
         log.info("✅ Driver {} accepted booking {}", driverId, bookingId);
 
         // BƯỚC 5: Gửi Kafka event RideAcceptedEvent (publish cho downstream services nếu cần)
+        com.cab.booking.core.dto.event.outbound.RideAcceptedEvent event = com.cab.booking.core.dto.event.outbound.RideAcceptedEvent.builder()
+                .eventId(UUID.randomUUID().toString())
+                .type("RideAccepted")
+                .rideId(bookingId.toString())
+                .customerId(booking.getCustomerId())
+                .driverId(driverId)
+                .timestamp(Instant.now().toString())
+                .build();
+        bookingEventPublisher.publishRideAccepted(event);
+
         redisTemplate.opsForValue().set("booking:" + bookingId, booking, Duration.ofHours(2));
 
         return BookingResponse.fromEntity(booking);
