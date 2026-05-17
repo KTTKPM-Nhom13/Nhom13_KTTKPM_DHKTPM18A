@@ -1,0 +1,164 @@
+{
+	"info": {
+		"_postman_id": "893c5e04-e3d2-4ee8-b2c6-d471f0d359fc",
+		"name": "Cab Booking System - Administrator Suite",
+		"description": "Dedicated API Collection for administering the Cab Booking ecosystem, including default administrator logins, secure role creation, and permission gating.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Admin Login",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var response = pm.response.json();",
+							"if (response && response.result && response.result.accessToken) {",
+							"    pm.environment.set(\"admin_access_token\", response.result.accessToken);",
+							"    pm.collectionVariables.set(\"admin_access_token\", response.result.accessToken);",
+							"    pm.test(\"Admin Access Token parsed and saved successfully\", function () {",
+							"        pm.expect(response.result.accessToken).to.not.be.null;",
+							"    });",
+							"}"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"email\": \"admin@cab.local\",\n  \"password\": \"AdminPassword123\",\n  \"deviceId\": \"admin-postman-console\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Client\",\n  \"appVersion\": \"1.0.0\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{gateway_url}}/api/auth/login",
+					"host": [
+						"{{gateway_url}}"
+					],
+					"path": [
+						"api",
+						"auth",
+						"login"
+					]
+				},
+				"description": "Authenticates as the default seeded administrator user (`admin@cab.local` / `AdminPassword123`) and saves the bearer access token into `{{admin_access_token}}` automatically."
+			},
+			"response": []
+		},
+		{
+			"name": "2. Create New Admin (Authorized)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{admin_access_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"fullName\": \"Secondary Administrator\",\n  \"email\": \"sub-admin.postman@cab.local\",\n  \"password\": \"AdminPassword456\",\n  \"phoneNumber\": \"0988888888\",\n  \"avatarUrl\": \"\",\n  \"deviceId\": \"sub-admin-device\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Client\",\n  \"appVersion\": \"1.0.0\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{gateway_url}}/api/auth/admin/register",
+					"host": [
+						"{{gateway_url}}"
+					],
+					"path": [
+						"api",
+						"auth",
+						"admin",
+						"register"
+					]
+				},
+				"description": "Registers a new system administrator. Enforces that only an already authenticated administrator (bearer token) is permitted to call this endpoint. Non-admin calls are immediately rejected with `403 Forbidden`."
+			},
+			"response": []
+		},
+		{
+			"name": "3. Get Self Profile (Admin)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{admin_access_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{gateway_url}}/api/users/me/profile",
+					"host": [
+						"{{gateway_url}}"
+					],
+					"path": [
+						"api",
+						"users",
+						"me",
+						"profile"
+					]
+				},
+				"description": "Retrieves the administrator's profile through the gateway, showcasing dynamic role mappings and claims propagation."
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "gateway_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "admin_access_token",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

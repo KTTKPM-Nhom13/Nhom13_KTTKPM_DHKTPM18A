@@ -1,7 +1,9 @@
 package iuh.fit.driverservice.dto.request;
 
+import iuh.fit.driverservice.entity.VehicleType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AccessLevel;
 import lombok.Data;
@@ -28,9 +30,8 @@ public class UpsertDriverProfileRequest {
     @Size(max = 100)
     String licenseNumber;
 
-    @NotBlank
-    @Size(max = 50)
-    String vehicleType;
+    @NotNull(message = "Vehicle type is required")
+    VehicleType vehicleType;
 
     @NotBlank
     @Size(max = 50)

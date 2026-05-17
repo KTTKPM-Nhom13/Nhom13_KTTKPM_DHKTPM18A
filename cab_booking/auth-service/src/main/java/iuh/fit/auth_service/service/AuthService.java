@@ -144,6 +144,35 @@ public class AuthService {
         return response;
     }
 
+    @Transactional
+    public AuthTokenResponse registerAdmin(RegisterRequest request) {
+        AuthUser currentUser = getAuthenticatedUser();
+        if (currentUser.getRole() != UserRole.ADMIN) {
+            throw new AppException(ErrorCode.UNAUTHORIZED_ACCESS);
+        }
+
+        String email = normalizeEmail(request.getEmail());
+        ensureEmailAvailable(email);
+
+        AuthUser user = new AuthUser();
+        user.setEmail(email);
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setFullName(request.getFullName());
+        user.setPhoneNumber(request.getPhoneNumber());
+        user.setAvatarUrl(resolveAvatar(request.getAvatarUrl(), request.getFullName()));
+        user.setRole(UserRole.ADMIN);
+        user.setProvider(AuthProvider.LOCAL_EMAIL);
+        user.setEmailVerified(true);
+        user.setActive(true);
+        user.setAccountStatus(AccountLifecycleStatus.ACTIVE);
+        user.setLastLoginAt(LocalDateTime.now());
+
+        AuthUser savedUser = authUserRepository.save(user);
+        return createSessionResponse(savedUser, request.getDeviceId(), request.getPlatform(),
+                request.getUserAgent(), request.getAppVersion());
+    }
+
+
     /*
     Old OTP-guarded register flow kept for reference:
     RegistrationEmailOtp verifiedOtp = getVerifiedOtpForRegistration(email);

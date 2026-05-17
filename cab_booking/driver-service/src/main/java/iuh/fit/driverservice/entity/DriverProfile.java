@@ -39,8 +39,9 @@ public class DriverProfile extends BaseEntity {
     @Column(name = "license_number", length = 100)
     String licenseNumber;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "vehicle_type", length = 50)
-    String vehicleType;
+    VehicleType vehicleType;
 
     @Column(name = "vehicle_plate", length = 50)
     String vehiclePlate;
