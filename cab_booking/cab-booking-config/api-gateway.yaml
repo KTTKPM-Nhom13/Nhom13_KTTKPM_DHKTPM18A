@@ -54,6 +54,31 @@ spring:
           predicates:
             - Path=/api/reviews/**
 
+        - id: booking-service
+          uri: lb://booking-service
+          predicates:
+            - Path=/api/v1/bookings/**
+
+        - id: ride-service
+          uri: lb://ride-service
+          predicates:
+            - Path=/api/v1/rides/**
+
+        - id: pricing-service
+          uri: lb://pricing-service
+          predicates:
+            - Path=/api/pricing/**
+
+        - id: payment-service
+          uri: lb://payment-service
+          predicates:
+            - Path=/api/payments/**
+
+        - id: ai-scoring-service
+          uri: http://cab-ai-scoring-service:8000
+          predicates:
+            - Path=/api/v1/ai/**
+
       default-filters:
         - name: Retry
           args:

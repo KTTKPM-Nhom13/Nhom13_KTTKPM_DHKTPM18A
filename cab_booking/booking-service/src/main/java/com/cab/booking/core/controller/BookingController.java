@@ -38,6 +38,11 @@ public class BookingController {
 
     private final BookingService bookingService;
 
+    @GetMapping("/health")
+    public ApiResponse<String> health() {
+        return ApiResponse.success("OK", "booking-service is running");
+    }   
+
     // ============================================================
     // HEALTH CHECK — Không yêu cầu xác thực (public)
     // ============================================================
