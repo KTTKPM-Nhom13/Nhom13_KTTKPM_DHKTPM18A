@@ -11,22 +11,35 @@ http://localhost:8083/api/pricing
 
 Tạo ước tính cước phí cho một chuyến đi.
 
-**Endpoint:** `GET /api/pricing/estimate`
+**Endpoint:** `POST /api/pricing/estimate`
 
-**Query Parameters:**
+**Request Body:**
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
+```json
+{
+  "pickupLat": 10.76,
+  "pickupLng": 106.70,
+  "dropoffLat": 10.78,
+  "dropoffLng": 106.73,
+  "vehicleType": "ECONOMY",
+  "estimatedDurationMinutes": 15
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
 | `pickupLat` | double | Yes | Vĩ độ điểm đón |
 | `pickupLng` | double | Yes | Kinh độ điểm đón |
 | `dropoffLat` | double | Yes | Vĩ độ điểm trả |
 | `dropoffLng` | double | Yes | Kinh độ điểm trả |
 | `vehicleType` | string | Yes | Loại xe: `ECONOMY`, `COMFORT`, `PREMIUM` |
-| `estimatedDurationMinutes` | int | Yes | Thời gian ước tính (phút) |
+| `estimatedDurationMinutes` | int | No | Thời gian ước tính (phút) |
 
 **Example Request:**
 ```bash
-curl "http://localhost:8083/api/pricing/estimate?pickupLat=10.76&pickupLng=106.70&dropoffLat=10.78&dropoffLng=106.73&vehicleType=ECONOMY&estimatedDurationMinutes=15"
+curl -X POST "http://localhost:8083/api/pricing/estimate" \
+  -H "Content-Type: application/json" \
+  -d '{"pickupLat": 10.76, "pickupLng": 106.70, "dropoffLat": 10.78, "dropoffLng": 106.73, "vehicleType": "ECONOMY", "estimatedDurationMinutes": 15}'
 ```
 
 **Response:**
@@ -176,15 +189,19 @@ Cập nhật surge multiplier cho một zone.
 **Request Body:**
 ```json
 {
-  "surgeMultiplier": 1.5
+  "multiplier": 1.5
 }
 ```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `multiplier` | number | Yes | Giá trị surge multiplier mới |
 
 **Example Request:**
 ```bash
 curl -X PUT "http://localhost:8083/api/pricing/surge/Z60206" \
   -H "Content-Type: application/json" \
-  -d '{"surgeMultiplier": 1.5}'
+  -d '{"multiplier": 1.5}'
 ```
 
 **Response:**
@@ -199,7 +216,47 @@ curl -X PUT "http://localhost:8083/api/pricing/surge/Z60206" \
 
 ---
 
-## 6. Get Pricing Configuration
+## 6. Update Demand & Supply Metrics (Admin)
+
+Cập nhật metrics demand/supply để tính surge pricing.
+
+**Endpoint:** `POST /api/pricing/demand-supply`
+
+**Request Body:**
+```json
+{
+  "zoneId": "Z60206",
+  "activeDrivers": 10,
+  "pendingRides": 30
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `zoneId` | string | Yes | Zone ID cần cập nhật |
+| `activeDrivers` | int | Yes | Số driver đang hoạt động |
+| `pendingRides` | int | Yes | Số ride đang chờ |
+
+**Example Request:**
+```bash
+curl -X POST "http://localhost:8083/api/pricing/demand-supply" \
+  -H "Content-Type: application/json" \
+  -d '{"zoneId": "Z60206", "activeDrivers": 10, "pendingRides": 30}'
+```
+
+**Response:**
+```json
+{
+  "zone_id": "Z60206",
+  "active_drivers": 10,
+  "pending_rides": 30,
+  "message": "Demand/supply metrics cached successfully."
+}
+```
+
+---
+
+## 7. Get Pricing Configuration
 
 Lấy cấu hình giá hiện tại.
 
@@ -245,6 +302,241 @@ curl "http://localhost:8083/api/pricing/config"
     "maxMultiplier": 3.0,
     "cacheTtlSeconds": 60
   }
+}
+```
+
+---
+
+## 8. Get Estimate By ID
+
+Lấy thông tin estimate theo ID.
+
+**Endpoint:** `GET /api/pricing/estimate/{estimateId}`
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `estimateId` | string (UUID) | Yes | ID của estimate cần lấy |
+
+**Example Request:**
+```bash
+curl "http://localhost:8083/api/pricing/estimate/f1365e9d-074c-4b24-90d3-d7762235755d"
+```
+
+**Response (200 OK):**
+```json
+{
+  "estimateId": "f1365e9d-074c-4b24-90d3-d7762235755d",
+  "pickupZone": "Z60206",
+  "dropoffZone": "Z60206",
+  "vehicleType": "ECONOMY",
+  "distanceKm": 3.96,
+  "durationMinutes": 15,
+  "baseFare": 12000,
+  "distanceFare": 33660,
+  "timeFare": 18000,
+  "platformFee": 2000,
+  "surgeMultiplier": 1.0,
+  "totalFare": 55660,
+  "currency": "VND",
+  "status": "PENDING",
+  "expiresAt": "2026-05-18T20:30:00",
+  "message": "Fare estimate generated successfully"
+}
+```
+
+**Response (404 Not Found):**
+```json
+{
+  "error": "ESTIMATE_NOT_FOUND",
+  "message": "Estimate with ID xxx not found",
+  "estimateId": "xxx"
+}
+```
+
+---
+
+## 9. Cancel Estimate
+
+Hủy một estimate đang ở trạng thái PENDING.
+
+**Endpoint:** `DELETE /api/pricing/estimate/{estimateId}`
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `estimateId` | string (UUID) | Yes | ID của estimate cần hủy |
+
+**Example Request:**
+```bash
+curl -X DELETE "http://localhost:8083/api/pricing/estimate/f1365e9d-074c-4b24-90d3-d7762235755d"
+```
+
+**Response (200 OK):**
+```json
+{
+  "estimateId": "f1365e9d-074c-4b24-90d3-d7762235755d",
+  "status": "CANCELLED",
+  "message": "Estimate cancelled successfully"
+}
+```
+
+**Response (400 Bad Request - Estimate không ở trạng thái PENDING):**
+```json
+{
+  "error": "INVALID_STATUS",
+  "message": "Estimate is not in PENDING status and cannot be cancelled. Current status: CONFIRMED",
+  "estimateId": "f1365e9d-074c-4b24-90d3-d7762235755d",
+  "currentStatus": "CONFIRMED"
+}
+```
+
+**Response (404 Not Found):**
+```json
+{
+  "error": "ESTIMATE_NOT_FOUND",
+  "message": "Estimate with ID xxx not found",
+  "estimateId": "xxx"
+}
+```
+
+---
+
+## 10. Compute Surge Multiplier
+
+Trigger tính surge multiplier thủ công cho một zone dựa trên demand/supply metrics hiện tại.
+
+**Endpoint:** `POST /api/pricing/surge/compute/{zoneId}`
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `zoneId` | string | Yes | Zone ID cần tính surge |
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `badWeather` | boolean | No | false | Có tính thời tiết xấu không |
+
+**Example Request:**
+```bash
+curl -X POST "http://localhost:8083/api/pricing/surge/compute/Z60206?badWeather=true"
+```
+
+**Response (200 OK):**
+```json
+{
+  "zone_id": "Z60206",
+  "previous_multiplier": 1.0,
+  "predicted_multiplier": 1.5,
+  "updated": true,
+  "message": "Surge multiplier updated"
+}
+```
+
+**Response khi surge không thay đổi (dưới threshold):**
+```json
+{
+  "zone_id": "Z60206",
+  "previous_multiplier": 1.0,
+  "predicted_multiplier": 1.05,
+  "updated": false,
+  "message": "Surge multiplier unchanged (below threshold)"
+}
+```
+
+---
+
+## 11. Get Zone Metrics
+
+Lấy thông tin demand/supply metrics của một zone.
+
+**Endpoint:** `GET /api/pricing/zones/{zoneId}/metrics`
+
+**Path Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `zoneId` | string | Yes | Zone ID cần lấy metrics |
+
+**Example Request:**
+```bash
+curl "http://localhost:8083/api/pricing/zones/Z60206/metrics"
+```
+
+**Response (200 OK):**
+```json
+{
+  "zone_id": "Z60206",
+  "active_drivers": 10,
+  "pending_rides": 30,
+  "updated_at": "2026-05-18T20:25:00Z",
+  "demand_ratio": "3.00"
+}
+```
+
+**Response (404 Not Found - Không có metrics cho zone):**
+```json
+{
+  "zone_id": "Z60206",
+  "error": "METRICS_NOT_FOUND",
+  "message": "No metrics found for zone: Z60206"
+}
+```
+
+---
+
+## 12. List Estimates
+
+Liệt kê các estimate với bộ lọc.
+
+**Endpoint:** `GET /api/pricing/estimates`
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `status` | string | No | - | Lọc theo status: PENDING, CONFIRMED, EXPIRED, CANCELLED |
+| `vehicleType` | string | No | - | Lọc theo loại xe: ECONOMY, COMFORT, PREMIUM |
+| `pickupZone` | string | No | - | Lọc theo pickup zone |
+| `limit` | int | No | 50 | Số lượng kết quả tối đa |
+| `offset` | int | No | 0 | Vị trí bắt đầu (pagination) |
+
+**Example Request:**
+```bash
+curl "http://localhost:8083/api/pricing/estimates?status=PENDING&limit=10&offset=0"
+```
+
+**Response (200 OK):**
+```json
+{
+  "estimates": [
+    {
+      "estimateId": "f1365e9d-074c-4b24-90d3-d7762235755d",
+      "pickupZone": "Z60206",
+      "dropoffZone": "Z60206",
+      "vehicleType": "ECONOMY",
+      "distanceKm": 3.96,
+      "durationMinutes": 15,
+      "baseFare": 12000,
+      "distanceFare": 33660,
+      "timeFare": 18000,
+      "platformFee": 2000,
+      "surgeMultiplier": 1.0,
+      "totalFare": 55660,
+      "currency": "VND",
+      "status": "PENDING",
+      "expiresAt": "2026-05-18T20:30:00",
+      "message": "Fare estimate generated successfully"
+    }
+  ],
+  "count": 1,
+  "limit": 10,
+  "offset": 0
 }
 ```
 

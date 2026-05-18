@@ -21,7 +21,7 @@ public class PricingSecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(parsePublicEndpoints()).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/pricing/estimate").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/pricing/estimate").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/pricing/confirm/**").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/pricing/calculate").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/pricing/surge/**").authenticated()
@@ -29,8 +29,6 @@ public class PricingSecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/pricing/test-mapbox").hasAnyAuthority(
                                 "SCOPE_pricing:admin", "SCOPE_admin", "SCOPE_ADMIN", "ROLE_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/pricing/demand-supply").hasAnyAuthority(
-                                "SCOPE_pricing:write", "SCOPE_pricing:admin", "SCOPE_admin", "SCOPE_ADMIN", "ROLE_ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/pricing/surge/**").hasAnyAuthority(
                                 "SCOPE_pricing:write", "SCOPE_pricing:admin", "SCOPE_admin", "SCOPE_ADMIN", "ROLE_ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/pricing/surge/**").hasAnyAuthority(
                                 "SCOPE_pricing:write", "SCOPE_pricing:admin", "SCOPE_admin", "SCOPE_ADMIN", "ROLE_ADMIN")

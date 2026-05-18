@@ -31,8 +31,12 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+
+import org.springframework.http.ResponseEntity;
 
 @Service
 @RequiredArgsConstructor
@@ -217,6 +221,63 @@ public class PricingService {
     public void processDemandSupplyUpdate(String zoneId, int activeDrivers, int pendingRides) {
         surgePricingService.updateCurrentZoneMetrics(zoneId, activeDrivers, pendingRides);
         log.info("Demand/supply metrics cached for zone {}.",                zoneId);
+    }
+
+    public Optional<FareEstimate> getEstimateById(String estimateId) {
+        return fareEstimateRepository.findById(estimateId);
+    }
+
+    public ResponseEntity<Map<String, Object>> cancelEstimate(String estimateId) {
+        Optional<FareEstimate> existingOpt = fareEstimateRepository.findById(estimateId);
+
+        if (existingOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of(
+                    "error", "ESTIMATE_NOT_FOUND",
+                    "message", "Estimate with ID " + estimateId + " not found",
+                    "estimateId", estimateId
+            ));
+        }
+
+        FareEstimate existing = existingOpt.get();
+
+        if (!FareEstimate.EstimateStatus.PENDING.name().equals(existing.getStatus())) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "INVALID_STATUS",
+                    "message", "Estimate is not in PENDING status and cannot be cancelled. Current status: " + existing.getStatus(),
+                    "estimateId", estimateId,
+                    "currentStatus", existing.getStatus()
+            ));
+        }
+
+        existing.setStatus(FareEstimate.EstimateStatus.CANCELLED.name());
+        fareEstimateRepository.save(existing);
+
+        log.info("Estimate cancelled - estimateId: {}, previousStatus: PENDING", estimateId);
+
+        return ResponseEntity.ok(Map.of(
+                "estimateId", estimateId,
+                "status", "CANCELLED",
+                "message", "Estimate cancelled successfully"
+        ));
+    }
+
+    public List<FareEstimate> listEstimates(String status, String vehicleType, String pickupZone, int limit, int offset) {
+        List<FareEstimate> allEstimates;
+
+        if (status != null && !status.isBlank()) {
+            allEstimates = fareEstimateRepository.findByStatus(status.toUpperCase());
+        } else if (vehicleType != null && !vehicleType.isBlank()) {
+            allEstimates = fareEstimateRepository.findByVehicleType(vehicleType.toUpperCase());
+        } else if (pickupZone != null && !pickupZone.isBlank()) {
+            allEstimates = fareEstimateRepository.findByPickupZone(pickupZone);
+        } else {
+            allEstimates = fareEstimateRepository.findAll();
+        }
+
+        int fromIndex = Math.min(offset, allEstimates.size());
+        int toIndex = Math.min(offset + limit, allEstimates.size());
+
+        return allEstimates.subList(fromIndex, toIndex);
     }
 
     public Map<String, Object> testMapboxConnection() {
