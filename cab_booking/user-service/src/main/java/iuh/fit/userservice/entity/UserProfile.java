@@ -65,4 +65,16 @@ public class UserProfile extends BaseEntity {
 
     @OneToMany(mappedBy = "userProfile", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     List<UserDevice> devices = new ArrayList<>();
+
+    public String getUserId() {
+        return getId() != null ? getId().toString() : null;
+    }
+
+    public boolean isEmailVerified() {
+        return true;
+    }
+
+    public LocalDateTime getLastLoginAt() {
+        return getUpdatedAt() != null ? getUpdatedAt() : LocalDateTime.now();
+    }
 }

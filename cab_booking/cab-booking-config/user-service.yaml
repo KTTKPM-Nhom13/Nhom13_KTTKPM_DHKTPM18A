@@ -30,3 +30,7 @@ eureka:
 integration:
   auth-service:
     url: ${AUTH_SERVICE_URL:http://auth-service:8081}
+
+app:
+  security:
+    public-endpoints: /api/users/**,/api/admin/users/**

@@ -66,6 +66,15 @@ public class AuthController {
                 .build();
     }
 
+    @PostMapping("/admin/register")
+    public ApiResponse<AuthTokenResponse> registerAdmin(@Valid @RequestBody RegisterRequest request) {
+        return ApiResponse.<AuthTokenResponse>builder()
+                .message("Admin registered successfully")
+                .result(authService.registerAdmin(request))
+                .build();
+    }
+
+
     /*
     Old alias for registration OTP flow.
     @PostMapping("/register/email")
