@@ -202,7 +202,7 @@ public class PricingController {
         Map<String, Object> response = Map.of(
                 "zone_id", zoneId,
                 "surge_multiplier", multiplier,
-                "message", "Surge multiplier updated and event published"
+                "message", "Surge multiplier updated successfully"
         );
 
         return ResponseEntity.ok(response);
@@ -254,7 +254,7 @@ public class PricingController {
                 "zone_id", zoneId,
                 "active_drivers", activeDrivers,
                 "pending_rides", pendingRides,
-                "message", "Demand/supply metrics cached. Surge update is handled asynchronously by scheduler."
+                "message", "Demand/supply metrics cached successfully."
         );
 
         return ResponseEntity.ok(response);

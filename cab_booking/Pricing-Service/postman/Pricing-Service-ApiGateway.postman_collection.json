@@ -1,0 +1,245 @@
+{
+  "info": {
+    "_postman_id": "b7ce0d3a-5e2d-4f6b-87f7-4f4f8a7b51c4",
+    "name": "Pricing Service - API Gateway Port Smoke",
+    "description": "Smoke tests for Pricing Service through API Gateway. Default BASE_URL uses gateway port 8080.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Gateway Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{BASE_URL}}/gateway/health",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "gateway",
+            "health"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Gateway is reachable on BASE_URL', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "Pricing Config Through Gateway",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{JWT_TOKEN}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/pricing/config",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "pricing",
+            "config"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Pricing config is returned through API Gateway', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.calculation.currency).to.eql('VND');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "Calculate Simple Price Through Gateway",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{JWT_TOKEN}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"distanceKm\": {{simple_distance_km}},\n  \"demandIndex\": {{simple_demand_index}}\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/api/pricing/calculate",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "pricing",
+            "calculate"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Simple price is calculated through API Gateway', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(Number(json.totalFare)).to.be.above(0);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    },
+    {
+      "name": "Estimate Fare Through Gateway",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{JWT_TOKEN}}",
+            "type": "text"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "gateway-estimate-{{$timestamp}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/pricing/estimate?pickupLat={{pickup_lat}}&pickupLng={{pickup_lng}}&dropoffLat={{dropoff_lat}}&dropoffLng={{dropoff_lng}}&vehicleType={{vehicle_type}}",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "pricing",
+            "estimate"
+          ],
+          "query": [
+            {
+              "key": "pickupLat",
+              "value": "{{pickup_lat}}"
+            },
+            {
+              "key": "pickupLng",
+              "value": "{{pickup_lng}}"
+            },
+            {
+              "key": "dropoffLat",
+              "value": "{{dropoff_lat}}"
+            },
+            {
+              "key": "dropoffLng",
+              "value": "{{dropoff_lng}}"
+            },
+            {
+              "key": "vehicleType",
+              "value": "{{vehicle_type}}"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Fare estimate is returned through API Gateway', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.estimateId).to.be.a('string');",
+              "  pm.expect(json.currency).to.eql('VND');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "JWT_TOKEN",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "pickup_lat",
+      "value": "10.8231",
+      "type": "string"
+    },
+    {
+      "key": "pickup_lng",
+      "value": "106.6297",
+      "type": "string"
+    },
+    {
+      "key": "dropoff_lat",
+      "value": "10.7626",
+      "type": "string"
+    },
+    {
+      "key": "dropoff_lng",
+      "value": "106.6601",
+      "type": "string"
+    },
+    {
+      "key": "vehicle_type",
+      "value": "ECONOMY",
+      "type": "string"
+    },
+    {
+      "key": "simple_distance_km",
+      "value": "5.5",
+      "type": "string"
+    },
+    {
+      "key": "simple_demand_index",
+      "value": "1.2",
+      "type": "string"
+    }
+  ]
+}

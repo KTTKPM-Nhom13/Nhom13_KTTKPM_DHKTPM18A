@@ -422,3 +422,21 @@ Sai:
 ```text
 pickupLat=106.629770
 ```
+
+## API Gateway Port Smoke Collection
+
+Use this collection when you want to verify Pricing Service through API Gateway instead of calling Pricing Service directly:
+
+```text
+Pricing-Service-ApiGateway.postman_collection.json
+BASE_URL=http://localhost:8080
+```
+
+Requests in this collection call:
+
+```text
+GET  /gateway/health
+GET  /api/pricing/config
+POST /api/pricing/calculate
+GET  /api/pricing/estimate
+```
