@@ -469,10 +469,19 @@
             }
           ],
           "request": {
-            "method": "GET",
-            "header": [],
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLat\": {{pickup_lat}},\n  \"pickupLng\": {{pickup_lng}},\n  \"dropoffLat\": {{dropoff_lat}},\n  \"dropoffLng\": {{dropoff_lng}},\n  \"vehicleType\": \"{{vehicle_type}}\"\n}"
+            },
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/estimate?pickupLat={{pickup_lat}}&pickupLng={{pickup_lng}}&dropoffLat={{dropoff_lat}}&dropoffLng={{dropoff_lng}}&vehicleType={{vehicle_type}}",
+              "raw": "{{BASE_URL}}/api/pricing/estimate",
               "host": [
                 "{{BASE_URL}}"
               ],
@@ -480,28 +489,6 @@
                 "api",
                 "pricing",
                 "estimate"
-              ],
-              "query": [
-                {
-                  "key": "pickupLat",
-                  "value": "{{pickup_lat}}"
-                },
-                {
-                  "key": "pickupLng",
-                  "value": "{{pickup_lng}}"
-                },
-                {
-                  "key": "dropoffLat",
-                  "value": "{{dropoff_lat}}"
-                },
-                {
-                  "key": "dropoffLng",
-                  "value": "{{dropoff_lng}}"
-                },
-                {
-                  "key": "vehicleType",
-                  "value": "{{vehicle_type}}"
-                }
               ]
             }
           },
@@ -528,10 +515,19 @@
             }
           ],
           "request": {
-            "method": "GET",
-            "header": [],
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLat\": {{pickup_lat}},\n  \"pickupLng\": {{pickup_lng}},\n  \"dropoffLat\": {{dropoff_lat}},\n  \"dropoffLng\": {{dropoff_lng}},\n  \"vehicleType\": \"{{vehicle_type}}\"\n}"
+            },
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/estimate?pickupLat={{pickup_lat}}&pickupLng={{pickup_lng}}&dropoffLat={{dropoff_lat}}&dropoffLng={{dropoff_lng}}&vehicleType={{vehicle_type}}",
+              "raw": "{{BASE_URL}}/api/pricing/estimate",
               "host": [
                 "{{BASE_URL}}"
               ],
@@ -539,28 +535,6 @@
                 "api",
                 "pricing",
                 "estimate"
-              ],
-              "query": [
-                {
-                  "key": "pickupLat",
-                  "value": "{{pickup_lat}}"
-                },
-                {
-                  "key": "pickupLng",
-                  "value": "{{pickup_lng}}"
-                },
-                {
-                  "key": "dropoffLat",
-                  "value": "{{dropoff_lat}}"
-                },
-                {
-                  "key": "dropoffLng",
-                  "value": "{{dropoff_lng}}"
-                },
-                {
-                  "key": "vehicleType",
-                  "value": "{{vehicle_type}}"
-                }
               ]
             }
           },
@@ -768,10 +742,19 @@
             }
           ],
           "request": {
-            "method": "GET",
-            "header": [],
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLat\": 999,\n  \"pickupLng\": {{pickup_lng}},\n  \"dropoffLat\": {{dropoff_lat}},\n  \"dropoffLng\": {{dropoff_lng}},\n  \"vehicleType\": \"{{vehicle_type}}\"\n}"
+            },
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/estimate?pickupLat=999&pickupLng={{pickup_lng}}&dropoffLat={{dropoff_lat}}&dropoffLng={{dropoff_lng}}&vehicleType={{vehicle_type}}",
+              "raw": "{{BASE_URL}}/api/pricing/estimate",
               "host": [
                 "{{BASE_URL}}"
               ],
@@ -779,28 +762,6 @@
                 "api",
                 "pricing",
                 "estimate"
-              ],
-              "query": [
-                {
-                  "key": "pickupLat",
-                  "value": "999"
-                },
-                {
-                  "key": "pickupLng",
-                  "value": "{{pickup_lng}}"
-                },
-                {
-                  "key": "dropoffLat",
-                  "value": "{{dropoff_lat}}"
-                },
-                {
-                  "key": "dropoffLng",
-                  "value": "{{dropoff_lng}}"
-                },
-                {
-                  "key": "vehicleType",
-                  "value": "{{vehicle_type}}"
-                }
               ]
             }
           },
@@ -886,9 +847,18 @@
           ],
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"zoneId\": \"{{pickup_zone}}\",\n  \"activeDrivers\": {{active_drivers}},\n  \"pendingRides\": {{pending_rides}}\n}"
+            },
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/demand-supply?zoneId={{pickup_zone}}&activeDrivers={{active_drivers}}&pendingRides={{pending_rides}}",
+              "raw": "{{BASE_URL}}/api/pricing/demand-supply",
               "host": [
                 "{{BASE_URL}}"
               ],
@@ -896,20 +866,6 @@
                 "api",
                 "pricing",
                 "demand-supply"
-              ],
-              "query": [
-                {
-                  "key": "zoneId",
-                  "value": "{{pickup_zone}}"
-                },
-                {
-                  "key": "activeDrivers",
-                  "value": "{{active_drivers}}"
-                },
-                {
-                  "key": "pendingRides",
-                  "value": "{{pending_rides}}"
-                }
               ]
             }
           },
@@ -935,9 +891,18 @@
           ],
           "request": {
             "method": "PUT",
-            "header": [],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"multiplier\": {{manual_surge}}\n}"
+            },
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/surge/{{pickup_zone}}?multiplier={{manual_surge}}",
+              "raw": "{{BASE_URL}}/api/pricing/surge/{{pickup_zone}}",
               "host": [
                 "{{BASE_URL}}"
               ],
@@ -946,12 +911,6 @@
                 "pricing",
                 "surge",
                 "{{pickup_zone}}"
-              ],
-              "query": [
-                {
-                  "key": "multiplier",
-                  "value": "{{manual_surge}}"
-                }
               ]
             }
           },
@@ -976,9 +935,18 @@
           ],
           "request": {
             "method": "PUT",
-            "header": [],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"multiplier\": 99\n}"
+            },
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/surge/{{pickup_zone}}?multiplier=99",
+              "raw": "{{BASE_URL}}/api/pricing/surge/{{pickup_zone}}",
               "host": [
                 "{{BASE_URL}}"
               ],
@@ -987,20 +955,263 @@
                 "pricing",
                 "surge",
                 "{{pickup_zone}}"
-              ],
-              "query": [
-                {
-                  "key": "multiplier",
-                  "value": "99"
-                }
               ]
             }
           },
           "response": []
         }
       ]
-    }
-  ],
+    },
+  {
+    "name": "04 - Estimate Management",
+    "item": [
+      {
+        "name": "13 - Get Estimate By ID",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Get estimate by ID succeeded', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.estimateId).to.eql(pm.collectionVariables.get('estimate_id'));",
+                "  pm.expect(json.totalFare).to.exist;",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "GET",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/pricing/estimate/{{estimate_id}}",
+            "host": [
+              "{{BASE_URL}}"
+            ],
+            "path": [
+              "api",
+              "pricing",
+              "estimate",
+              "{{estimate_id}}"
+            ]
+          },
+          "response": []
+        }
+      },
+      {
+        "name": "14 - Cancel Estimate",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Cancel estimate succeeded', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.status).to.eql('CANCELLED');",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "DELETE",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/pricing/estimate/{{estimate_id}}",
+            "host": [
+              "{{BASE_URL}}"
+            ],
+            "path": [
+              "api",
+              "pricing",
+              "estimate",
+              "{{estimate_id}}"
+            ]
+          },
+          "response": []
+        }
+      },
+      {
+        "name": "15 - List Estimates with Filters",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('List estimates succeeded', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.estimates).to.be.an('array');",
+                "  pm.expect(json.count).to.exist;",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "GET",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/pricing/estimates?status=PENDING&limit=10&offset=0",
+            "host": [
+              "{{BASE_URL}}"
+            ],
+            "path": [
+              "api",
+              "pricing",
+              "estimates"
+            ],
+            "query": [
+              {
+                "key": "status",
+                "value": "PENDING"
+              },
+              {
+                "key": "limit",
+                "value": "10"
+              },
+              {
+                "key": "offset",
+                "value": "0"
+              }
+            ]
+          },
+          "response": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "05 - Surge & Metrics",
+    "item": [
+      {
+        "name": "16 - Get Zone Metrics",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Get zone metrics succeeded', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.zone_id).to.eql(pm.collectionVariables.get('pickup_zone'));",
+                "  pm.expect(json.active_drivers).to.exist;",
+                "  pm.expect(json.pending_rides).to.exist;",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "GET",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/pricing/zones/{{pickup_zone}}/metrics",
+            "host": [
+              "{{BASE_URL}}"
+            ],
+            "path": [
+              "api",
+              "pricing",
+              "zones",
+              "{{pickup_zone}}",
+              "metrics"
+            ]
+          },
+          "response": []
+        }
+      },
+      {
+        "name": "17 - Compute Surge Multiplier",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Compute surge succeeded', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.zone_id).to.eql(pm.collectionVariables.get('pickup_zone'));",
+                "  pm.expect(json.previous_multiplier).to.exist;",
+                "  pm.expect(json.predicted_multiplier).to.exist;",
+                "  pm.expect(json.updated).to.exist;",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "POST",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/pricing/surge/compute/{{pickup_zone}}?badWeather=false",
+            "host": [
+              "{{BASE_URL}}"
+            ],
+            "path": [
+              "api",
+              "pricing",
+              "surge",
+              "compute",
+              "{{pickup_zone}}"
+            ],
+            "query": [
+              {
+                "key": "badWeather",
+                "value": "false"
+              }
+            ]
+          },
+          "response": []
+        }
+      },
+      {
+        "name": "18 - Get Zone Metrics Not Found",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Get zone metrics not found handled', function () {",
+                "  pm.response.to.have.status(404);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.error).to.eql('METRICS_NOT_FOUND');",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "GET",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/pricing/zones/UNKNOWN_ZONE/metrics",
+            "host": [
+              "{{BASE_URL}}"
+            ],
+            "path": [
+              "api",
+              "pricing",
+              "zones",
+              "UNKNOWN_ZONE",
+              "metrics"
+            ]
+          },
+          "response": []
+        }
+      }
+    ]
+  }
+],
   "event": [
     {
       "listen": "prerequest",

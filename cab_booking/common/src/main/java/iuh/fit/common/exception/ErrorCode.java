@@ -19,6 +19,7 @@ public enum ErrorCode {
     USER_DEVICE_NOT_FOUND(404, "User device not found", HttpStatus.NOT_FOUND),
     USER_DEVICE_DUPLICATED(409, "User device already exists", HttpStatus.CONFLICT),
     EMAIL_ALREADY_EXISTS(409, "Email already exists", HttpStatus.CONFLICT),
+    UNAUTHORIZED_ACCESS(403, "Unauthorized access", HttpStatus.FORBIDDEN),
     INVALID_CREDENTIALS(401, "Invalid email or password", HttpStatus.UNAUTHORIZED),
     REFRESH_TOKEN_INVALID(401, "Refresh token is invalid", HttpStatus.UNAUTHORIZED),
     REFRESH_TOKEN_EXPIRED(401, "Refresh token has expired", HttpStatus.UNAUTHORIZED),

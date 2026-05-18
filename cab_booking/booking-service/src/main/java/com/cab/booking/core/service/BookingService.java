@@ -23,6 +23,8 @@ public interface BookingService {
 
     org.springframework.data.domain.Page<BookingResponse> getCustomerHistory(String customerId, int page, int size);
 
+    BookingResponse getBookingById(java.util.UUID bookingId);
+
     BookingResponse getActiveBookingByCustomer(String customerId);
 
     BookingResponse cancelRide(java.util.UUID bookingId, String reason);

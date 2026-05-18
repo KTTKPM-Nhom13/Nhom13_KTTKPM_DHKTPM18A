@@ -39,6 +39,24 @@ public class SocketIOService {
             }
         });
 
+        // Event listener for clients joining a booking room
+        server.addEventListener("join_room", String.class, (client, bookingId, ackRequest) -> {
+            if (bookingId != null && !bookingId.trim().isEmpty()) {
+                client.joinRoom(bookingId);
+                log.info("Client Session {} joined room: {}", client.getSessionId(), bookingId);
+                client.sendEvent("joined_room_success", Map.of("bookingId", bookingId, "status", "success"));
+            }
+        });
+
+        // Event listener for clients leaving a booking room
+        server.addEventListener("leave_room", String.class, (client, bookingId, ackRequest) -> {
+            if (bookingId != null && !bookingId.trim().isEmpty()) {
+                client.leaveRoom(bookingId);
+                log.info("Client Session {} left room: {}", client.getSessionId(), bookingId);
+                client.sendEvent("left_room_success", Map.of("bookingId", bookingId, "status", "success"));
+            }
+        });
+
         server.start();
         log.info("Socket.io server started on port {}", server.getConfiguration().getPort());
     }
@@ -55,6 +73,16 @@ public class SocketIOService {
             log.info("Sent event '{}' to user {}", eventName, userId);
         } else {
             log.debug("User {} is not connected via Socket.io", userId);
+        }
+    }
+
+    /**
+     * Broadcasts an event to all connected clients in a specific booking room
+     */
+    public void broadcastToBookingRoom(String bookingId, String eventName, Object data) {
+        if (bookingId != null && !bookingId.trim().isEmpty()) {
+            server.getRoomOperations(bookingId).sendEvent(eventName, data);
+            log.info("Broadcasted event '{}' to room '{}'", eventName, bookingId);
         }
     }
 }

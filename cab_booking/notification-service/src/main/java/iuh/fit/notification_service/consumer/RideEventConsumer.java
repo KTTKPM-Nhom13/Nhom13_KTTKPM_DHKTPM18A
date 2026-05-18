@@ -33,7 +33,7 @@ public class RideEventConsumer {
                 return;
             }
             
-            String title = "Ride Update";
+            String title = "Cập nhật chuyến đi";
             String notificationMessage = "";
             
             // Get event type from either 'type' or 'eventType' field
@@ -46,7 +46,11 @@ public class RideEventConsumer {
                 } else if ("RideStarted".equals(type) || "RIDE_STARTED".equals(type) || "ride.started".equals(topic)) {
                     notificationMessage = "Chuyến đi đã bắt đầu. Chúc bạn một chuyến đi an toàn!";
                 } else if ("RideCancelled".equals(type) || "RIDE_CANCELLED".equals(type)) {
-                    notificationMessage = "Your ride has been cancelled. Reason: " + event.getOrDefault("reason", "Not specified");
+                    String reason = String.valueOf(event.getOrDefault("reason", "Không xác định"));
+                    if ("TIMEOUT_NO_DRIVER_FOUND".equals(reason)) {
+                        reason = "Không tìm thấy tài xế sau 3 phút";
+                    }
+                    notificationMessage = "Chuyến đi của bạn đã bị hủy. Lý do: " + reason;
                 }
             } else {
                 switch (topic) {
@@ -63,28 +67,33 @@ public class RideEventConsumer {
                         break;
                     case "booking.timeout":
                         notificationMessage = "Rất tiếc, hiện tại không tìm thấy tài xế nào xung quanh. Vui lòng thử lại sau ít phút.";
-                        title = "Booking Timeout";
+                        title = "Hết thời gian tìm kiếm";
                         break;
                     case "payment.completed":
                         notificationMessage = "Thanh toán thành công! Chúc bạn một ngày tốt lành.";
-                        title = "Payment Successful";
+                        title = "Thanh toán thành công";
                         break;
                     case "ride.finished":
                         notificationMessage = "Chuyến đi đã hoàn thành. Cảm ơn bạn đã sử dụng dịch vụ!";
-                        title = "Ride Completed";
+                        title = "Chuyến đi hoàn thành";
                         break;
                     case "pricing.surge.updated":
                         log.info("Surge pricing update received for zone: {}", event.get("zone_id"));
                         return;
                     default:
                         if (!type.isEmpty()) {
-                            notificationMessage = "Update for your ride: " + type;
+                            notificationMessage = "Cập nhật chuyến đi của bạn: " + type;
                         }
                 }
             }
             
             if (customerId != null && !notificationMessage.isEmpty() && !"null".equals(customerId)) {
                 notificationService.sendNotification(customerId, title, notificationMessage, "PUSH");
+            }
+            
+            // Also broadcast the event to the active booking/ride room for real-time room routing (notifying driver & passenger simultaneously)
+            if (rideId != null && !notificationMessage.isEmpty() && !"null".equals(rideId)) {
+                notificationService.broadcastNotificationToRoom(rideId, title, notificationMessage, "ROOM_BROADCAST");
             }
         } catch (Exception e) {
             log.error("Error processing Kafka message from topic {}: {}", topic, e.getMessage());

@@ -1,8 +1,6 @@
 package iuh.fit.pricing_service.service;
 
-import iuh.fit.pricing_service.config.KafkaConfig;
 import iuh.fit.pricing_service.model.FareEstimate;
-import iuh.fit.pricing_service.producer.SurgeEventProducer;
 import iuh.fit.pricing_service.repository.FareEstimateRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +16,6 @@ import java.util.List;
 public class FareEstimateExpiryScheduler {
 
     private final FareEstimateRepository fareEstimateRepository;
-    private final SurgeEventProducer surgeEventProducer;
 
     @Scheduled(fixedDelayString = "${pricing.estimate.expiry-scheduler-fixed-delay-ms:60000}")
     public void expirePendingEstimates() {
@@ -32,16 +29,7 @@ public class FareEstimateExpiryScheduler {
 
         for (FareEstimate estimate : expiredEstimates) {
             estimate.setStatus(FareEstimate.EstimateStatus.EXPIRED.name());
-            FareEstimate saved = fareEstimateRepository.save(estimate);
-            surgeEventProducer.publishEstimateEvent(
-                    KafkaConfig.TOPIC_PRICING_ESTIMATE_EXPIRED,
-                    "ESTIMATE_EXPIRED",
-                    saved.getId(),
-                    saved.getTotalFare(),
-                    saved.getCurrency(),
-                    saved.getSurgeMultiplier(),
-                    saved.getPricingConfigVersion()
-            );
+            fareEstimateRepository.save(estimate);
         }
 
         log.info("Expired {} pending fare estimates", expiredEstimates.size());

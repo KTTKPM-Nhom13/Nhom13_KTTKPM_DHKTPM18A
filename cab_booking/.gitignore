@@ -25,3 +25,6 @@ temp/
 
 # --- Docker ---
 docker-compose.override.yml
+
+# --- Firebase Credentials ---
+**/serviceAccountKey.json

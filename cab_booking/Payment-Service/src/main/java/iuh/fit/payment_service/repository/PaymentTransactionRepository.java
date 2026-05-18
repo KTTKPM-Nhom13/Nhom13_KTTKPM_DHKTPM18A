@@ -56,4 +56,6 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
             @Param("key") String idempotencyKey,
             @Param("status") PaymentStatus status
     );
+
+    long countByStatus(PaymentStatus status);
 }

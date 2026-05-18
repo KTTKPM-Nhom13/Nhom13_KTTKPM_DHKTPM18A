@@ -41,6 +41,11 @@ public class NotificationController {
         notificationService.deleteNotification(id);
     }
 
+    @PostMapping("/register-token")
+    public void registerToken(@RequestParam String userId, @RequestParam String token) {
+        notificationService.registerFcmToken(userId, token);
+    }
+
     @PostMapping("/test")
     public Notification testNotification(@RequestParam String userId, @RequestParam String message) {
         Notification notification = Notification.builder()

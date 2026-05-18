@@ -1,13 +1,14 @@
 package iuh.fit.driverservice;
 
 import iuh.fit.driverservice.dto.event.DriverStatusEvent;
-import iuh.fit.driverservice.dto.event.RideAssignedEvent;
+import iuh.fit.driverservice.dto.event.RideAcceptedEvent;
 import iuh.fit.driverservice.dto.request.HandleDriverAssignmentRequest;
 import iuh.fit.driverservice.dto.request.UpdateDriverAvailabilityRequest;
 import iuh.fit.driverservice.dto.request.UpsertDriverProfileRequest;
 import iuh.fit.driverservice.dto.response.DriverAvailabilityResponse;
 import iuh.fit.driverservice.dto.response.DriverStatusCheckResponse;
 import iuh.fit.driverservice.entity.DriverProfile;
+import iuh.fit.driverservice.entity.VehicleType;
 import iuh.fit.driverservice.repository.DriverProfileRepository;
 import iuh.fit.driverservice.service.DriverProfileService;
 import org.junit.jupiter.api.Test;
@@ -54,7 +55,7 @@ class DriverServiceApplicationTests {
         profileRequest.setEmail("driver1@example.com");
         profileRequest.setPhoneNumber("0900000001");
         profileRequest.setLicenseNumber("LIC-001");
-        profileRequest.setVehicleType("CAR");
+        profileRequest.setVehicleType(VehicleType.CAR4);
         profileRequest.setVehiclePlate("51A-12345");
 
         driverProfileService.upsertProfile("driver-1", profileRequest);
@@ -89,7 +90,7 @@ class DriverServiceApplicationTests {
         profileRequest.setEmail("driver2@example.com");
         profileRequest.setPhoneNumber("0900000002");
         profileRequest.setLicenseNumber("LIC-002");
-        profileRequest.setVehicleType("BIKE");
+        profileRequest.setVehicleType(VehicleType.BIKE);
         profileRequest.setVehiclePlate("59B-67890");
 
         driverProfileService.upsertProfile("driver-2", profileRequest);
@@ -108,12 +109,12 @@ class DriverServiceApplicationTests {
 
         driverProfileService.handleAssignment("driver-2", assignmentRequest);
 
-        ArgumentCaptor<Object> rideAssignedCaptor = ArgumentCaptor.forClass(Object.class);
-        verify(kafkaTemplate).send(eq("ride.assigned"), rideAssignedCaptor.capture());
-        RideAssignedEvent event = (RideAssignedEvent) rideAssignedCaptor.getValue();
+        ArgumentCaptor<Object> rideAcceptedCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(kafkaTemplate).send(eq("ride.accepted"), eq("2f52e5f8-0f91-4801-98db-ece474d38a13"), rideAcceptedCaptor.capture());
+        RideAcceptedEvent event = (RideAcceptedEvent) rideAcceptedCaptor.getValue();
         assertThat(event.getRideId()).isEqualTo("2f52e5f8-0f91-4801-98db-ece474d38a13");
         assertThat(event.getDriverId()).isEqualTo("driver-2");
-        assertThat(event.getType()).isEqualTo(RideAssignedEvent.EVENT_TYPE);
+        assertThat(event.getType()).isEqualTo("RideAccepted");
     }
 
     @Test
@@ -123,7 +124,7 @@ class DriverServiceApplicationTests {
         profileRequest.setEmail("driver3@example.com");
         profileRequest.setPhoneNumber("0900000003");
         profileRequest.setLicenseNumber("LIC-003");
-        profileRequest.setVehicleType("CAR");
+        profileRequest.setVehicleType(VehicleType.CAR4);
         profileRequest.setVehiclePlate("60A-11111");
         profileRequest.setVehicleModel("Hyundai Accent");
         profileRequest.setVehicleColor("White");

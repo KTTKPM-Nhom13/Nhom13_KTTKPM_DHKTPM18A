@@ -20,7 +20,13 @@ spring:
     redis:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:redis123}
+integration:
+  auth-service:
+    url: ${AUTH_SERVICE_URL:http://auth-service:8081}
+
+app:
+  security:
+    public-endpoints: /api/drivers/**,/api/admin/drivers/**
 
 eureka:
   client:
@@ -31,3 +37,4 @@ eureka:
   instance:
     prefer-ip-address: true
     instance-id: ${spring.application.name}:${server.port}:${random.value}
+

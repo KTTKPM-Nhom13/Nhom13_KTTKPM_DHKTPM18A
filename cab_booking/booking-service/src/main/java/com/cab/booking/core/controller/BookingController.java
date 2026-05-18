@@ -102,6 +102,12 @@ public class BookingController {
     // API KHÁCH HÀNG (CUSTOMER)
     // ============================================================
 
+    @GetMapping("/{id}")
+    public ApiResponse<BookingResponse> getBookingById(@PathVariable UUID id) {
+        return ApiResponse.success("Lấy thông tin chuyến đi thành công",
+                bookingService.getBookingById(id));
+    }
+
     @GetMapping("/customer/{customerId}")
     public ApiResponse<org.springframework.data.domain.Page<BookingResponse>> getCustomerHistory(
             @PathVariable String customerId,

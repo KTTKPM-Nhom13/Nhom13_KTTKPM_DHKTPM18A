@@ -59,9 +59,9 @@ spring:
           predicates:
             - Path=/driver/**,/api/drivers/**
 
-        # ── Pricing Service (Docker network) ──
+        # Pricing Service via API Gateway/Eureka
         - id: pricing-service
-          uri: http://pricing-service:8084
+          uri: lb://pricing-service
           predicates:
             - Path=/api/pricing/**
 

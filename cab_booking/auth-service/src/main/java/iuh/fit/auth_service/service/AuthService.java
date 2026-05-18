@@ -28,6 +28,11 @@ import iuh.fit.auth_service.repository.PasswordResetOtpRepository;
 import iuh.fit.auth_service.repository.RegistrationEmailOtpRepository;
 import iuh.fit.common.exception.AppException;
 import iuh.fit.common.exception.ErrorCode;
+import org.springframework.cloud.client.discovery.DiscoveryClient;
+import org.springframework.cloud.client.ServiceInstance;
+import org.springframework.web.client.RestTemplate;
+import java.util.HashMap;
+import java.util.Map;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -54,6 +59,7 @@ public class AuthService {
     final BCryptPasswordEncoder passwordEncoder;
     final AuthTokenService authTokenService;
     final EmailServiceClient emailServiceClient;
+    final DiscoveryClient discoveryClient;
 
     @Value("${auth.jwt.refresh-token-days:30}")
     long refreshTokenDays;
@@ -139,10 +145,77 @@ public class AuthService {
         user.setLastLoginAt(LocalDateTime.now());
 
         AuthUser savedUser = authUserRepository.save(user);
+
+        // Sync profile immediately to the respective domain microservice (user-service or driver-service)
+        syncProfileToDomainService(savedUser);
+
         AuthTokenResponse response = createSessionResponse(savedUser, request.getDeviceId(), request.getPlatform(),
                 request.getUserAgent(), request.getAppVersion());
         return response;
     }
+
+    private void syncProfileToDomainService(AuthUser user) {
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("userId", user.getId().toString());
+            payload.put("fullName", user.getFullName());
+            payload.put("email", user.getEmail());
+            payload.put("phoneNumber", user.getPhoneNumber());
+            payload.put("avatarUrl", user.getAvatarUrl());
+
+            if (user.getRole() == UserRole.USER) {
+                String baseUrl = getServiceUrl("user-service", "http://user-service:8082");
+                restTemplate.postForObject(baseUrl + "/internal/users", payload, Object.class);
+            } else if (user.getRole() == UserRole.DRIVER) {
+                String baseUrl = getServiceUrl("driver-service", "http://driver-service:8083");
+                restTemplate.postForObject(baseUrl + "/internal/drivers", payload, Object.class);
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to sync profile immediately on registration: " + e.getMessage());
+        }
+    }
+
+    private String getServiceUrl(String serviceName, String defaultFallback) {
+        try {
+            List<ServiceInstance> instances = discoveryClient.getInstances(serviceName);
+            if (instances != null && !instances.isEmpty()) {
+                return instances.get(0).getUri().toString();
+            }
+        } catch (Exception e) {
+            System.err.println("Failed to lookup service via Eureka: " + e.getMessage());
+        }
+        return defaultFallback;
+    }
+
+    @Transactional
+    public AuthTokenResponse registerAdmin(RegisterRequest request) {
+        AuthUser currentUser = getAuthenticatedUser();
+        if (currentUser.getRole() != UserRole.ADMIN) {
+            throw new AppException(ErrorCode.UNAUTHORIZED_ACCESS);
+        }
+
+        String email = normalizeEmail(request.getEmail());
+        ensureEmailAvailable(email);
+
+        AuthUser user = new AuthUser();
+        user.setEmail(email);
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setFullName(request.getFullName());
+        user.setPhoneNumber(request.getPhoneNumber());
+        user.setAvatarUrl(resolveAvatar(request.getAvatarUrl(), request.getFullName()));
+        user.setRole(UserRole.ADMIN);
+        user.setProvider(AuthProvider.LOCAL_EMAIL);
+        user.setEmailVerified(true);
+        user.setActive(true);
+        user.setAccountStatus(AccountLifecycleStatus.ACTIVE);
+        user.setLastLoginAt(LocalDateTime.now());
+
+        AuthUser savedUser = authUserRepository.save(user);
+        return createSessionResponse(savedUser, request.getDeviceId(), request.getPlatform(),
+                request.getUserAgent(), request.getAppVersion());
+    }
+
 
     /*
     Old OTP-guarded register flow kept for reference:
@@ -307,7 +380,7 @@ public class AuthService {
         user.setDeletionRequestedAt(request.getDeletionRequestedAt());
         user.setScheduledDeletionAt(request.getScheduledDeletionAt());
         user.setDeletionReason(request.getDeletionReason());
-        user.setActive(status != AccountLifecycleStatus.DELETED);
+        user.setActive(status == AccountLifecycleStatus.ACTIVE);
         authUserRepository.save(user);
     }
 

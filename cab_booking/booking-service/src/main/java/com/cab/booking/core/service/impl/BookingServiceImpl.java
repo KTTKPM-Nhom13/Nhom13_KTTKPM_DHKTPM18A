@@ -383,6 +383,14 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
+    public BookingResponse getBookingById(UUID bookingId) {
+        return bookingRepository.findById(bookingId)
+                .map(BookingResponse::fromEntity)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public java.util.List<BookingResponse> getNearbyMatchingBookings(double lat, double lng, double radiusKm) {
         // TODO: Kết hợp Redis GeoHash để tìm theo tọa độ thực tế.
         // Hiện tại trả về tất cả các booking đang MATCHING.

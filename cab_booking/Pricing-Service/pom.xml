@@ -20,7 +20,6 @@
     <properties>
         <java.version>21</java.version>
         <spring-cloud.version>2023.0.3</spring-cloud.version>
-        <spring-kafka.version>3.2.5</spring-kafka.version>
         <springdoc.version>2.6.0</springdoc.version>
     </properties>
 
@@ -89,12 +88,6 @@
             <artifactId>spring-cloud-starter-config</artifactId>
         </dependency>
 
-        <!-- Spring Kafka -->
-        <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
-        </dependency>
-
         <!-- Spring Data Redis -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -139,12 +132,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka-test</artifactId>
             <scope>test</scope>
         </dependency>
 

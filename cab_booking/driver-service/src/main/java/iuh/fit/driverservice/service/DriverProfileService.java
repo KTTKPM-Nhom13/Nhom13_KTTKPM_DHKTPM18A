@@ -456,7 +456,7 @@ public class DriverProfileService {
                 .phoneNumber(profile.getPhoneNumber())
                 .avatarUrl(profile.getAvatarUrl())
                 .licenseNumber(profile.getLicenseNumber())
-                .vehicleType(profile.getVehicleType())
+                .vehicleType(profile.getVehicleType() == null ? null : profile.getVehicleType().name())
                 .vehiclePlate(profile.getVehiclePlate())
                 .vehicleModel(profile.getVehicleModel())
                 .vehicleColor(profile.getVehicleColor())

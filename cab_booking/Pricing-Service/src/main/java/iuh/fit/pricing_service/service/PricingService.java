@@ -2,7 +2,6 @@ package iuh.fit.pricing_service.service;
 
 import iuh.fit.pricing_service.client.MapboxClient;
 import iuh.fit.pricing_service.client.OpenMeteoClient;
-import iuh.fit.pricing_service.config.KafkaConfig;
 import iuh.fit.pricing_service.config.PricingConfigProperties;
 import iuh.fit.pricing_service.exception.PricingException;
 import iuh.fit.pricing_service.model.FareEstimate;
@@ -10,7 +9,6 @@ import iuh.fit.pricing_service.model.FareEstimateRequest;
 import iuh.fit.pricing_service.model.FareEstimateResponse;
 import iuh.fit.pricing_service.model.PricingTestResponse;
 import iuh.fit.pricing_service.model.SurgeRule;
-import iuh.fit.pricing_service.producer.SurgeEventProducer;
 import iuh.fit.pricing_service.repository.FareEstimateRepository;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
@@ -33,8 +31,12 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+
+import org.springframework.http.ResponseEntity;
 
 @Service
 @RequiredArgsConstructor
@@ -48,7 +50,6 @@ public class PricingService {
 
     private final FareEstimateRepository fareEstimateRepository;
     private final SurgePricingService surgePricingService;
-    private final SurgeEventProducer surgeEventProducer;
     private final PricingConfigProperties pricingConfig;
     private final MapboxClient mapboxClient;
     private final OpenMeteoClient openMeteoClient;
@@ -125,15 +126,6 @@ public class PricingService {
 
         fareEstimateRepository.save(fareEstimate);
         rememberEstimateForIdempotency(idempotencyKey, estimateId);
-        surgeEventProducer.publishEstimateEvent(
-                KafkaConfig.TOPIC_PRICING_ESTIMATE_CREATED,
-                "ESTIMATE_CREATED",
-                estimateId,
-                fareEstimate.getTotalFare(),
-                fareEstimate.getCurrency(),
-                fareEstimate.getSurgeMultiplier(),
-                fareEstimate.getPricingConfigVersion()
-        );
         log.info("Fare estimate saved: {} - total fare: {} {}", estimateId,
                 fareBreakdown.totalFare(), pricingConfig.getCalculation().getCurrency());
 
@@ -169,15 +161,6 @@ public class PricingService {
 
         log.info("Fare confirmed for estimate {}: total fare = {} {}",
                 estimateId, confirmed.getTotalFare(), confirmed.getCurrency());
-        surgeEventProducer.publishEstimateEvent(
-                KafkaConfig.TOPIC_PRICING_ESTIMATE_CONFIRMED,
-                "ESTIMATE_CONFIRMED",
-                estimateId,
-                confirmed.getTotalFare(),
-                confirmed.getCurrency(),
-                confirmed.getSurgeMultiplier(),
-                confirmed.getPricingConfigVersion()
-        );
 
         return confirmed;
     }
@@ -231,15 +214,70 @@ public class PricingService {
                     normalizedMultiplier,
                     SurgeRule.SurgeSource.MANUAL.name()
             );
-            surgeEventProducer.publishSurgeUpdate(zoneId, normalizedMultiplier);
-            log.info("Manual surge updated and event published for zone {}", zoneId);
+            log.info("Manual surge updated for zone {}", zoneId);
         }
     }
 
     public void processDemandSupplyUpdate(String zoneId, int activeDrivers, int pendingRides) {
         surgePricingService.updateCurrentZoneMetrics(zoneId, activeDrivers, pendingRides);
-        log.info("Demand/supply metrics cached for zone {}. Surge computation is handled by scheduler.",
-                zoneId);
+        log.info("Demand/supply metrics cached for zone {}.",                zoneId);
+    }
+
+    public Optional<FareEstimate> getEstimateById(String estimateId) {
+        return fareEstimateRepository.findById(estimateId);
+    }
+
+    public ResponseEntity<Map<String, Object>> cancelEstimate(String estimateId) {
+        Optional<FareEstimate> existingOpt = fareEstimateRepository.findById(estimateId);
+
+        if (existingOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of(
+                    "error", "ESTIMATE_NOT_FOUND",
+                    "message", "Estimate with ID " + estimateId + " not found",
+                    "estimateId", estimateId
+            ));
+        }
+
+        FareEstimate existing = existingOpt.get();
+
+        if (!FareEstimate.EstimateStatus.PENDING.name().equals(existing.getStatus())) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "INVALID_STATUS",
+                    "message", "Estimate is not in PENDING status and cannot be cancelled. Current status: " + existing.getStatus(),
+                    "estimateId", estimateId,
+                    "currentStatus", existing.getStatus()
+            ));
+        }
+
+        existing.setStatus(FareEstimate.EstimateStatus.CANCELLED.name());
+        fareEstimateRepository.save(existing);
+
+        log.info("Estimate cancelled - estimateId: {}, previousStatus: PENDING", estimateId);
+
+        return ResponseEntity.ok(Map.of(
+                "estimateId", estimateId,
+                "status", "CANCELLED",
+                "message", "Estimate cancelled successfully"
+        ));
+    }
+
+    public List<FareEstimate> listEstimates(String status, String vehicleType, String pickupZone, int limit, int offset) {
+        List<FareEstimate> allEstimates;
+
+        if (status != null && !status.isBlank()) {
+            allEstimates = fareEstimateRepository.findByStatus(status.toUpperCase());
+        } else if (vehicleType != null && !vehicleType.isBlank()) {
+            allEstimates = fareEstimateRepository.findByVehicleType(vehicleType.toUpperCase());
+        } else if (pickupZone != null && !pickupZone.isBlank()) {
+            allEstimates = fareEstimateRepository.findByPickupZone(pickupZone);
+        } else {
+            allEstimates = fareEstimateRepository.findAll();
+        }
+
+        int fromIndex = Math.min(offset, allEstimates.size());
+        int toIndex = Math.min(offset + limit, allEstimates.size());
+
+        return allEstimates.subList(fromIndex, toIndex);
     }
 
     public Map<String, Object> testMapboxConnection() {
