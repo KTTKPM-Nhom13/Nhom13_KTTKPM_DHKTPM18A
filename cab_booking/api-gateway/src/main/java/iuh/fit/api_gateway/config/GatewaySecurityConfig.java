@@ -67,7 +67,7 @@ public class GatewaySecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         org.springframework.web.cors.CorsConfiguration config = new org.springframework.web.cors.CorsConfiguration();
         config.setAllowedOriginPatterns(List.of("*"));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("X-Served-By", "X-Debug-Trace-Id", "Retry-After", "X-RateLimit-Remaining",
                 "X-RateLimit-Limit", "X-RateLimit-Burst-Capacity", "X-RateLimit-Replenish-Rate",

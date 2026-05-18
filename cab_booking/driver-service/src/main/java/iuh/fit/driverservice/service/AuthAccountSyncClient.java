@@ -1,7 +1,5 @@
-package iuh.fit.userservice.service;
+package iuh.fit.driverservice.service;
 
-import iuh.fit.userservice.dto.request.SyncAccountLifecycleRequest;
-import iuh.fit.userservice.entity.UserProfile;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -17,20 +15,6 @@ public class AuthAccountSyncClient {
 
     @Value("${integration.auth-service.url:http://auth-service:8081}")
     String authServiceUrl;
-
-    public void syncAccountLifecycle(UserProfile profile) {
-        restClientBuilder.build()
-                .post()
-                .uri(authServiceUrl + "/internal/auth/users/{userId}/account-lifecycle", profile.getExternalUserId())
-                .body(SyncAccountLifecycleRequest.builder()
-                        .accountStatus(profile.getAccountStatus().name())
-                        .deletionRequestedAt(profile.getDeletionRequestedAt())
-                        .scheduledDeletionAt(profile.getScheduledDeletionAt())
-                        .deletionReason(profile.getDeletionReason())
-                        .build())
-                .retrieve()
-                .toBodilessEntity();
-    }
 
     public String registerAuthAccount(java.util.Map<String, Object> payload) {
         try {

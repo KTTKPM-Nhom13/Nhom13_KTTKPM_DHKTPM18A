@@ -1,0 +1,372 @@
+{
+  "info": {
+    "_postman_id": "cab-booking-admin-apis-flow",
+    "name": "CAB-BOOKING ADMINISTRATIVE APIs FLOW",
+    "description": "Verification of user, driver, auth service administrative APIs via API Gateway.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('run_id')) {",
+          "    const runId = Date.now().toString();",
+          "    pm.collectionVariables.set('run_id', runId);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "gatewayUrl",
+      "value": "http://127.0.0.1:8080",
+      "type": "string"
+    },
+    {
+      "key": "run_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "created_user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "created_driver_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Admin Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Admin Logged In Successfully', function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "});",
+              "const json = pm.response.json();",
+              "const token = json.result?.accessToken || json.accessToken || '';",
+              "pm.collectionVariables.set('admin_access_token', token);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"admin@cab.local\",\n  \"password\": \"AdminPassword123\",\n  \"deviceId\": \"web-admin-portal\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Admin Client\",\n  \"appVersion\": \"1.0.0\"\n}"
+        },
+        "url": "{{gatewayUrl}}/api/auth/login"
+      }
+    },
+    {
+      "name": "02 - Admin Create User",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('User Profile Created by Admin', function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "});",
+              "const json = pm.response.json();",
+              "const resultObj = json.result || json;",
+              "const uid = resultObj.id || resultObj.userId || '';",
+              "pm.collectionVariables.set('created_user_id', uid);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{admin_access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Admin Created User\",\n  \"email\": \"user_{{run_id}}@example.com\",\n  \"password\": \"User@123456\",\n  \"phoneNumber\": \"0987654321\",\n  \"avatarUrl\": \"https://example.com/avatar.png\"\n}"
+        },
+        "url": "{{gatewayUrl}}/api/admin/users"
+      }
+    },
+    {
+      "name": "03 - Admin Get All Users",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Fetched Users successfully', function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{admin_access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "url": "{{gatewayUrl}}/api/admin/users"
+      }
+    },
+    {
+      "name": "04 - Admin Count Users",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Fetched User Count', function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{admin_access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "url": "{{gatewayUrl}}/api/users/count"
+      }
+    },
+    {
+      "name": "05 - Admin Suspend User",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Suspended user successfully', function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{admin_access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"SUSPENDED\"\n}"
+        },
+        "url": "{{gatewayUrl}}/api/users/{{created_user_id}}/status"
+      }
+    },
+    {
+      "name": "06 - Admin Create Driver",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Driver Profile Created by Admin', function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "});",
+              "const json = pm.response.json();",
+              "const resultObj = json.result || json;",
+              "const did = resultObj.id || resultObj.driverId || '';",
+              "pm.collectionVariables.set('created_driver_id', did);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{admin_access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Admin Created Driver\",\n  \"email\": \"driver_{{run_id}}@example.com\",\n  \"password\": \"Driver@123456\",\n  \"phoneNumber\": \"0912345678\",\n  \"avatarUrl\": \"https://example.com/driver.png\"\n}"
+        },
+        "url": "{{gatewayUrl}}/api/admin/drivers"
+      }
+    },
+    {
+      "name": "07 - Admin Get All Drivers",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Fetched Drivers successfully', function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{admin_access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "url": "{{gatewayUrl}}/api/admin/drivers"
+      }
+    },
+    {
+      "name": "08 - Admin Count Drivers",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Fetched Driver Count', function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{admin_access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "url": "{{gatewayUrl}}/api/drivers/count"
+      }
+    },
+    {
+      "name": "09 - Admin Approve Driver Verification",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Approved driver verification successfully', function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{admin_access_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"APPROVED\"\n}"
+        },
+        "url": "{{gatewayUrl}}/api/drivers/{{created_driver_id}}/verification"
+      }
+    }
+  ]
+}

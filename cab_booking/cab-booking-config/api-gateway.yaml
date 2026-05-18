@@ -21,7 +21,7 @@ spring:
       routes:
         # route-level RequestRateLimiter
         - id: auth-service
-          uri: http://auth-service:8081
+          uri: lb://auth-service
           predicates:
             - Path=/api/auth/**
           filters:
@@ -54,12 +54,12 @@ spring:
         - id: user-service
           uri: lb://user-service
           predicates:
-            - Path=/api/users/**
+            - Path=/api/users/**,/api/admin/users/**
 
         - id: driver-service
           uri: lb://driver-service
           predicates:
-            - Path=/api/drivers/**
+            - Path=/api/drivers/**,/api/admin/drivers/**
 
         - id: review-service
           uri: lb://review-service
