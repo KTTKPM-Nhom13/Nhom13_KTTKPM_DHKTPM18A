@@ -19,3 +19,11 @@ spring:
           driver-status:iuh.fit.driverservice.dto.event.DriverStatusEvent,
           driver-accepted:iuh.fit.driverservice.dto.event.DriverAcceptedEvent,
           driver-rejected:iuh.fit.driverservice.dto.event.DriverRejectedEvent
+    consumer:
+      group-id: driver-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.value.default.type: java.util.Map

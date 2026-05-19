@@ -94,6 +94,7 @@ public class PaymentSagaService {
                 .transactionId("TXN" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase())
                 .bookingId(request.getBookingId())
                 .customerId(request.getCustomerId())
+                .driverId(request.getDriverId())
                 .amount(request.getAmount())
                 .currency(request.getCurrency() != null ? request.getCurrency() : "VND")
                 .paymentMethod(request.getPaymentMethod())
@@ -231,6 +232,7 @@ public class PaymentSagaService {
                 "PAYMENT_COMPLETED",
                 PaymentCompletedEvent.fromTransaction(
                         transaction.getBookingId(),
+                        transaction.getDriverId(),
                         transaction.getAmount(),
                         transaction.getCurrency(),
                         transaction.getGatewayTransactionId(),
@@ -391,6 +393,7 @@ public class PaymentSagaService {
                     "PAYMENT_COMPLETED",
                     PaymentCompletedEvent.fromTransaction(
                             transaction.getBookingId(),
+                            transaction.getDriverId(),
                             transaction.getAmount(),
                             transaction.getCurrency(),
                             transaction.getGatewayTransactionId(),
@@ -454,6 +457,7 @@ public class PaymentSagaService {
                 "PAYMENT_COMPLETED",
                 PaymentCompletedEvent.fromTransaction(
                         transaction.getBookingId(),
+                        transaction.getDriverId(),
                         transaction.getAmount(),
                         transaction.getCurrency(),
                         transaction.getGatewayTransactionId(),
@@ -499,6 +503,7 @@ public class PaymentSagaService {
                     "PAYMENT_COMPLETED",
                     PaymentCompletedEvent.fromTransaction(
                             transaction.getBookingId(),
+                            transaction.getDriverId(),
                             transaction.getAmount(),
                             transaction.getCurrency(),
                             transaction.getGatewayTransactionId(),

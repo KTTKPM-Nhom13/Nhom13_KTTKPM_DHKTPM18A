@@ -41,6 +41,9 @@ public class PaymentTransaction {
     @Column(nullable = false, length = 64)
     private String customerId;
 
+    @Column(length = 64)
+    private String driverId;
+
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;
 
