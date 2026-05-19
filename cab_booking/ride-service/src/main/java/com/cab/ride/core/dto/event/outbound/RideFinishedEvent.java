@@ -24,6 +24,7 @@ public class RideFinishedEvent {
     private String type;
     private String rideId;
     private String customerId;
+    private String driverId;
     private BigDecimal finalFare;
     private String paymentMethod;
     private String timestamp;

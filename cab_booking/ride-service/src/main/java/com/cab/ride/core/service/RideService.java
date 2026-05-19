@@ -305,6 +305,7 @@ public class RideService {
                 .type(RideFinishedEvent.EVENT_TYPE)
                 .rideId(event.aggregateId())
                 .customerId(ride.getCustomerId())
+                .driverId(ride.getDriverId())
                 .finalFare(event.getFinalFare() == null ? BigDecimal.ZERO : event.getFinalFare())
                 .paymentMethod(event.getPaymentMethod() == null ? "CASH" : event.getPaymentMethod())
                 .timestamp(Instant.now().toString())

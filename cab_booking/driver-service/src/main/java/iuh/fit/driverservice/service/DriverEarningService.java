@@ -20,8 +20,11 @@ import java.math.RoundingMode;
 @Slf4j
 public class DriverEarningService {
 
-    private static final BigDecimal DRIVER_SHARE_PERCENT = new BigDecimal("30.00");
-    private static final BigDecimal DRIVER_SHARE_RATE = new BigDecimal("0.30");
+    private static final BigDecimal DRIVER_SHARE_PERCENT = new BigDecimal("70.00");
+    private static final BigDecimal DRIVER_SHARE_RATE = new BigDecimal("0.70");
+    private static final String CASH_PAYMENT_METHOD = "CASH";
+    private static final String SETTLEMENT_ONLINE_GATEWAY_CREDIT = "ONLINE_GATEWAY_CREDIT";
+    private static final String SETTLEMENT_CASH_PLATFORM_FEE_DEBIT = "CASH_PLATFORM_FEE_DEBIT";
 
     private final DriverProfileRepository driverProfileRepository;
     private final DriverEarningRepository driverEarningRepository;
@@ -48,6 +51,9 @@ public class DriverEarningService {
         BigDecimal grossAmount = event.getAmount().setScale(2, RoundingMode.HALF_UP);
         BigDecimal driverAmount = grossAmount.multiply(DRIVER_SHARE_RATE).setScale(2, RoundingMode.HALF_UP);
         BigDecimal platformAmount = grossAmount.subtract(driverAmount).setScale(2, RoundingMode.HALF_UP);
+        boolean cashPayment = isCashPayment(event.getPaymentMethod());
+        BigDecimal balanceDelta = cashPayment ? platformAmount.negate() : driverAmount;
+        String settlementType = cashPayment ? SETTLEMENT_CASH_PLATFORM_FEE_DEBIT : SETTLEMENT_ONLINE_GATEWAY_CREDIT;
 
         DriverEarning earning = new DriverEarning();
         earning.setPaymentEventId(event.getEventId());
@@ -57,6 +63,8 @@ public class DriverEarningService {
         earning.setGrossAmount(grossAmount);
         earning.setDriverAmount(driverAmount);
         earning.setPlatformAmount(platformAmount);
+        earning.setBalanceDelta(balanceDelta);
+        earning.setSettlementType(settlementType);
         earning.setDriverSharePercent(DRIVER_SHARE_PERCENT);
         earning.setCurrency(hasText(event.getCurrency()) ? event.getCurrency() : "VND");
         earning.setPaymentMethod(event.getPaymentMethod());
@@ -66,11 +74,11 @@ public class DriverEarningService {
         BigDecimal currentEarnings = profile.getTotalEarnings() == null
                 ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
                 : profile.getTotalEarnings();
-        profile.setTotalEarnings(currentEarnings.add(driverAmount).setScale(2, RoundingMode.HALF_UP));
+        profile.setTotalEarnings(currentEarnings.add(balanceDelta).setScale(2, RoundingMode.HALF_UP));
         driverProfileRepository.save(profile);
 
-        log.info("[DriverEarning] Credited driver earning - driverId={}, rideId={}, grossAmount={}, driverAmount={}, platformAmount={}",
-                event.getDriverId(), rideId, grossAmount, driverAmount, platformAmount);
+        log.info("[DriverEarning] Settled driver earning - driverId={}, rideId={}, paymentMethod={}, settlementType={}, grossAmount={}, driverAmount={}, platformAmount={}, balanceDelta={}",
+                event.getDriverId(), rideId, event.getPaymentMethod(), settlementType, grossAmount, driverAmount, platformAmount, balanceDelta);
     }
 
     private void validateEvent(PaymentCompletedEvent event) {
@@ -86,5 +94,9 @@ public class DriverEarningService {
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    private boolean isCashPayment(String paymentMethod) {
+        return hasText(paymentMethod) && CASH_PAYMENT_METHOD.equalsIgnoreCase(paymentMethod.trim());
     }
 }

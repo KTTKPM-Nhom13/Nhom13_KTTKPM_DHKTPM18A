@@ -2,8 +2,10 @@ package iuh.fit.payment_service.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import iuh.fit.payment_service.config.RedisConfig.IdempotencyRedisService;
+import iuh.fit.payment_service.dto.event.BookingCreatedEvent;
 import iuh.fit.payment_service.dto.event.PaymentCompletedEvent;
 import iuh.fit.payment_service.dto.event.PaymentFailedEvent;
+import iuh.fit.payment_service.dto.event.PaymentInitiatedEvent;
 import iuh.fit.payment_service.dto.momo.MoMoIpnResult;
 import iuh.fit.payment_service.dto.request.ChargePaymentRequest;
 import iuh.fit.payment_service.dto.request.GatewayChargeRequest;
@@ -23,6 +25,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
@@ -52,6 +56,62 @@ public class PaymentSagaService {
 
         PaymentTransaction transaction = createAndSaveTransaction(request);
         return executePayment(transaction);
+    }
+
+    @Transactional
+    public void initiatePaymentFromBookingCreated(BookingCreatedEvent event) {
+        String bookingId = event.getBookingId();
+        if (bookingId == null || bookingId.isBlank()) {
+            log.warn("[Saga] booking.created has blank bookingId/rideId, skipping payment initiation");
+            return;
+        }
+
+        if (paymentRepository.findByBookingId(bookingId).isPresent()) {
+            log.info("[Saga] Payment transaction already exists for bookingId={}, skipping duplicate booking.created", bookingId);
+            return;
+        }
+
+        PaymentMethod method = resolvePaymentMethod(event.getPaymentMethod());
+        if (method == PaymentMethod.CASH) {
+            log.info("[Saga] booking.created uses CASH, skipping pre-payment initiation - bookingId={}", bookingId);
+            return;
+        }
+
+        BigDecimal amount = event.getAmount();
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("[Saga] booking.created has invalid amount={}, bookingId={}, skipping payment initiation",
+                    amount, bookingId);
+            return;
+        }
+
+        ChargePaymentRequest request = ChargePaymentRequest.builder()
+                .bookingId(bookingId)
+                .customerId(event.getCustomerId())
+                .amount(amount)
+                .currency(event.getCurrency() != null && !event.getCurrency().isBlank() ? event.getCurrency() : "VND")
+                .paymentMethod(method)
+                .description("Pre-payment for booking " + bookingId)
+                .idempotencyKey("booking-created-" + bookingId)
+                .build();
+
+        PaymentTransaction transaction = createAndSaveTransaction(request);
+        GatewayChargeResponse gatewayResponse = callPaymentGateway(transaction);
+
+        if (gatewayResponse.isSuccess()) {
+            markAndPublishSuccess(transaction, gatewayResponse);
+            return;
+        }
+
+        if (gatewayResponse.isPending()) {
+            updateStatusWithGatewayResponse(transaction, PaymentStatus.PENDING, gatewayResponse);
+            publishPaymentInitiated(transaction, gatewayResponse);
+            log.info("[Saga] Payment initiated from booking.created - bookingId={}, txnId={}, method={}",
+                    bookingId, transaction.getTransactionId(), method);
+            return;
+        }
+
+        String reason = gatewayResponse.getErrorCode() + ": " + gatewayResponse.getMessage();
+        markAndPublishFailed(transaction, reason, false);
     }
 
     @Transactional
@@ -293,6 +353,38 @@ public class PaymentSagaService {
             return vnPayPaymentService.charge(gatewayRequest);
         }
         return gatewayService.charge(gatewayRequest);
+    }
+
+    @Transactional
+    public void publishPaymentInitiated(PaymentTransaction transaction, GatewayChargeResponse gatewayResponse) {
+        outboxService.saveOutboxEventInTx(
+                "PaymentTransaction",
+                transaction.getTransactionId(),
+                "PAYMENT_INITIATED",
+                PaymentInitiatedEvent.fromGatewayResponse(
+                        transaction.getBookingId(),
+                        transaction.getCustomerId(),
+                        transaction.getTransactionId(),
+                        transaction.getAmount(),
+                        transaction.getCurrency(),
+                        transaction.getPaymentMethod().name(),
+                        transaction.getStatus().name(),
+                        gatewayResponse
+                )
+        );
+    }
+
+    private PaymentMethod resolvePaymentMethod(String rawPaymentMethod) {
+        if (rawPaymentMethod == null || rawPaymentMethod.isBlank()) {
+            return PaymentMethod.CASH;
+        }
+        return switch (rawPaymentMethod.trim().toUpperCase()) {
+            case "MOMO", "MOMO_WALLET" -> PaymentMethod.MOMO;
+            case "ZALOPAY", "ZALO_PAY" -> PaymentMethod.ZALOPAY;
+            case "VNPAY", "VNPAY_ATM", "ATM", "BANK_TRANSFER", "BANK", "TRANSFER" -> PaymentMethod.VNPAY;
+            case "CASH" -> PaymentMethod.CASH;
+            default -> PaymentMethod.valueOf(rawPaymentMethod.trim().toUpperCase());
+        };
     }
 
     private GatewayChargeResponse processCashPayment(GatewayChargeRequest request) {

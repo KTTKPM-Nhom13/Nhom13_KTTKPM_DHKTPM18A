@@ -46,6 +46,12 @@ public class DriverEarning extends BaseEntity {
     @Column(name = "platform_amount", nullable = false, precision = 18, scale = 2)
     BigDecimal platformAmount;
 
+    @Column(name = "balance_delta", precision = 18, scale = 2)
+    BigDecimal balanceDelta;
+
+    @Column(name = "settlement_type", length = 40)
+    String settlementType;
+
     @Column(name = "driver_share_percent", nullable = false, precision = 5, scale = 2)
     BigDecimal driverSharePercent;
 

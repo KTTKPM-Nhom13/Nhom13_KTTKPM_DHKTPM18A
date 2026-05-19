@@ -15,6 +15,7 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -30,7 +31,7 @@ public class RideFinishedConsumer {
             containerFactory = "kafkaListenerContainerFactory"
     )
     public void consumeRideFinishedEvent(
-            @Payload Object payload,
+            @Payload Map<String, Object> payload,
             @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
             @Header(KafkaHeaders.OFFSET) long offset,
             @Header(KafkaHeaders.RECEIVED_KEY) String key,
@@ -61,6 +62,17 @@ public class RideFinishedConsumer {
             } catch (IllegalArgumentException e) {
                 log.warn("[Consumer] Unknown payment method '{}', defaulting to CASH", event.getPaymentMethod());
             }
+        }
+
+        if (method != PaymentMethod.CASH) {
+            log.info("[Consumer] Skipping ride.finished payment for prepaid method={} rideId={}. Online payments are initiated from booking.created.",
+                    method, rideId);
+            return;
+        }
+
+        if (event.getDriverId() == null || event.getDriverId().isBlank()) {
+            log.warn("[Consumer] Skipping CASH settlement - missing driverId for rideId={}", rideId);
+            return;
         }
 
         BigDecimal amount = event.getFinalFare();
