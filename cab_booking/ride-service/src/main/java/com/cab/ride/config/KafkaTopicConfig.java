@@ -38,10 +38,6 @@ public class KafkaTopicConfig {
                 TopicBuilder.name("ride.completed")
                         .partitions(1)
                         .replicas(1)
-                        .build(),
-                TopicBuilder.name("ride.finished")
-                        .partitions(1)
-                        .replicas(1)
                         .build()
         );
     }

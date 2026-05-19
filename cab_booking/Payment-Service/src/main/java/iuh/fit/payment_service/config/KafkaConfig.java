@@ -31,7 +31,7 @@ import java.util.Map;
 @Slf4j
 public class KafkaConfig {
 
-    public static final String TOPIC_RIDE_FINISHED = "ride.finished";
+    public static final String TOPIC_RIDE_COMPLETED = "ride.completed";
     public static final String TOPIC_PAYMENT_COMPLETED = "payment.completed";
     public static final String TOPIC_PAYMENT_FAILED = "payment.failed";
     public static final String TOPIC_PAYMENT_INITIATED = "payment.initiated";
@@ -111,8 +111,8 @@ public class KafkaConfig {
     }
 
     @Bean
-    public NewTopic rideFinishedTopic() {
-        return TopicBuilder.name(TOPIC_RIDE_FINISHED)
+    public NewTopic rideCompletedTopic() {
+        return TopicBuilder.name(TOPIC_RIDE_COMPLETED)
                 .partitions(3)
                 .replicas(1)
                 .build();

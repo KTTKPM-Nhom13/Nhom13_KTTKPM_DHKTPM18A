@@ -60,7 +60,7 @@ spring:
       properties:
         spring.json.trusted.packages: "*"
         spring.json.type.mapping: >
-          ride-finished:iuh.fit.payment_service.dto.event.RideFinishedEvent
+          ride-completed:iuh.fit.payment_service.dto.event.RideCompletedEvent
 
 eureka:
   client:

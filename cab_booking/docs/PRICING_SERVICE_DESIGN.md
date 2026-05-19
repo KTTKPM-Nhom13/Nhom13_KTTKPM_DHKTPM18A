@@ -90,7 +90,6 @@ Pricing Service consumes:
 - `demand.supply.updated`
 - `ride.created`
 - `ride.cancelled`
-- `ride.finished`
 - `ride.completed`
 - `driver.status.changed`
 - `driver.status.updated` for forward compatibility if the driver event topic is renamed later

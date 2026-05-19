@@ -19,7 +19,7 @@ spring:
           ride-cancelled:java.util.Map,
           ride-accepted:java.util.Map,
           booking-timeout:java.util.Map,
-          ride-finished:java.util.Map,
+          ride-completed:java.util.Map,
           ride-started:java.util.Map,
           driver-arrived:java.util.Map,
           ride-assigned:java.util.Map

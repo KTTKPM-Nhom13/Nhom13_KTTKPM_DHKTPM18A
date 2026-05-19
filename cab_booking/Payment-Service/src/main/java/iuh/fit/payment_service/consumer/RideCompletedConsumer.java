@@ -1,7 +1,7 @@
 package iuh.fit.payment_service.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import iuh.fit.payment_service.dto.event.RideFinishedEvent;
+import iuh.fit.payment_service.dto.event.RideCompletedEvent;
 import iuh.fit.payment_service.dto.request.ChargePaymentRequest;
 import iuh.fit.payment_service.enums.PaymentMethod;
 import iuh.fit.payment_service.service.PaymentSagaService;
@@ -20,17 +20,17 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class RideFinishedConsumer {
+public class RideCompletedConsumer {
 
     private final PaymentSagaService paymentSagaService;
     private final ObjectMapper objectMapper;
 
     @KafkaListener(
-            topics = "ride.finished",
+            topics = "ride.completed",
             groupId = "payment-ride-consumer-group",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void consumeRideFinishedEvent(
+    public void consumeRideCompletedEvent(
             @Payload Map<String, Object> payload,
             @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
             @Header(KafkaHeaders.OFFSET) long offset,
@@ -38,20 +38,20 @@ public class RideFinishedConsumer {
             Acknowledgment acknowledgment) {
 
         try {
-            RideFinishedEvent event = objectMapper.convertValue(payload, RideFinishedEvent.class);
-            log.info("[Consumer] Received ride.finished - key={}, partition={}, offset={}, eventType={}, rideId={}, finalFare={}",
-                key, partition, offset, event.getEventType(), event.getRideId(), event.getFinalFare());
-            processPaymentFromRideFinished(event);
+            RideCompletedEvent event = objectMapper.convertValue(payload, RideCompletedEvent.class);
+            log.info("[Consumer] Received ride.completed - key={}, partition={}, offset={}, eventType={}, rideId={}, finalFare={}",
+                    key, partition, offset, event.getEventType(), event.getRideId(), event.getFinalFare());
+            processPaymentFromRideCompleted(event);
             acknowledgment.acknowledge();
-            log.info("[Consumer] Successfully processed ride.finished - key={}", key);
+            log.info("[Consumer] Successfully processed ride.completed - key={}", key);
         } catch (Exception e) {
-            log.error("[Consumer] Error processing ride.finished event - key={}, partition={}, offset={}",
+            log.error("[Consumer] Error processing ride.completed event - key={}, partition={}, offset={}",
                     key, partition, offset, e);
             acknowledgment.acknowledge();
         }
     }
 
-    private void processPaymentFromRideFinished(RideFinishedEvent event) {
+    private void processPaymentFromRideCompleted(RideCompletedEvent event) {
         String rideId = event.getRideId();
         log.info("[Consumer] Initiating automatic payment for rideId={}", rideId);
 
@@ -65,7 +65,7 @@ public class RideFinishedConsumer {
         }
 
         if (method != PaymentMethod.CASH) {
-            log.info("[Consumer] Skipping ride.finished payment for prepaid method={} rideId={}. Online payments are initiated from booking.created.",
+            log.info("[Consumer] Skipping ride.completed payment for prepaid method={} rideId={}. Online payments are initiated earlier.",
                     method, rideId);
             return;
         }
@@ -82,14 +82,14 @@ public class RideFinishedConsumer {
         }
 
         ChargePaymentRequest chargeRequest = ChargePaymentRequest.builder()
-            .bookingId(rideId)
+                .bookingId(rideId)
                 .customerId(event.getCustomerId())
                 .driverId(event.getDriverId())
                 .amount(amount)
                 .currency("VND")
                 .paymentMethod(method)
-            .description("Auto-payment for ride " + rideId)
-            .idempotencyKey("ride-finished-" + rideId)
+                .description("Auto-payment for ride " + rideId)
+                .idempotencyKey("ride-completed-" + rideId)
                 .build();
 
         try {

@@ -2,15 +2,19 @@ package iuh.fit.payment_service.dto.event;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class RideFinishedEvent {
+public class RideCompletedEvent {
 
     @JsonProperty("eventType")
     @JsonAlias({"type", "eventType"})
@@ -40,14 +44,14 @@ public class RideFinishedEvent {
 
     public String getEventId() {
         if (eventId == null || eventId.isBlank()) {
-            return java.util.UUID.randomUUID().toString();
+            return UUID.randomUUID().toString();
         }
         return eventId;
     }
 
     public String getEventType() {
         if (eventType == null || eventType.isBlank()) {
-            return "RIDE_FINISHED";
+            return "RideCompleted";
         }
         return eventType;
     }

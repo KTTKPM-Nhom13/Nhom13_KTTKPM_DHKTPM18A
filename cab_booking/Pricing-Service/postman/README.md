@@ -484,8 +484,7 @@ Cập nhật thủ công metrics cung-cầu cho một zone.
 ```text
 ride.created         - Ride mới được tạo → pendingRides++
 ride.cancelled       - Ride bị hủy → pendingRides--
-ride.finished       - Ride hoàn thành → activeDrivers++ (driver trở lại)
-ride.completed      - Ride completed
+ride.completed      - Ride hoàn thành → activeDrivers++ (driver trở lại)
 driver.status.changed - Driver online/offline → activeDrivers +/--
 driver.location.updated - Driver di chuyển
 ```

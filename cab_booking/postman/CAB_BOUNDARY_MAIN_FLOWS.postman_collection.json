@@ -520,7 +520,7 @@
               "options": { "raw": { "language": "json" } }
             },
             "url": "{{rideServiceUrl}}/api/rides/{{completeBookingId}}/complete",
-            "description": "Ride Service validates the JWT driver is assigned to this ride, updates IN_PROGRESS -> COMPLETED, publishes ride.completed, and emits deprecated ride.finished for Payment compatibility. Booking consumes ride.completed and updates COMPLETED."
+            "description": "Ride Service validates the JWT driver is assigned to this ride, updates IN_PROGRESS -> COMPLETED, and publishes ride.completed. Booking consumes ride.completed and updates COMPLETED."
           }
         },
         {

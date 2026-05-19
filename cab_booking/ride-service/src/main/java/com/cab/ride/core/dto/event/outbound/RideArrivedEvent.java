@@ -1,4 +1,4 @@
-package com.cab.ride.core.dto.event.inbound;
+package com.cab.ride.core.dto.event.outbound;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RideStartedEvent {
+public class RideArrivedEvent {
     private String eventId;
     private String eventType;
     private String rideId;

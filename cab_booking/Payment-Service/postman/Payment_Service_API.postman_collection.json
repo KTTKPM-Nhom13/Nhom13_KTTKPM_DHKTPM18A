@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "4b9f3e4b-9c2f-4512-87a1-2d7c58f0c1a1",
     "name": "Payment Service API",
-    "description": "Payment Service Postman collection. Flow 1 tests online prepay from booking.created to payment.initiated/payment.completed. Flow 2 tests CASH settlement after ride.finished: driver collected 100% cash, Driver Service deducts 30% platform fee; driver keeps 70%.",
+    "description": "Payment Service Postman collection. Flow 1 tests online prepay from booking.created to payment.initiated/payment.completed. Flow 2 tests CASH settlement after ride.completed: driver collected 100% cash, Driver Service deducts 30% platform fee; driver keeps 70%.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -329,8 +329,8 @@
       ]
     },
     {
-      "name": "Flow 2 - CASH settlement after ride.finished (driver collected 100%)",
-      "description": "Test flow tien mat: khi tai xe ket thuc chuyen va thu 100% tien mat, Payment Service phat payment.completed voi paymentMethod CASH; Driver Service consume va tru 30% phi nen tang khoi totalEarnings. Request charge trong folder nay la smoke test truc tiep cho payment.completed; khi chay full system, event tuong duong se den tu ride.finished.",
+      "name": "Flow 2 - CASH settlement after ride.completed (driver collected 100%)",
+      "description": "Test flow tien mat: khi tai xe ket thuc chuyen va thu 100% tien mat, Payment Service phat payment.completed voi paymentMethod CASH; Driver Service consume va tru 30% phi nen tang khoi totalEarnings. Request charge trong folder nay la smoke test truc tiep cho payment.completed; khi chay full system, event tuong duong se den tu ride.completed.",
       "item": [
         {
           "name": "1. Driver - Upsert/Get test profile",
@@ -470,7 +470,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"bookingId\": \"{{payment_event_booking_id}}\",\n    \"customerId\": \"{{customer_id}}\",\n    \"driverId\": \"{{driver_id}}\",\n    \"amount\": {{payment_event_amount}},\n    \"paymentMethod\": \"CASH\",\n    \"currency\": \"VND\",\n    \"description\": \"Postman CASH settlement after ride.finished\"\n}",
+              "raw": "{\n    \"bookingId\": \"{{payment_event_booking_id}}\",\n    \"customerId\": \"{{customer_id}}\",\n    \"driverId\": \"{{driver_id}}\",\n    \"amount\": {{payment_event_amount}},\n    \"paymentMethod\": \"CASH\",\n    \"currency\": \"VND\",\n    \"description\": \"Postman CASH settlement after ride.completed\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -488,7 +488,7 @@
                 "charge"
               ]
             },
-            "description": "Smoke test cho logic moi sau ride.finished CASH: Payment Service tao transaction SUCCESS va publish payment.completed. Driver Service consume event nay de tru 30% phi nen tang vi tai xe da thu 100% tien mat."
+            "description": "Smoke test cho logic moi sau ride.completed CASH: Payment Service tao transaction SUCCESS va publish payment.completed. Driver Service consume event nay de tru 30% phi nen tang vi tai xe da thu 100% tien mat."
           },
           "event": [
             {

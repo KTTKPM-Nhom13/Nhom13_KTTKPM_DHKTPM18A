@@ -2,11 +2,10 @@ package com.cab.ride.core.service;
 
 import com.cab.ride.core.dto.event.DriverLocationEvent;
 import com.cab.ride.core.dto.event.inbound.DriverAcceptedEvent;
-import com.cab.ride.core.dto.event.inbound.RideArrivedEvent;
-import com.cab.ride.core.dto.event.inbound.RideCompletedEvent;
 import com.cab.ride.core.dto.event.inbound.RideCreatedEvent;
-import com.cab.ride.core.dto.event.inbound.RideStartedEvent;
-import com.cab.ride.core.dto.event.outbound.RideFinishedEvent;
+import com.cab.ride.core.dto.event.outbound.RideArrivedEvent;
+import com.cab.ride.core.dto.event.outbound.RideCompletedEvent;
+import com.cab.ride.core.dto.event.outbound.RideStartedEvent;
 import com.cab.ride.core.dto.request.CompleteRideRequest;
 import com.cab.ride.core.entity.Ride;
 import com.cab.ride.core.enums.RideStatus;
@@ -35,7 +34,6 @@ public class RideService {
     private static final String TOPIC_RIDE_ARRIVED = "ride.arrived";
     private static final String TOPIC_RIDE_STARTED = "ride.started";
     private static final String TOPIC_RIDE_COMPLETED = "ride.completed";
-    private static final String TOPIC_RIDE_FINISHED_LEGACY = "ride.finished";
 
     private final RideRepository rideRepository;
     private final RedisTemplate<String, Object> redisTemplate;
@@ -233,7 +231,6 @@ public class RideService {
                     .build();
             kafkaTemplate.send(TOPIC_RIDE_COMPLETED, rideId, event);
             log.info("[RideService] ride.completed published | rideId={} | driverId={}", rideId, driverId);
-            publishLegacyRideFinished(saved, event);
         }
         return saved;
     }
@@ -299,18 +296,4 @@ public class RideService {
         return driverId != null && !driverId.isBlank() && driverId.equals(ride.getDriverId());
     }
 
-    private void publishLegacyRideFinished(Ride ride, RideCompletedEvent event) {
-        RideFinishedEvent legacyEvent = RideFinishedEvent.builder()
-                .eventId(event.getEventId())
-                .type(RideFinishedEvent.EVENT_TYPE)
-                .rideId(event.aggregateId())
-                .customerId(ride.getCustomerId())
-                .driverId(ride.getDriverId())
-                .finalFare(event.getFinalFare() == null ? BigDecimal.ZERO : event.getFinalFare())
-                .paymentMethod(event.getPaymentMethod() == null ? "CASH" : event.getPaymentMethod())
-                .timestamp(Instant.now().toString())
-                .build();
-        kafkaTemplate.send(TOPIC_RIDE_FINISHED_LEGACY, event.aggregateId(), legacyEvent);
-        log.info("[RideService] DEPRECATED compatibility event ride.finished published | rideId={}", event.aggregateId());
-    }
 }
