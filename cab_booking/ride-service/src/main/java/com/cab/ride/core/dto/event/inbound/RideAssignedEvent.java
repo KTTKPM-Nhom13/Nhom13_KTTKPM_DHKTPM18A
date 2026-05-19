@@ -5,19 +5,19 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Inbound event từ topic {@code ride.assigned} — được publish bởi matching-service
- * khi một tài xế được chỉ định cho cuốc xe.
- */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class RideAssignedEvent {
-
-    /** ID của cuốc xe (UUID dưới dạng String). */
+    private String eventId;
+    private String eventType;
     private String rideId;
-
-    /** ID của tài xế được chỉ định. */
+    private String bookingId;
     private String driverId;
+    private String timestamp;
+
+    public String aggregateId() {
+        return bookingId != null && !bookingId.isBlank() ? bookingId : rideId;
+    }
 }

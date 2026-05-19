@@ -34,6 +34,11 @@ public class KafkaConfig {
         configProps.put(ProducerConfig.ACKS_CONFIG, "all");
         configProps.put(ProducerConfig.RETRIES_CONFIG, 3);
         configProps.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        configProps.put("spring.json.type.mapping",
+                "ride-arrived:com.cab.ride.core.dto.event.inbound.RideArrivedEvent,"
+                        + "ride-started:com.cab.ride.core.dto.event.inbound.RideStartedEvent,"
+                        + "ride-completed:com.cab.ride.core.dto.event.inbound.RideCompletedEvent,"
+                        + "ride-finished:com.cab.ride.core.dto.event.outbound.RideFinishedEvent");
 
         return new DefaultKafkaProducerFactory<>(
                 configProps,

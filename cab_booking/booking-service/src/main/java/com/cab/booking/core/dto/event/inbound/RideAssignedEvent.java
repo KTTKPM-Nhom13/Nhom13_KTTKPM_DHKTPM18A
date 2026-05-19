@@ -16,4 +16,8 @@ public class RideAssignedEvent {
     private String bookingId;
     private String driverId;
     private String timestamp;
+
+    public String aggregateId() {
+        return bookingId != null && !bookingId.isBlank() ? bookingId : rideId;
+    }
 }

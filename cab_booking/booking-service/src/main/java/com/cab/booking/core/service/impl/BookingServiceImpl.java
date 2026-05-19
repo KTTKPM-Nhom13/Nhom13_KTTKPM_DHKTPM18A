@@ -5,10 +5,11 @@ import com.cab.booking.core.dto.request.BookingRequest;
 import com.cab.booking.core.dto.response.BookingResponse;
 import com.cab.booking.core.entity.Booking;
 import com.cab.booking.core.enums.BookingStatus;
+import com.cab.booking.core.enums.VehicleType;
+import com.cab.booking.core.enums.VehicleTypeNormalizer;
 import com.cab.booking.core.repository.BookingRepository;
 import com.cab.booking.core.service.BookingEventPublisher;
 import com.cab.booking.core.service.BookingService;
-import com.cab.booking.integration.driver.client.DriverFeignClient;
 import com.cab.booking.core.statemachine.BookingStateMachine;
 import iuh.fit.common.exception.AppException;
 import iuh.fit.common.exception.ErrorCode;
@@ -17,7 +18,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
@@ -41,10 +41,7 @@ public class BookingServiceImpl implements BookingService {
 
     private final BookingRepository bookingRepository;
     private final BookingStateMachine bookingStateMachine;
-    @SuppressWarnings("unused")
-    private final DriverFeignClient driverFeignClient; // TODO: re-add driver matching call khi Driver Service hoàn thiện
     private final RedisTemplate<String, Object> redisTemplate;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
     private final BookingEventPublisher bookingEventPublisher;
 
     // ================================================================
@@ -82,6 +79,7 @@ public class BookingServiceImpl implements BookingService {
 
         // BƯỚC 2: Verify fare
         BigDecimal verifiedFare = verifyAndExtractFare(request);
+        VehicleType vehicleType = normalizeRequestedVehicleType(request.getVehicleType());
 
         // BƯỚC 3: Build entity
         Booking booking = Booking.builder()
@@ -93,7 +91,7 @@ public class BookingServiceImpl implements BookingService {
                 .pickupLng(extractLng(request.getPickupCoordinates()))
                 .dropoffLat(extractLat(request.getDropoffCoordinates()))
                 .dropoffLng(extractLng(request.getDropoffCoordinates()))
-                .vehicleType(request.getVehicleType())
+                .vehicleType(vehicleType)
                 .paymentMethod(request.getPaymentMethod())
                 .estimatedFare(verifiedFare)
                 .promoCode(request.getPromoCode())
@@ -123,7 +121,7 @@ public class BookingServiceImpl implements BookingService {
                 .customerNote(booking.getCustomerNote())
                 .pickup(request.getPickupCoordinates())
                 .dropoff(request.getDropoffCoordinates())
-                .vehicleType(request.getVehicleType())
+                .vehicleType(vehicleType.name())
                 .paymentMethod(request.getPaymentMethod())
                 .estimatedFare(verifiedFare)
                 .promoCode(request.getPromoCode())
@@ -170,17 +168,6 @@ public class BookingServiceImpl implements BookingService {
         booking = bookingRepository.save(booking);
         log.info("✅ Driver {} accepted booking {}", driverId, bookingId);
 
-        // BƯỚC 5: Gửi Kafka event RideAcceptedEvent (publish cho downstream services nếu cần)
-        com.cab.booking.core.dto.event.outbound.RideAcceptedEvent event = com.cab.booking.core.dto.event.outbound.RideAcceptedEvent.builder()
-                .eventId(UUID.randomUUID().toString())
-                .type("RideAccepted")
-                .rideId(bookingId.toString())
-                .customerId(booking.getCustomerId())
-                .driverId(driverId)
-                .timestamp(Instant.now().toString())
-                .build();
-        bookingEventPublisher.publishRideAccepted(event);
-
         redisTemplate.opsForValue().set("booking:" + bookingId, booking, Duration.ofHours(2));
 
         return BookingResponse.fromEntity(booking);
@@ -206,27 +193,7 @@ public class BookingServiceImpl implements BookingService {
         booking = bookingRepository.save(booking);
         redisTemplate.opsForValue().set("booking:" + bookingId, booking, Duration.ofHours(2));
 
-        RideCreatedEvent event = RideCreatedEvent.builder()
-                .eventId(UUID.randomUUID().toString())
-                .type(RideCreatedEvent.EVENT_TYPE)
-                .rideId(booking.getId().toString())
-                .customerId(booking.getCustomerId())
-                .customerNote(booking.getCustomerNote())
-                .pickup(coordinateMap(booking.getPickupLat(), booking.getPickupLng()))
-                .dropoff(coordinateMap(booking.getDropoffLat(), booking.getDropoffLng()))
-                .vehicleType(booking.getVehicleType())
-                .paymentMethod(booking.getPaymentMethod())
-                .estimatedFare(booking.getEstimatedFare())
-                .promoCode(booking.getPromoCode())
-                .matchingAttempt(1)
-                .searchRadiusKm(3.0)
-                .rematch(true)
-                .excludedDriverIds(java.util.List.of(driverId))
-                .timestamp(Instant.now().toString())
-                .build();
-        bookingEventPublisher.publishRideCreated(event);
-
-        log.info("Driver {} rejected booking {}. Booking moved back to MATCHING. Reason={}",
+        log.info("Driver {} rejected booking {}. Booking moved back to MATCHING; matching-service rematches from driver.rejected. Reason={}",
                 driverId,
                 bookingId,
                 reason);
@@ -236,7 +203,7 @@ public class BookingServiceImpl implements BookingService {
     // ================================================================
     // START RIDE — PICKUP → IN_PROGRESS
     // ================================================================
-    @Override
+    @Deprecated
     @Transactional
     public BookingResponse startRide(UUID bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
@@ -259,9 +226,9 @@ public class BookingServiceImpl implements BookingService {
     }
 
     // ================================================================
-    // COMPLETE RIDE — IN_PROGRESS → COMPLETED → gửi ride.finished
+    // COMPLETE RIDE - IN_PROGRESS -> COMPLETED
     // ================================================================
-    @Override
+    @Deprecated
     @Transactional
     public BookingResponse completeRide(UUID bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
@@ -296,6 +263,15 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException(ErrorCode.VALIDATION_ERROR);
         }
         return request.getEstimatedFare();
+    }
+
+    private VehicleType normalizeRequestedVehicleType(String rawVehicleType) {
+        try {
+            return VehicleTypeNormalizer.normalizeVehicleType(rawVehicleType);
+        } catch (IllegalArgumentException ex) {
+            log.warn("Invalid vehicleType in booking request: {}", rawVehicleType);
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
     }
 
     private Double extractLat(Map<String, Double> coords) {
@@ -356,7 +332,7 @@ public class BookingServiceImpl implements BookingService {
         return BookingResponse.fromEntity(booking);
     }
 
-    @Override
+    @Deprecated
     @Transactional
     public BookingResponse arriveAtPickup(UUID bookingId) {
         Booking booking = bookingRepository.findById(bookingId)

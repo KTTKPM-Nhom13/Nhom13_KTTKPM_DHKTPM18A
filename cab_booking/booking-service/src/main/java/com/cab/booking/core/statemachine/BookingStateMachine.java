@@ -26,7 +26,7 @@ public class BookingStateMachine {
         // Vòng đời: CREATED/REQUESTED → MATCHING → ASSIGNED → ACCEPTED → PICKUP → IN_PROGRESS → COMPLETED → PAID
         // Ngoài ra, tất cả các trạng thái (trừ CREATED) đều có thể chuyển sang CANCELLED
         boolean isValid = switch (currentStatus) {
-            case CREATED -> nextStatus == BookingStatus.MATCHING; // CREATED không được CANCELLED
+            case CREATED -> nextStatus == BookingStatus.MATCHING || nextStatus == BookingStatus.ASSIGNED;
             case MATCHING -> nextStatus == BookingStatus.ASSIGNED || nextStatus == BookingStatus.CANCELLED;
             case ASSIGNED -> nextStatus == BookingStatus.ACCEPTED
                     || nextStatus == BookingStatus.MATCHING

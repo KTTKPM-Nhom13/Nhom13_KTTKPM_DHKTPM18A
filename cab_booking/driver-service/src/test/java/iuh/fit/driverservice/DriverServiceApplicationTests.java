@@ -1,7 +1,7 @@
 package iuh.fit.driverservice;
 
 import iuh.fit.driverservice.dto.event.DriverStatusEvent;
-import iuh.fit.driverservice.dto.event.RideAcceptedEvent;
+import iuh.fit.driverservice.dto.event.DriverAcceptedEvent;
 import iuh.fit.driverservice.dto.request.HandleDriverAssignmentRequest;
 import iuh.fit.driverservice.dto.request.UpdateDriverAvailabilityRequest;
 import iuh.fit.driverservice.dto.request.UpsertDriverProfileRequest;
@@ -11,17 +11,21 @@ import iuh.fit.driverservice.entity.DriverProfile;
 import iuh.fit.driverservice.entity.VehicleType;
 import iuh.fit.driverservice.repository.DriverProfileRepository;
 import iuh.fit.driverservice.service.DriverProfileService;
+import iuh.fit.driverservice.service.DriverRideCommandService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.kafka.core.KafkaTemplate;
 
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 
@@ -39,10 +43,24 @@ class DriverServiceApplicationTests {
     DriverProfileService driverProfileService;
 
     @Autowired
+    DriverRideCommandService driverRideCommandService;
+
+    @Autowired
     DriverProfileRepository driverProfileRepository;
 
     @MockBean
     KafkaTemplate<String, Object> kafkaTemplate;
+
+    @MockBean
+    StringRedisTemplate stringRedisTemplate;
+
+    @MockBean
+    ValueOperations<String, String> valueOperations;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUpRedisMock() {
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+    }
 
     @Test
     void contextLoads() {
@@ -84,7 +102,7 @@ class DriverServiceApplicationTests {
     }
 
     @Test
-    void handleAssignmentShouldPublishRideAssignedForBookingService() {
+    void handleAssignmentShouldPublishDriverAcceptedForBookingService() {
         UpsertDriverProfileRequest profileRequest = new UpsertDriverProfileRequest();
         profileRequest.setFullName("Driver Two");
         profileRequest.setEmail("driver2@example.com");
@@ -107,14 +125,14 @@ class DriverServiceApplicationTests {
         assignmentRequest.setPickupAddress("1 Vo Van Ngan, Thu Duc");
         assignmentRequest.setDestinationAddress("268 Ly Thuong Kiet, District 10");
 
-        driverProfileService.handleAssignment("driver-2", assignmentRequest);
+        driverRideCommandService.handleAssignment("driver-2", assignmentRequest);
 
         ArgumentCaptor<Object> rideAcceptedCaptor = ArgumentCaptor.forClass(Object.class);
-        verify(kafkaTemplate).send(eq("ride.accepted"), eq("2f52e5f8-0f91-4801-98db-ece474d38a13"), rideAcceptedCaptor.capture());
-        RideAcceptedEvent event = (RideAcceptedEvent) rideAcceptedCaptor.getValue();
+        verify(kafkaTemplate).send(eq("driver.accepted"), eq("2f52e5f8-0f91-4801-98db-ece474d38a13"), rideAcceptedCaptor.capture());
+        DriverAcceptedEvent event = (DriverAcceptedEvent) rideAcceptedCaptor.getValue();
         assertThat(event.getRideId()).isEqualTo("2f52e5f8-0f91-4801-98db-ece474d38a13");
         assertThat(event.getDriverId()).isEqualTo("driver-2");
-        assertThat(event.getType()).isEqualTo("RideAccepted");
+        assertThat(event.getEventType()).isEqualTo("DRIVER_ACCEPTED");
     }
 
     @Test

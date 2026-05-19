@@ -27,6 +27,7 @@ public class BookingRequest {
     private Map<String, Double> pickupCoordinates;
     private Map<String, Double> dropoffCoordinates;
 
+    @NotBlank(message = "Vehicle type is required")
     private String vehicleType;
     private String paymentMethod;
 

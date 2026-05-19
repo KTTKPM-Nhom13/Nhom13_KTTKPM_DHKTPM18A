@@ -1,5 +1,6 @@
 package com.cab.matching.service.consumer;
 
+import com.cab.matching.core.dto.event.inbound.DriverRejectedEvent;
 import com.cab.matching.core.dto.event.inbound.RideCreatedEvent;
 import com.cab.matching.service.MatchingService;
 import lombok.RequiredArgsConstructor;
@@ -16,9 +17,9 @@ public class RideCreatedListener {
 
     /**
      * Lắng nghe sự kiện có cuốc xe mới được tạo trên hệ thống.
-     * Topic: ride.created
+     * Topic: booking.created (canonical), ride.created (legacy compatibility)
      */
-    @KafkaListener(topics = "ride.created", groupId = "matching-group")
+    @KafkaListener(topics = {"booking.created", "ride.created"}, groupId = "matching-group")
     public void listenRideCreated(RideCreatedEvent event) {
         log.info("📥 Nhan su kien RideCreated: [RideId={}, CustomerId={}]", 
             event.rideId(), event.customerId());
@@ -29,6 +30,17 @@ public class RideCreatedListener {
         } catch (Exception e) {
             log.error("❌ CRITICAL ERROR khi xu ly event matching cho rideId={}: {}", 
                     event.rideId(), e.getMessage(), e);
+        }
+    }
+
+    @KafkaListener(topics = "driver.rejected", groupId = "matching-group")
+    public void listenDriverRejected(DriverRejectedEvent event) {
+        log.info("Received driver.rejected: rideId={} | driverId={}", event.aggregateId(), event.getDriverId());
+        try {
+            matchingService.processDriverRejected(event);
+        } catch (Exception e) {
+            log.error("Failed to rematch rideId={} after driver rejection: {}",
+                    event.aggregateId(), e.getMessage(), e);
         }
     }
 }

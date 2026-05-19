@@ -17,6 +17,7 @@ public class DriverStatusEvent {
     private String driverId;
     private String availabilityStatus;
     private Boolean activeForBooking;
+    private String vehicleType;
     private String rideId;
     private String rideStatus;
     private DriverLocationPayload currentLocation;
