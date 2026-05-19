@@ -26,9 +26,9 @@ public class KafkaConfig {
         configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JacksonJsonSerializer.class);
         configProps.put("spring.json.type.mapping",
-                "ride-created:com.cab.booking.core.dto.event.outbound.RideCreatedEvent,"
+                "booking-created:com.cab.booking.core.dto.event.outbound.RideCreatedEvent,"
+                        + "ride-created:com.cab.booking.core.dto.event.outbound.RideCreatedEvent,"
                         + "ride-cancelled:com.cab.booking.core.dto.event.outbound.RideCancelledEvent,"
-                        + "ride-accepted:com.cab.booking.core.dto.event.outbound.RideAcceptedEvent,"
                         + "booking-timeout:com.cab.booking.core.dto.event.outbound.BookingTimeoutEvent");
 
         return new DefaultKafkaProducerFactory<>(configProps);

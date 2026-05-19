@@ -7,13 +7,21 @@ spring:
 
   kafka:
     bootstrap-servers: ${KAFKA_URL:localhost:9092}
+    properties:
+      security.protocol: PLAINTEXT
+    admin:
+      properties:
+        security.protocol: PLAINTEXT
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
+        security.protocol: PLAINTEXT
         spring.json.add.type.headers: true
         # MATCHING LÀ NGƯỜI PHÁT RA RIDE-ASSIGNED
         spring.json.type.mapping: >
+          booking-created:com.cab.matching.core.dto.event.inbound.RideCreatedEvent,
+          driver-assigned:com.cab.matching.core.dto.event.outbound.RideAssignedEvent,
           ride-assigned:com.cab.matching.core.dto.event.outbound.RideAssignedEvent
     consumer:
       group-id: matching-group
@@ -21,12 +29,16 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       properties:
+        security.protocol: PLAINTEXT
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: "*"
-        spring.json.use.type.headers: false
-        spring.json.value.default.type: com.cab.matching.core.dto.event.inbound.RideCreatedEvent
+        spring.json.use.type.headers: true
         spring.json.type.mapping: >
+          booking.created:com.cab.matching.core.dto.event.inbound.RideCreatedEvent,
+          booking-created:com.cab.matching.core.dto.event.inbound.RideCreatedEvent,
           ride.created:com.cab.matching.core.dto.event.inbound.RideCreatedEvent,
+          ride-created:com.cab.matching.core.dto.event.inbound.RideCreatedEvent,
+          driver-rejected:com.cab.matching.core.dto.event.inbound.DriverRejectedEvent,
           ride-cancelled:com.cab.matching.core.dto.event.inbound.RideCancelledEvent
 
   data:

@@ -7,7 +7,11 @@ public record RideStartedEvent(
         String eventId,
         Instant timestamp,
         String rideId,
+        String bookingId,
         String customerId,
         String driverId
 ) {
+    public String aggregateId() {
+        return bookingId != null && !bookingId.isBlank() ? bookingId : rideId;
+    }
 }

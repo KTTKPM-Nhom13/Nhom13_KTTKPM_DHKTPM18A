@@ -19,11 +19,27 @@ public class KafkaTopicConfig {
                         .partitions(3)
                         .replicas(1)
                         .build(),
+                TopicBuilder.name("driver.assigned")
+                        .partitions(1)
+                        .replicas(1)
+                        .build(),
                 TopicBuilder.name("ride.assigned")
                         .partitions(1)
                         .replicas(1)
                         .build(),
-                TopicBuilder.name("payment.completed")
+                TopicBuilder.name("ride.arrived")
+                        .partitions(1)
+                        .replicas(1)
+                        .build(),
+                TopicBuilder.name("ride.started")
+                        .partitions(1)
+                        .replicas(1)
+                        .build(),
+                TopicBuilder.name("ride.completed")
+                        .partitions(1)
+                        .replicas(1)
+                        .build(),
+                TopicBuilder.name("ride.finished")
                         .partitions(1)
                         .replicas(1)
                         .build()

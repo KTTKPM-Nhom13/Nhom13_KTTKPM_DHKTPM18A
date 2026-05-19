@@ -35,9 +35,10 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
         spring.json.type.mapping: >
-          ride-finished:com.cab.ride.core.dto.event.outbound.RideFinishedEvent,
-          ride-started:com.cab.ride.core.dto.event.outbound.RideStartedEvent,
-          driver-arrived:com.cab.ride.core.dto.event.outbound.DriverArrivedEvent
+          ride-arrived:com.cab.ride.core.dto.event.inbound.RideArrivedEvent,
+          ride-started:com.cab.ride.core.dto.event.inbound.RideStartedEvent,
+          ride-completed:com.cab.ride.core.dto.event.inbound.RideCompletedEvent,
+          ride-finished:com.cab.ride.core.dto.event.outbound.RideFinishedEvent
     consumer:
       group-id: ride-service-group
       auto-offset-reset: earliest
@@ -47,9 +48,14 @@ spring:
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: "*"
         spring.json.type.mapping: >
+          driver-assigned:com.cab.ride.core.dto.event.inbound.RideAssignedEvent,
           ride-assigned:com.cab.ride.core.dto.event.inbound.RideAssignedEvent,
-          payment-completed:com.cab.ride.core.dto.event.inbound.PaymentCompletedEvent,
+          booking-created:com.cab.ride.core.dto.event.inbound.RideCreatedEvent,
           ride-created:com.cab.ride.core.dto.event.inbound.RideCreatedEvent,
+          driver-accepted:com.cab.ride.core.dto.event.inbound.DriverAcceptedEvent,
+          ride-arrived:com.cab.ride.core.dto.event.inbound.RideArrivedEvent,
+          ride-started:com.cab.ride.core.dto.event.inbound.RideStartedEvent,
+          ride-completed:com.cab.ride.core.dto.event.inbound.RideCompletedEvent,
           driver-location:com.cab.ride.core.dto.event.DriverLocationEvent
 
 # ── Eureka ──────────────────────────────────────────────────────────────────

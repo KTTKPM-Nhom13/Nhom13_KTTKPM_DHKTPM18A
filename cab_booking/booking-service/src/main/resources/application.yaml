@@ -36,9 +36,9 @@ spring:
       properties:
         # BOOKING PHÁT RA CÁC SỰ KIỆN LIÊN QUAN ĐẾN ĐƠN ĐẶT (Đã xóa ride-assigned khỏi đây)
         spring.json.type.mapping: >
+          booking-created:com.cab.booking.core.dto.event.outbound.RideCreatedEvent,
           ride-created:com.cab.booking.core.dto.event.outbound.RideCreatedEvent,
           ride-cancelled:com.cab.booking.core.dto.event.outbound.RideCancelledEvent,
-          ride-accepted:com.cab.booking.core.dto.event.outbound.RideAcceptedEvent,
           booking-timeout:com.cab.booking.core.dto.event.outbound.BookingTimeoutEvent
     consumer:
       group-id: booking-group
@@ -51,16 +51,14 @@ spring:
         # BOOKING NHẬN VỀ CÁC SỰ KIỆN TỪ MATCHING, RIDE, VÀ PAYMENT
         # Đã gom driver-matched thành ride-assigned và thêm đủ dấu phẩy
         spring.json.type.mapping: >
+          driver-assigned:com.cab.booking.core.dto.event.inbound.RideAssignedEvent,
           ride-assigned:com.cab.booking.core.dto.event.inbound.RideAssignedEvent,
           com.cab.matching.core.dto.event.outbound.RideAssignedEvent:com.cab.booking.core.dto.event.inbound.RideAssignedEvent,
-          ride-accepted:com.cab.booking.core.dto.event.inbound.RideAcceptedEvent,
-          ride-rejected:com.cab.booking.core.dto.event.inbound.RideRejectedEvent,
-          ride-accept-requested:com.cab.booking.core.dto.event.inbound.RideAcceptRequestedEvent,
-          ride-reject-requested:com.cab.booking.core.dto.event.inbound.RideRejectRequestedEvent,
-          driver-arrived:com.cab.booking.core.dto.event.inbound.DriverArrivedEvent,
+          driver-accepted:com.cab.booking.core.dto.event.inbound.DriverAcceptedEvent,
+          driver-rejected:com.cab.booking.core.dto.event.inbound.DriverRejectedEvent,
+          ride-arrived:com.cab.booking.core.dto.event.inbound.RideArrivedEvent,
           ride-started:com.cab.booking.core.dto.event.inbound.RideStartedEvent,
           ride-completed:com.cab.booking.core.dto.event.inbound.RideCompletedEvent,
-          ride-finished:com.cab.booking.core.dto.event.inbound.RideFinishedEvent,
           payment-completed:com.cab.booking.core.dto.event.inbound.PaymentCompletedEvent,
           payment-failed:com.cab.booking.core.dto.event.inbound.PaymentFailedEvent,
           driver-status:com.cab.booking.core.dto.event.inbound.DriverStatusEvent
