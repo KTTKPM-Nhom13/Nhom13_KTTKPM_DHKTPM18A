@@ -2,10 +2,304 @@
   "info": {
     "_postman_id": "4b9f3e4b-9c2f-4512-87a1-2d7c58f0c1a1",
     "name": "Payment Service API",
-    "description": "APIs for testing Payment Service with JWT authentication. VNPay flow: run charge request, copy/open saved vnpay_pay_url, pay with NCB test card, then check booking/transaction status.",
+    "description": "APIs for testing Payment Service with JWT authentication. Includes event smoke test: Payment Service publishes payment.completed and Driver Service consumes it to credit 30% driver earnings. VNPay flow: run charge request, copy/open saved vnpay_pay_url, pay with NCB test card, then check booking/transaction status.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
+    {
+      "name": "Event Test - Payment completed -> Driver earnings",
+      "description": "Smoke test nho cho flow khong dung Wallet/Ledger Service: Payment Service publish payment.completed, Driver Service consume event va cong 30% vao totalEarnings. Truoc khi chay, driver_jwt_token phai la token cua tai xe can cong tien; driver_id se duoc lay tu /api/drivers/me/profile.",
+      "item": [
+        {
+          "name": "1. Driver - Upsert/Get test profile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{driver_jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"fullName\": \"Postman Payment Event Driver\",\n    \"email\": \"payment-event-driver@example.com\",\n    \"phoneNumber\": \"0900000001\",\n    \"licenseNumber\": \"GPLX-PAYMENT-EVENT\",\n    \"vehicleType\": \"CAR4\",\n    \"vehiclePlate\": \"PAY-12345\",\n    \"vehicleModel\": \"Toyota Vios\",\n    \"vehicleColor\": \"White\",\n    \"serviceArea\": \"Ho Chi Minh City\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{driver_service_url}}/api/drivers/me/profile",
+              "host": [
+                "{{driver_service_url}}"
+              ],
+              "path": [
+                "api",
+                "drivers",
+                "me",
+                "profile"
+              ]
+            },
+            "description": "Tao/cap nhat DriverProfile cho token tai xe. Test script luu externalUserId vao collection variable driver_id."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Driver profile request returns 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "const result = body.result || body.data || body;",
+                  "pm.test('Driver profile has externalUserId', function () { pm.expect(result.externalUserId).to.be.a('string').and.not.empty; });",
+                  "pm.collectionVariables.set('driver_id', result.externalUserId);",
+                  "console.log('driver_id =', result.externalUserId);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "2. Driver - Earnings before payment.completed",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{driver_jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{driver_service_url}}/api/drivers/me/earnings/summary",
+              "host": [
+                "{{driver_service_url}}"
+              ],
+              "path": [
+                "api",
+                "drivers",
+                "me",
+                "earnings",
+                "summary"
+              ]
+            },
+            "description": "Luu totalEarnings truoc khi Payment Service phat event."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Earnings before request returns 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "const result = body.result || body.data || body;",
+                  "const total = Number(result.totalEarnings || 0);",
+                  "pm.collectionVariables.set('driver_earnings_before', total.toFixed(2));",
+                  "console.log('driver_earnings_before =', total);"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "3. Payment - CASH charge emits payment.completed",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "{{payment_event_idempotency_key}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"bookingId\": \"{{payment_event_booking_id}}\",\n    \"customerId\": \"{{customer_id}}\",\n    \"driverId\": \"{{driver_id}}\",\n    \"amount\": {{payment_event_amount}},\n    \"paymentMethod\": \"CASH\",\n    \"currency\": \"VND\",\n    \"description\": \"Postman test payment.completed -> driver earnings\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/payments/charge",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "charge"
+              ]
+            },
+            "description": "CASH payment success ngay lap tuc, Payment Service tao outbox PAYMENT_COMPLETED va publish Kafka topic payment.completed. Driver Service se consume event nay de cong 30%."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const suffix = Date.now();",
+                  "pm.collectionVariables.set('payment_event_booking_id', `B-EVENT-${suffix}`);",
+                  "pm.collectionVariables.set('payment_event_idempotency_key', `idem-event-${suffix}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Payment charge returns 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "const result = body.result || body.data || body;",
+                  "pm.test('Payment status is SUCCESS', function () { pm.expect(result.status).to.eql('SUCCESS'); });",
+                  "pm.test('Payment response keeps driverId', function () { pm.expect(result.driverId).to.eql(pm.collectionVariables.get('driver_id')); });",
+                  "if (result.transactionId) pm.collectionVariables.set('transaction_id', result.transactionId);",
+                  "console.log('Payment transaction_id =', result.transactionId);",
+                  "console.log('Wait 1-3 seconds, then run step 4 so Driver Service has time to consume Kafka event.');"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "4. Driver - Earnings after payment.completed",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{driver_jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{driver_service_url}}/api/drivers/me/earnings/summary",
+              "host": [
+                "{{driver_service_url}}"
+              ],
+              "path": [
+                "api",
+                "drivers",
+                "me",
+                "earnings",
+                "summary"
+              ]
+            },
+            "description": "Chay sau step 3 khoang 1-3 giay. Neu totalEarnings tang dung 30% amount thi Driver Service da consume payment.completed thanh cong."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Earnings after request returns 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "const result = body.result || body.data || body;",
+                  "const before = Number(pm.collectionVariables.get('driver_earnings_before') || 0);",
+                  "const amount = Number(pm.collectionVariables.get('payment_event_amount') || 0);",
+                  "const expectedIncrease = amount * 0.30;",
+                  "const after = Number(result.totalEarnings || 0);",
+                  "pm.collectionVariables.set('driver_earnings_after', after.toFixed(2));",
+                  "console.log('driver_earnings_before =', before);",
+                  "console.log('driver_earnings_after =', after);",
+                  "console.log('expected increase =', expectedIncrease);",
+                  "pm.test('Driver earnings increased by 30% of payment amount', function () { pm.expect(after).to.be.closeTo(before + expectedIncrease, 0.01); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "5. Payment - Verify transaction includes driverId",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/payments/txn/{{transaction_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "txn",
+                "{{transaction_id}}"
+              ]
+            },
+            "description": "Xac nhan PaymentTransaction da luu driverId de event payment.completed co du du lieu cho Driver Service."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Payment lookup returns 2xx', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+                  "const body = pm.response.json();",
+                  "const result = body.result || body.data || body;",
+                  "pm.test('Transaction has driverId', function () { pm.expect(result.driverId).to.eql(pm.collectionVariables.get('driver_id')); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
     {
       "name": "Thanh toan ZaloPay (Co JWT)",
       "request": {
@@ -430,6 +724,46 @@
     {
       "key": "vnpay_pay_url",
       "value": "",
+      "type": "string"
+    },
+    {
+      "key": "driver_service_url",
+      "value": "http://localhost:8083",
+      "type": "string"
+    },
+    {
+      "key": "driver_jwt_token",
+      "value": "paste_driver_jwt_token_here",
+      "type": "string"
+    },
+    {
+      "key": "driver_id",
+      "value": "driver_external_user_id_from_step_1",
+      "type": "string"
+    },
+    {
+      "key": "payment_event_amount",
+      "value": "50000",
+      "type": "string"
+    },
+    {
+      "key": "payment_event_booking_id",
+      "value": "B-EVENT-TEST",
+      "type": "string"
+    },
+    {
+      "key": "payment_event_idempotency_key",
+      "value": "idem-event-test",
+      "type": "string"
+    },
+    {
+      "key": "driver_earnings_before",
+      "value": "0.00",
+      "type": "string"
+    },
+    {
+      "key": "driver_earnings_after",
+      "value": "0.00",
       "type": "string"
     }
   ]

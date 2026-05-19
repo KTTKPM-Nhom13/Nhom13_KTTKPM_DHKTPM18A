@@ -72,6 +72,7 @@ public class RideFinishedConsumer {
         ChargePaymentRequest chargeRequest = ChargePaymentRequest.builder()
             .bookingId(rideId)
                 .customerId(event.getCustomerId())
+                .driverId(event.getDriverId())
                 .amount(amount)
                 .currency("VND")
                 .paymentMethod(method)

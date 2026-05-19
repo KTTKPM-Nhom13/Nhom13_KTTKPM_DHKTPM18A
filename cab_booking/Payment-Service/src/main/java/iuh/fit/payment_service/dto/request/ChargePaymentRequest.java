@@ -18,6 +18,8 @@ public class ChargePaymentRequest {
     @NotBlank(message = "Customer ID is required")
     private String customerId;
 
+    private String driverId;
+
     @NotNull(message = "Amount is required")
     @DecimalMin(value = "1000.00", message = "Minimum amount is 1000 VND")
     @DecimalMax(value = "100000000.00", message = "Maximum amount exceeded")

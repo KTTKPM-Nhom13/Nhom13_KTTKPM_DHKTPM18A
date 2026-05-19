@@ -19,6 +19,7 @@ public class PaymentResponse {
     private String transactionId;
     private String bookingId;
     private String customerId;
+    private String driverId;
     private BigDecimal amount;
     private String currency;
     private PaymentMethod paymentMethod;
@@ -46,6 +47,7 @@ public class PaymentResponse {
                 .transactionId(entity.getTransactionId())
                 .bookingId(entity.getBookingId())
                 .customerId(entity.getCustomerId())
+                .driverId(entity.getDriverId())
                 .amount(entity.getAmount())
                 .currency(entity.getCurrency())
                 .paymentMethod(entity.getPaymentMethod())
