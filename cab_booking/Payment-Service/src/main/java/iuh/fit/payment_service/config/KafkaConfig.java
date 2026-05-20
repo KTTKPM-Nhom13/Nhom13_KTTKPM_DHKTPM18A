@@ -36,6 +36,7 @@ public class KafkaConfig {
     public static final String TOPIC_PAYMENT_FAILED = "payment.failed";
     public static final String TOPIC_PAYMENT_INITIATED = "payment.initiated";
     public static final String TOPIC_PAYMENT_REFUNDED = "payment.refunded";
+    public static final String TOPIC_DRIVER_EARNING_SETTLED = "driver.earning.settled";
     public static final String TOPIC_BOOKING_FAILED = "booking.failed";
 
     @Value("${spring.kafka.bootstrap-servers}")
@@ -145,6 +146,14 @@ public class KafkaConfig {
     @Bean
     public NewTopic paymentRefundedTopic() {
         return TopicBuilder.name(TOPIC_PAYMENT_REFUNDED)
+                .partitions(3)
+                .replicas(1)
+                .build();
+    }
+
+    @Bean
+    public NewTopic driverEarningSettledTopic() {
+        return TopicBuilder.name(TOPIC_DRIVER_EARNING_SETTLED)
                 .partitions(3)
                 .replicas(1)
                 .build();
