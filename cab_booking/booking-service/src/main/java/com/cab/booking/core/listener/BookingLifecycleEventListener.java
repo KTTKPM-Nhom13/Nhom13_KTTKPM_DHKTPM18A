@@ -13,6 +13,8 @@ import com.cab.booking.core.enums.BookingStatus;
 import com.cab.booking.core.repository.BookingRepository;
 import com.cab.booking.core.service.BookingService;
 import com.cab.booking.core.statemachine.BookingStateMachine;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -29,6 +31,7 @@ public class BookingLifecycleEventListener {
     private final BookingRepository bookingRepository;
     private final BookingService bookingService;
     private final BookingStateMachine bookingStateMachine;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @KafkaListener(topics = "ride.assigned", groupId = "booking-service-group")
     @Transactional
@@ -101,8 +104,16 @@ public class BookingLifecycleEventListener {
         transitionIfCurrent(event.aggregateId(), BookingStatus.IN_PROGRESS, BookingStatus.COMPLETED, "ride.completed");
     }
 
-    @KafkaListener(topics = "payment.completed", groupId = "booking-service-group")
-    public void handlePaymentCompleted(PaymentCompletedEvent event) {
+    @KafkaListener(
+            topics = "payment.completed",
+            groupId = "booking-service-group",
+            containerFactory = "paymentKafkaListenerContainerFactory"
+    )
+    public void handlePaymentCompleted(String payload) {
+        PaymentCompletedEvent event = readPaymentEvent(payload, PaymentCompletedEvent.class, "payment.completed");
+        if (event == null) {
+            return;
+        }
         log.info("[payment.completed] rideId={} | bookingId={} | eventId={} | amount={}",
                 event.getRideId(), event.getBookingId(), event.getEventId(), event.getAmount());
 
@@ -131,8 +142,16 @@ public class BookingLifecycleEventListener {
         log.info("Booking {} moved to PAID", booking.getId());
     }
 
-    @KafkaListener(topics = "payment.failed", groupId = "booking-service-group")
-    public void handlePaymentFailed(PaymentFailedEvent event) {
+    @KafkaListener(
+            topics = "payment.failed",
+            groupId = "booking-service-group",
+            containerFactory = "paymentKafkaListenerContainerFactory"
+    )
+    public void handlePaymentFailed(String payload) {
+        PaymentFailedEvent event = readPaymentEvent(payload, PaymentFailedEvent.class, "payment.failed");
+        if (event == null) {
+            return;
+        }
         UUID rideId = resolveRideId(event.getRideId(), event.getBookingId(), "payment.failed");
         log.info("[payment.failed] rideId={} | bookingId={} | status={} | reason={}",
                 event.getRideId(), event.getBookingId(), event.getStatus(), event.getReason());
@@ -218,6 +237,15 @@ public class BookingLifecycleEventListener {
             return UUID.fromString(id);
         } catch (IllegalArgumentException ex) {
             log.error("Invalid rideId/bookingId '{}' from {}, skipping event.", id, topic);
+            return null;
+        }
+    }
+
+    private <T> T readPaymentEvent(String payload, Class<T> eventType, String topic) {
+        try {
+            return objectMapper.readValue(payload, eventType);
+        } catch (JsonProcessingException ex) {
+            log.error("Invalid {} payload, skipping. payload={} | error={}", topic, payload, ex.getMessage());
             return null;
         }
     }
