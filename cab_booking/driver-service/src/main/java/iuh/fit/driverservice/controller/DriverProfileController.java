@@ -1,10 +1,8 @@
 package iuh.fit.driverservice.controller;
 
 import iuh.fit.common.dto.response.ApiResponse;
-import iuh.fit.driverservice.dto.request.CompleteDriverRideRequest;
 import iuh.fit.driverservice.dto.request.HandleDriverAssignmentRequest;
 import iuh.fit.driverservice.dto.request.UpdateDriverAvailabilityRequest;
-import iuh.fit.driverservice.dto.request.UpdateDriverRideProgressRequest;
 import iuh.fit.driverservice.dto.request.UpsertDriverProfileRequest;
 import iuh.fit.driverservice.dto.response.DriverAvailabilityResponse;
 import iuh.fit.driverservice.dto.response.DriverCurrentRideResponse;
@@ -12,6 +10,7 @@ import iuh.fit.driverservice.dto.response.DriverEarningsSummaryResponse;
 import iuh.fit.driverservice.dto.response.DriverProfileResponse;
 import iuh.fit.driverservice.security.CurrentUserFacade;
 import iuh.fit.driverservice.service.DriverProfileService;
+import iuh.fit.driverservice.service.DriverRideCommandService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class DriverProfileController {
     DriverProfileService driverProfileService;
+    DriverRideCommandService driverRideCommandService;
     CurrentUserFacade currentUserFacade;
 
     @GetMapping("/profile")
@@ -71,7 +71,7 @@ public class DriverProfileController {
             @Valid @RequestBody HandleDriverAssignmentRequest request) {
         return ApiResponse.<DriverCurrentRideResponse>builder()
                 .message("Handled driver assignment successfully")
-                .result(driverProfileService.handleAssignment(currentUserFacade.getCurrentUserId(), request))
+                .result(driverRideCommandService.handleAssignment(currentUserFacade.getCurrentUserId(), request))
                 .build();
     }
 
@@ -79,7 +79,7 @@ public class DriverProfileController {
     public ApiResponse<DriverCurrentRideResponse> acceptRide(@PathVariable String rideId) {
         return ApiResponse.<DriverCurrentRideResponse>builder()
                 .message("Ride accept request submitted")
-                .result(driverProfileService.acceptRide(currentUserFacade.getCurrentUserId(), rideId))
+                .result(driverRideCommandService.acceptRide(currentUserFacade.getCurrentUserId(), rideId))
                 .build();
     }
 
@@ -87,51 +87,7 @@ public class DriverProfileController {
     public ApiResponse<DriverCurrentRideResponse> rejectRide(@PathVariable String rideId) {
         return ApiResponse.<DriverCurrentRideResponse>builder()
                 .message("Ride reject request submitted")
-                .result(driverProfileService.rejectRide(currentUserFacade.getCurrentUserId(), rideId))
-                .build();
-    }
-
-    @PostMapping("/rides/{rideId}/arrive")
-    public ApiResponse<DriverCurrentRideResponse> arriveAtPickup(@PathVariable String rideId) {
-        return ApiResponse.<DriverCurrentRideResponse>builder()
-                .message("Driver arrival submitted")
-                .result(driverProfileService.arriveAtPickup(currentUserFacade.getCurrentUserId(), rideId))
-                .build();
-    }
-
-    @PostMapping("/rides/{rideId}/start")
-    public ApiResponse<DriverCurrentRideResponse> startRide(@PathVariable String rideId) {
-        return ApiResponse.<DriverCurrentRideResponse>builder()
-                .message("Ride start submitted")
-                .result(driverProfileService.startRide(currentUserFacade.getCurrentUserId(), rideId))
-                .build();
-    }
-
-    @PostMapping("/rides/{rideId}/complete")
-    public ApiResponse<DriverCurrentRideResponse> completeRide(
-            @PathVariable String rideId,
-            @Valid @RequestBody CompleteDriverRideRequest request) {
-        return ApiResponse.<DriverCurrentRideResponse>builder()
-                .message("Ride completion submitted")
-                .result(driverProfileService.completeRide(currentUserFacade.getCurrentUserId(), rideId, request))
-                .build();
-    }
-
-    @PatchMapping("/rides/current")
-    public ApiResponse<DriverCurrentRideResponse> updateRideProgress(
-            @Valid @RequestBody UpdateDriverRideProgressRequest request) {
-        return ApiResponse.<DriverCurrentRideResponse>builder()
-                .message("Updated current ride successfully")
-                .result(driverProfileService.updateRideProgress(currentUserFacade.getCurrentUserId(), request))
-                .build();
-    }
-
-    @PostMapping("/rides/current/complete")
-    public ApiResponse<DriverCurrentRideResponse> completeRide(
-            @Valid @RequestBody CompleteDriverRideRequest request) {
-        return ApiResponse.<DriverCurrentRideResponse>builder()
-                .message("Completed current ride successfully")
-                .result(driverProfileService.completeCurrentRide(currentUserFacade.getCurrentUserId(), request))
+                .result(driverRideCommandService.rejectRide(currentUserFacade.getCurrentUserId(), rideId))
                 .build();
     }
 

@@ -12,13 +12,21 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RideFinishedEvent {
-    public static final String EVENT_TYPE = "RideFinished";
-
     private String eventId;
     private String type;
+    private String eventType;
     private String rideId;
+    private String bookingId;
+    private String customerId;
     private String driverId;
     private BigDecimal finalFare;
+    private BigDecimal amount;
+    private String currency;
+    private String gatewayTransactionId;
     private String paymentMethod;
     private String timestamp;
+
+    public String aggregateId() {
+        return rideId != null && !rideId.isBlank() ? rideId : bookingId;
+    }
 }

@@ -2,13 +2,18 @@ package iuh.fit.payment_service.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import iuh.fit.payment_service.config.RedisConfig.IdempotencyRedisService;
+import iuh.fit.payment_service.dto.event.BookingCreatedEvent;
+import iuh.fit.payment_service.dto.event.DriverEarningSettledEvent;
 import iuh.fit.payment_service.dto.event.PaymentCompletedEvent;
 import iuh.fit.payment_service.dto.event.PaymentFailedEvent;
+import iuh.fit.payment_service.dto.event.PaymentInitiatedEvent;
+import iuh.fit.payment_service.dto.event.RideCompletedEvent;
 import iuh.fit.payment_service.dto.momo.MoMoIpnResult;
 import iuh.fit.payment_service.dto.request.ChargePaymentRequest;
 import iuh.fit.payment_service.dto.request.GatewayChargeRequest;
 import iuh.fit.payment_service.dto.response.GatewayChargeResponse;
 import iuh.fit.payment_service.dto.response.PaymentResponse;
+import iuh.fit.payment_service.dto.vnpay.VnPayCallbackResult;
 import iuh.fit.payment_service.dto.zalopay.ZaloPayCallbackResult;
 import iuh.fit.payment_service.entity.PaymentTransaction;
 import iuh.fit.payment_service.enums.PaymentStatus;
@@ -23,6 +28,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -33,10 +41,16 @@ public class PaymentSagaService {
     private final MockPaymentGatewayService gatewayService;
     private final MoMoPaymentService moMoPaymentService;
     private final ZaloPayPaymentService zaloPayPaymentService;
+    private final VnPayPaymentService vnPayPaymentService;
     private final OutboxService outboxService;
     private final ObjectMapper objectMapper;
 
     private static final int MAX_RETRY = 3;
+    private static final BigDecimal DRIVER_SHARE_PERCENT = new BigDecimal("70.00");
+    private static final BigDecimal PLATFORM_SHARE_PERCENT = new BigDecimal("30.00");
+    private static final BigDecimal DRIVER_SHARE_RATE = new BigDecimal("0.70");
+    private static final String SETTLEMENT_ONLINE_GATEWAY_CREDIT = "ONLINE_GATEWAY_CREDIT";
+    private static final String SETTLEMENT_CASH_PLATFORM_FEE_DEBIT = "CASH_PLATFORM_FEE_DEBIT";
 
     public PaymentResponse startPaymentSaga(ChargePaymentRequest request) {
         String idempotencyKey = request.getIdempotencyKey();
@@ -50,6 +64,146 @@ public class PaymentSagaService {
 
         PaymentTransaction transaction = createAndSaveTransaction(request);
         return executePayment(transaction);
+    }
+
+    @Transactional
+    public void initiatePaymentFromBookingCreated(BookingCreatedEvent event) {
+        String bookingId = event.getBookingId();
+        if (bookingId == null || bookingId.isBlank()) {
+            log.warn("[Saga] booking.created has blank bookingId/rideId, skipping payment initiation");
+            return;
+        }
+
+        if (paymentRepository.findByBookingId(bookingId).isPresent()) {
+            log.info("[Saga] Payment transaction already exists for bookingId={}, skipping duplicate booking.created", bookingId);
+            return;
+        }
+
+        PaymentMethod method = resolvePaymentMethod(event.getPaymentMethod());
+        if (method == PaymentMethod.CASH) {
+            log.info("[Saga] booking.created uses CASH, skipping pre-payment initiation - bookingId={}", bookingId);
+            return;
+        }
+
+        BigDecimal amount = event.getAmount();
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("[Saga] booking.created has invalid amount={}, bookingId={}, skipping payment initiation",
+                    amount, bookingId);
+            return;
+        }
+
+        ChargePaymentRequest request = ChargePaymentRequest.builder()
+                .bookingId(bookingId)
+                .customerId(event.getCustomerId())
+                .amount(amount)
+                .currency(event.getCurrency() != null && !event.getCurrency().isBlank() ? event.getCurrency() : "VND")
+                .paymentMethod(method)
+                .description("Pre-payment for booking " + bookingId)
+                .idempotencyKey("booking-created-" + bookingId)
+                .build();
+
+        PaymentTransaction transaction = createAndSaveTransaction(request);
+        GatewayChargeResponse gatewayResponse = callPaymentGateway(transaction);
+
+        if (gatewayResponse.isSuccess()) {
+            markAndPublishSuccess(transaction, gatewayResponse);
+            return;
+        }
+
+        if (gatewayResponse.isPending()) {
+            updateStatusWithGatewayResponse(transaction, PaymentStatus.PENDING, gatewayResponse);
+            publishPaymentInitiated(transaction, gatewayResponse);
+            log.info("[Saga] Payment initiated from booking.created - bookingId={}, txnId={}, method={}",
+                    bookingId, transaction.getTransactionId(), method);
+            return;
+        }
+
+        String reason = gatewayResponse.getErrorCode() + ": " + gatewayResponse.getMessage();
+        markAndPublishFailed(transaction, reason, false);
+    }
+
+    @Transactional
+    public void settleDriverEarningFromRideCompleted(RideCompletedEvent event) {
+        if (event == null || event.aggregateId() == null || event.aggregateId().isBlank()) {
+            log.warn("[Settlement] ride.completed has blank bookingId/rideId, skipping driver earning settlement");
+            return;
+        }
+        if (event.getDriverId() == null || event.getDriverId().isBlank()) {
+            log.warn("[Settlement] ride.completed has blank driverId, aggregateId={}, skipping driver earning settlement",
+                    event.aggregateId());
+            return;
+        }
+
+        PaymentMethod method = resolvePaymentMethod(event.getPaymentMethod());
+        if (method == PaymentMethod.CASH) {
+            settleCashRide(event);
+            return;
+        }
+
+        settleOnlineRide(event, method);
+    }
+
+    private void settleCashRide(RideCompletedEvent event) {
+        BigDecimal amount = event.getFinalFare();
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("[Settlement] Skipping CASH settlement - invalid finalFare={} aggregateId={}",
+                    amount, event.aggregateId());
+            return;
+        }
+
+        ChargePaymentRequest request = ChargePaymentRequest.builder()
+                .bookingId(event.aggregateId())
+                .customerId(event.getCustomerId())
+                .driverId(event.getDriverId())
+                .amount(amount)
+                .currency("VND")
+                .paymentMethod(PaymentMethod.CASH)
+                .description("Cash collected by driver for ride " + event.aggregateId())
+                .idempotencyKey("ride-completed-" + event.aggregateId())
+                .build();
+
+        PaymentResponse response = startPaymentSaga(request);
+        PaymentTransaction transaction = paymentRepository.findByTransactionId(response.getTransactionId())
+                .orElseThrow(() -> new PaymentException(ErrorCode.PAYMENT_NOT_FOUND,
+                        "Transaction not found after CASH settlement: " + response.getTransactionId()));
+
+        publishDriverEarningSettled(transaction, event.aggregateId(), event.getDriverId(),
+                SETTLEMENT_CASH_PLATFORM_FEE_DEBIT);
+        log.info("[Settlement] CASH driver earning settled - aggregateId={}, driverId={}, txnId={}",
+                event.aggregateId(), event.getDriverId(), transaction.getTransactionId());
+    }
+
+    private void settleOnlineRide(RideCompletedEvent event, PaymentMethod method) {
+        PaymentTransaction transaction = paymentRepository.findByBookingId(event.aggregateId())
+                .orElseThrow(() -> new PaymentException(ErrorCode.PAYMENT_NOT_FOUND,
+                        "Payment not found for completed ride: " + event.aggregateId()));
+
+        if (transaction.getStatus() != PaymentStatus.SUCCESS) {
+            log.warn("[Settlement] Skipping online driver earning settlement - payment not SUCCESS, aggregateId={}, txnId={}, status={}",
+                    event.aggregateId(), transaction.getTransactionId(), transaction.getStatus());
+            return;
+        }
+
+        if (transaction.getPaymentMethod() == PaymentMethod.CASH) {
+            log.warn("[Settlement] Expected online payment but transaction is CASH, aggregateId={}, txnId={}",
+                    event.aggregateId(), transaction.getTransactionId());
+            return;
+        }
+
+        if (transaction.getPaymentMethod() != method) {
+            log.warn("[Settlement] ride.completed paymentMethod={} differs from transaction method={} for aggregateId={}",
+                    method, transaction.getPaymentMethod(), event.aggregateId());
+        }
+
+        if (transaction.getDriverId() == null || transaction.getDriverId().isBlank()) {
+            transaction.setDriverId(event.getDriverId());
+            paymentRepository.save(transaction);
+        }
+
+        publishDriverEarningSettled(transaction, event.aggregateId(), event.getDriverId(),
+                SETTLEMENT_ONLINE_GATEWAY_CREDIT);
+        log.info("[Settlement] Online driver earning settled - aggregateId={}, driverId={}, txnId={}, method={}",
+                event.aggregateId(), event.getDriverId(), transaction.getTransactionId(), transaction.getPaymentMethod());
     }
 
     @Transactional
@@ -89,9 +243,10 @@ public class PaymentSagaService {
     @Transactional
     public PaymentTransaction createAndSaveTransaction(ChargePaymentRequest request) {
         PaymentTransaction transaction = PaymentTransaction.builder()
-                .transactionId("txn_" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12))
+                .transactionId("TXN" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase())
                 .bookingId(request.getBookingId())
                 .customerId(request.getCustomerId())
+                .driverId(request.getDriverId())
                 .amount(request.getAmount())
                 .currency(request.getCurrency() != null ? request.getCurrency() : "VND")
                 .paymentMethod(request.getPaymentMethod())
@@ -229,6 +384,7 @@ public class PaymentSagaService {
                 "PAYMENT_COMPLETED",
                 PaymentCompletedEvent.fromTransaction(
                         transaction.getBookingId(),
+                        transaction.getDriverId(),
                         transaction.getAmount(),
                         transaction.getCurrency(),
                         transaction.getGatewayTransactionId(),
@@ -276,21 +432,113 @@ public class PaymentSagaService {
                 .description("Payment for booking " + transaction.getBookingId())
                 .build();
 
+        if (transaction.getPaymentMethod() == PaymentMethod.CASH) {
+            return processCashPayment(gatewayRequest);
+        }
         if (transaction.getPaymentMethod() == PaymentMethod.MOMO) {
             return moMoPaymentService.charge(gatewayRequest);
         }
         if (transaction.getPaymentMethod() == PaymentMethod.ZALOPAY) {
             return zaloPayPaymentService.charge(gatewayRequest);
         }
+        if (transaction.getPaymentMethod() == PaymentMethod.VNPAY) {
+            return vnPayPaymentService.charge(gatewayRequest);
+        }
         return gatewayService.charge(gatewayRequest);
     }
 
+    @Transactional
+    public void publishPaymentInitiated(PaymentTransaction transaction, GatewayChargeResponse gatewayResponse) {
+        outboxService.saveOutboxEventInTx(
+                "PaymentTransaction",
+                transaction.getTransactionId(),
+                "PAYMENT_INITIATED",
+                PaymentInitiatedEvent.fromGatewayResponse(
+                        transaction.getBookingId(),
+                        transaction.getCustomerId(),
+                        transaction.getTransactionId(),
+                        transaction.getAmount(),
+                        transaction.getCurrency(),
+                        transaction.getPaymentMethod().name(),
+                        transaction.getStatus().name(),
+                        gatewayResponse
+                )
+        );
+    }
+
+    private void publishDriverEarningSettled(
+            PaymentTransaction transaction,
+            String rideId,
+            String driverId,
+            String settlementType
+    ) {
+        BigDecimal grossAmount = transaction.getAmount().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal driverAmount = grossAmount.multiply(DRIVER_SHARE_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal platformAmount = grossAmount.subtract(driverAmount).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal balanceDelta = SETTLEMENT_CASH_PLATFORM_FEE_DEBIT.equals(settlementType)
+                ? platformAmount.negate()
+                : driverAmount;
+
+        outboxService.saveOutboxEventInTx(
+                "DriverEarning",
+                rideId,
+                "DRIVER_EARNING_SETTLED",
+                DriverEarningSettledEvent.fromTransaction(
+                        transaction,
+                        rideId,
+                        driverId,
+                        driverAmount,
+                        platformAmount,
+                        DRIVER_SHARE_PERCENT,
+                        PLATFORM_SHARE_PERCENT,
+                        balanceDelta,
+                        settlementType
+                )
+        );
+    }
+
+    private PaymentMethod resolvePaymentMethod(String rawPaymentMethod) {
+        if (rawPaymentMethod == null || rawPaymentMethod.isBlank()) {
+            return PaymentMethod.CASH;
+        }
+        return switch (rawPaymentMethod.trim().toUpperCase()) {
+            case "MOMO", "MOMO_WALLET" -> PaymentMethod.MOMO;
+            case "ZALOPAY", "ZALO_PAY" -> PaymentMethod.ZALOPAY;
+            case "VNPAY", "VNPAY_ATM", "ATM", "BANK_TRANSFER", "BANK", "TRANSFER" -> PaymentMethod.VNPAY;
+            case "CASH" -> PaymentMethod.CASH;
+            default -> PaymentMethod.valueOf(rawPaymentMethod.trim().toUpperCase());
+        };
+    }
+
+    private GatewayChargeResponse processCashPayment(GatewayChargeRequest request) {
+        log.info("[CashPayment] Recording cash payment - txnId={}, bookingId={}, amount={}",
+                request.getTransactionId(), request.getBookingId(), request.getAmount());
+
+        return GatewayChargeResponse.builder()
+                .success(true)
+                .pending(false)
+                .gatewayTransactionId(null)
+                .status("CASH_COLLECTED")
+                .message("Cash payment recorded successfully")
+                .amount(request.getAmount())
+                .currency(request.getCurrency() != null ? request.getCurrency() : "VND")
+                .paymentMethod(PaymentMethod.CASH)
+                .transactionRef(request.getTransactionId())
+                .build();
+    }
+
     private String resolveGatewayName(PaymentMethod paymentMethod) {
+        if (paymentMethod == PaymentMethod.CASH) {
+            return "CASH";
+        }
         if (paymentMethod == PaymentMethod.MOMO) {
             return "MOMO";
         }
         if (paymentMethod == PaymentMethod.ZALOPAY) {
             return "ZALOPAY";
+        }
+        if (paymentMethod == PaymentMethod.VNPAY) {
+            return "VNPAY";
         }
         return "MOCK_GATEWAY";
     }
@@ -360,6 +608,7 @@ public class PaymentSagaService {
                     "PAYMENT_COMPLETED",
                     PaymentCompletedEvent.fromTransaction(
                             transaction.getBookingId(),
+                            transaction.getDriverId(),
                             transaction.getAmount(),
                             transaction.getCurrency(),
                             transaction.getGatewayTransactionId(),
@@ -423,11 +672,80 @@ public class PaymentSagaService {
                 "PAYMENT_COMPLETED",
                 PaymentCompletedEvent.fromTransaction(
                         transaction.getBookingId(),
+                        transaction.getDriverId(),
                         transaction.getAmount(),
                         transaction.getCurrency(),
                         transaction.getGatewayTransactionId(),
                         transaction.getPaymentMethod().name()
                 )
         );
+    }
+
+    @Transactional
+    public PaymentResponse completePaymentFromVnPayCallback(VnPayCallbackResult callbackResult) {
+        log.info("[Saga] Processing VNPay callback completion - txnId={}, vnpTxnNo={}, success={}",
+                callbackResult.getTransactionId(), callbackResult.getGatewayTransactionId(), callbackResult.isSuccess());
+
+        PaymentTransaction transaction = paymentRepository.findByTransactionId(callbackResult.getTransactionId())
+                .orElseThrow(() -> new PaymentException(ErrorCode.PAYMENT_NOT_FOUND,
+                        "Transaction not found: " + callbackResult.getTransactionId()));
+
+        if (transaction.getStatus() != PaymentStatus.PENDING) {
+            log.info("[Saga] Ignoring VNPay callback for non-pending transaction - txnId={}, status={}",
+                    transaction.getTransactionId(), transaction.getStatus());
+            return PaymentResponse.fromEntity(transaction);
+        }
+
+        if (callbackResult.getAmount() == null || transaction.getAmount().compareTo(callbackResult.getAmount()) != 0) {
+            log.error("[Saga] VNPay callback amount mismatch - txnId={}, expected={}, actual={}",
+                    transaction.getTransactionId(), transaction.getAmount(), callbackResult.getAmount());
+            throw new PaymentException(ErrorCode.VALIDATION_ERROR,
+                    "VNPay callback amount mismatch for transaction: " + transaction.getTransactionId());
+        }
+
+        if (callbackResult.isSuccess()) {
+            transaction.markSuccess(
+                    callbackResult.getGatewayTransactionId(),
+                    "VNPay callback: responseCode=" + callbackResult.getResponseCode()
+                            + ", transactionStatus=" + callbackResult.getTransactionStatus()
+            );
+            paymentRepository.save(transaction);
+            log.info("[Saga] VNPay payment SUCCESS from callback - txnId={}, gatewayTxnId={}",
+                    transaction.getTransactionId(), callbackResult.getGatewayTransactionId());
+            outboxService.saveOutboxEventInTx(
+                    "PaymentTransaction",
+                    transaction.getTransactionId(),
+                    "PAYMENT_COMPLETED",
+                    PaymentCompletedEvent.fromTransaction(
+                            transaction.getBookingId(),
+                            transaction.getDriverId(),
+                            transaction.getAmount(),
+                            transaction.getCurrency(),
+                            transaction.getGatewayTransactionId(),
+                            transaction.getPaymentMethod().name()
+                    )
+            );
+        } else {
+            String reason = "VNPay responseCode=" + callbackResult.getResponseCode()
+                    + ", transactionStatus=" + callbackResult.getTransactionStatus();
+            transaction.markFailed(reason, false);
+            paymentRepository.save(transaction);
+            log.warn("[Saga] VNPay payment FAILED from callback - txnId={}, reason={}",
+                    transaction.getTransactionId(), reason);
+            outboxService.saveOutboxEventInTx(
+                    "PaymentTransaction",
+                    transaction.getTransactionId(),
+                    "PAYMENT_FAILED",
+                    PaymentFailedEvent.fromTransaction(
+                            transaction.getBookingId(),
+                            transaction.getAmount(),
+                            transaction.getCurrency(),
+                            reason,
+                            transaction.getRetryCount()
+                    )
+            );
+        }
+
+        return PaymentResponse.fromEntity(transaction);
     }
 }

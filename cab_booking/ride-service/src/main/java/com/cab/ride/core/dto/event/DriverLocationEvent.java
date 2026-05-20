@@ -16,6 +16,12 @@ import lombok.NoArgsConstructor;
 public class DriverLocationEvent {
 
     /** ID của tài xế. */
+    private String eventId;
+
+    private String eventType;
+
+    private String rideId;
+
     private String driverId;
 
     /** Vĩ độ hiện tại. */

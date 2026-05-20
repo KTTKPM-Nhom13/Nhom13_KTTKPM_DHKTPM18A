@@ -28,14 +28,27 @@ public class PaymentCompletedEvent {
     @JsonProperty("bookingId")
     private String bookingId;
 
+    @JsonProperty("driverId")
+    private String driverId;
+
     @JsonProperty("amount")
     private BigDecimal amount;
+
+    @JsonProperty("currency")
+    private String currency;
+
+    @JsonProperty("gatewayTransactionId")
+    private String gatewayTransactionId;
+
+    @JsonProperty("paymentMethod")
+    private String paymentMethod;
 
     @JsonProperty("timestamp")
     private String timestamp;
 
     public static PaymentCompletedEvent fromTransaction(
             String rideId,
+            String driverId,
             BigDecimal amount,
             String currency,
             String gatewayTransactionId,
@@ -46,7 +59,11 @@ public class PaymentCompletedEvent {
                 .eventType("PAYMENT_COMPLETED")
                 .rideId(rideId)
                 .bookingId(rideId)
+                .driverId(driverId)
                 .amount(amount)
+                .currency(currency)
+                .gatewayTransactionId(gatewayTransactionId)
+                .paymentMethod(paymentMethod)
                 .timestamp(Instant.now().toString())
                 .build();
     }

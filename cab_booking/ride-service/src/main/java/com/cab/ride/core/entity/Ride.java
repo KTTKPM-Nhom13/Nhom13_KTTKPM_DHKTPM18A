@@ -5,8 +5,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.annotations.UuidGenerator;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -29,7 +29,6 @@ public class Ride {
 
     // ── Primary Key ────────────────────────────────────────────────────────
     @Id
-    @UuidGenerator
     @Column(updatable = false, nullable = false)
     private UUID id;
 
@@ -39,28 +38,44 @@ public class Ride {
 
     // ── Participants ───────────────────────────────────────────────────────
     /** ID của khách hàng đặt cuốc. */
-    @Column(nullable = false)
+    @Column(length = 100)
     private String customerId;
 
+    @Column(length = 100)
+    private String bookingId;
+
     /** ID của tài xế được chỉ định (null cho đến khi ASSIGNED). */
+    @Column(length = 100)
     private String driverId;
+
+    @Column(length = 255)
+    private String pickupAddress;
+
+    @Column(length = 255)
+    private String dropoffAddress;
 
     // ── Coordinates ───────────────────────────────────────────────────────
     /** Vĩ độ điểm đón. */
-    @Column(nullable = false)
+    @Column
     private Double pickupLat;
 
     /** Kinh độ điểm đón. */
-    @Column(nullable = false)
+    @Column
     private Double pickupLng;
 
     /** Vĩ độ điểm đến. */
-    @Column(nullable = false)
+    @Column
     private Double dropoffLat;
 
     /** Kinh độ điểm đến. */
-    @Column(nullable = false)
+    @Column
     private Double dropoffLng;
+
+    @Column(precision = 12, scale = 2)
+    private BigDecimal finalFare;
+
+    @Column(length = 50)
+    private String paymentMethod;
 
     // ── State Machine ──────────────────────────────────────────────────────
     @Enumerated(EnumType.STRING)

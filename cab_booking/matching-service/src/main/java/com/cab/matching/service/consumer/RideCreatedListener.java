@@ -1,5 +1,7 @@
 package com.cab.matching.service.consumer;
 
+import com.cab.matching.core.dto.event.inbound.DriverRejectedEvent;
+import com.cab.matching.core.dto.event.inbound.RideCancelledEvent;
 import com.cab.matching.core.dto.event.inbound.RideCreatedEvent;
 import com.cab.matching.service.MatchingService;
 import lombok.RequiredArgsConstructor;
@@ -14,21 +16,51 @@ public class RideCreatedListener {
 
     private final MatchingService matchingService;
 
-    /**
-     * Lắng nghe sự kiện có cuốc xe mới được tạo trên hệ thống.
-     * Topic: ride.created
-     */
     @KafkaListener(topics = "ride.created", groupId = "matching-group")
     public void listenRideCreated(RideCreatedEvent event) {
-        log.info("📥 Nhan su kien RideCreated: [RideId={}, CustomerId={}]", 
-            event.rideId(), event.customerId());
-        
+        log.info("Received ride.created: rideId={} | customerId={}",
+                event.rideId(), event.customerId());
+
         try {
-            // Ủy nhiệm việc xử lý cho Brain (MatchingService)
             matchingService.processMatching(event);
         } catch (Exception e) {
-            log.error("❌ CRITICAL ERROR khi xu ly event matching cho rideId={}: {}", 
+            log.error("Critical error processing ride.created for rideId={}: {}",
                     event.rideId(), e.getMessage(), e);
+        }
+    }
+
+    @KafkaListener(topics = "matching.retry.requested", groupId = "matching-group")
+    public void listenMatchingRetryRequested(RideCreatedEvent event) {
+        log.info("Received matching.retry.requested: rideId={} | attempt={}",
+                event.rideId(), event.attemptOrDefault());
+
+        try {
+            matchingService.processMatching(event);
+        } catch (Exception e) {
+            log.error("Critical error processing matching.retry.requested for rideId={}: {}",
+                    event.rideId(), e.getMessage(), e);
+        }
+    }
+
+    @KafkaListener(topics = "ride.rejected", groupId = "matching-group")
+    public void listenRideRejected(DriverRejectedEvent event) {
+        log.info("Received ride.rejected: rideId={} | driverId={}", event.aggregateId(), event.getDriverId());
+        try {
+            matchingService.processDriverRejected(event);
+        } catch (Exception e) {
+            log.error("Failed to rematch rideId={} after driver rejection: {}",
+                    event.aggregateId(), e.getMessage(), e);
+        }
+    }
+
+    @KafkaListener(topics = "ride.cancelled", groupId = "matching-group")
+    public void listenRideCancelled(RideCancelledEvent event) {
+        log.info("Received ride.cancelled: rideId={} | driverId={}", event.getRideId(), event.getDriverId());
+        try {
+            matchingService.processRideCancelled(event);
+        } catch (Exception e) {
+            log.error("Failed to cleanup matching state after ride.cancelled rideId={}: {}",
+                    event.getRideId(), e.getMessage(), e);
         }
     }
 }

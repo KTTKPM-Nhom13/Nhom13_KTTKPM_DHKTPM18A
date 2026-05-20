@@ -13,6 +13,8 @@ public record RideCreatedEvent(
         String rideId,
         String customerId,
         String customerNote,
+        String pickupAddress,
+        String dropoffAddress,
         Map<String, Double> pickup,
         Map<String, Double> dropoff,
         String vehicleType,

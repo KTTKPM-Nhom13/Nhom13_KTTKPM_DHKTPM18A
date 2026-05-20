@@ -1,0 +1,70 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: ride-service
+  datasource:
+    url: ${POSTGRES_URL:${RIDE_DB_JDBC_URL:jdbc:postgresql://ride-db:5432/ride_db}}
+    username: ${POSTGRES_USER:${RIDE_DB_USER:postgres}}
+    password: ${POSTGRES_PASSWORD:${RIDE_DB_PASSWORD:password}}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:redis123}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:${KAFKA_URL:kafka:9092}}
+    consumer:
+      group-id: ride-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.trusted.packages: "*"
+        spring.json.type.mapping: >
+          ride-assigned:com.cab.ride.core.dto.event.inbound.RideAssignedEvent,
+          ride-created:com.cab.ride.core.dto.event.inbound.RideCreatedEvent,
+          ride-accepted:com.cab.ride.core.dto.event.inbound.DriverAcceptedEvent,
+          ride-cancelled:com.cab.ride.core.dto.event.inbound.RideCancelledEvent,
+          driver-location:com.cab.ride.core.dto.event.DriverLocationEvent
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.type.mapping: >
+          ride-arrived:com.cab.ride.core.dto.event.outbound.RideArrivedEvent,
+          ride-started:com.cab.ride.core.dto.event.outbound.RideStartedEvent,
+          ride-completed:com.cab.ride.core.dto.event.outbound.RideCompletedEvent,
+          ride-finished:com.cab.ride.core.dto.event.outbound.RideCompletedEvent,
+          driver-location:com.cab.ride.core.dto.event.DriverLocationEvent
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_DEFAULT_ZONE:${EUREKA_SERVER_URL:http://eureka-server:8761/eureka/}}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}:${random.value}
+
+app:
+  security:
+    public-endpoints: >-
+      /actuator/health,
+      /actuator/info,
+      /v3/api-docs/**,
+      /swagger-ui/**,
+      /swagger-ui.html,
+      /api/v1/rides/location,
+      /api/v1/rides/ping

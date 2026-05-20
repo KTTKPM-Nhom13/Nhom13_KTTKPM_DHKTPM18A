@@ -5,11 +5,14 @@ import iuh.fit.payment_service.dto.momo.MoMoIpnRequest;
 import iuh.fit.payment_service.dto.momo.MoMoIpnResult;
 import iuh.fit.payment_service.dto.request.ChargePaymentRequest;
 import iuh.fit.payment_service.dto.response.PaymentResponse;
+import iuh.fit.payment_service.dto.vnpay.VnPayCallbackResult;
+import iuh.fit.payment_service.dto.vnpay.VnPayIpnResponse;
 import iuh.fit.payment_service.dto.zalopay.ZaloPayCallbackRequest;
 import iuh.fit.payment_service.dto.zalopay.ZaloPayCallbackResponse;
 import iuh.fit.payment_service.dto.zalopay.ZaloPayCallbackResult;
 import iuh.fit.payment_service.service.MoMoPaymentService;
 import iuh.fit.payment_service.service.PaymentSagaService;
+import iuh.fit.payment_service.service.VnPayPaymentService;
 import iuh.fit.payment_service.service.ZaloPayPaymentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -22,6 +25,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
@@ -33,6 +38,7 @@ public class PaymentController {
     private final PaymentSagaService paymentSagaService;
     private final MoMoPaymentService moMoPaymentService;
     private final ZaloPayPaymentService zaloPayPaymentService;
+    private final VnPayPaymentService vnPayPaymentService;
 
     @PostMapping("/charge")
     @Operation(
@@ -160,6 +166,49 @@ public class PaymentController {
         } catch (Exception e) {
             log.error("[Controller] ZaloPay callback processing failed: {}", e.getMessage(), e);
             return ResponseEntity.ok(ZaloPayCallbackResponse.invalid(e.getMessage()));
+        }
+    }
+
+    @GetMapping("/vnpay/return")
+    @Operation(
+            summary = "VNPay return URL",
+            description = "Receives customer redirect parameters from VNPay after payment completion"
+    )
+    public ResponseEntity<ApiResponse<PaymentResponse>> handleVnPayReturn(
+            @RequestParam Map<String, String> params
+    ) {
+        log.info("[Controller] GET /api/payments/vnpay/return - txnRef={}, responseCode={}",
+                params.get("vnp_TxnRef"), params.get("vnp_ResponseCode"));
+
+        VnPayCallbackResult result = vnPayPaymentService.processCallback(params);
+        PaymentResponse response = paymentSagaService.completePaymentFromVnPayCallback(result);
+        return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
+                .message(result.isSuccess() ? "VNPay payment completed successfully" : "VNPay payment failed")
+                .result(response)
+                .build());
+    }
+
+    @GetMapping("/vnpay/ipn")
+    @Operation(
+            summary = "VNPay IPN webhook",
+            description = "Receives server-to-server payment confirmation from VNPay"
+    )
+    public ResponseEntity<VnPayIpnResponse> handleVnPayIpn(
+            @RequestParam Map<String, String> params
+    ) {
+        log.info("[Controller] GET /api/payments/vnpay/ipn - txnRef={}, responseCode={}",
+                params.get("vnp_TxnRef"), params.get("vnp_ResponseCode"));
+
+        try {
+            if (params.isEmpty() || !params.containsKey("vnp_SecureHash")) {
+                return ResponseEntity.ok(new VnPayIpnResponse("99", "Input data required"));
+            }
+            VnPayCallbackResult result = vnPayPaymentService.processCallback(params);
+            paymentSagaService.completePaymentFromVnPayCallback(result);
+            return ResponseEntity.ok(VnPayIpnResponse.success());
+        } catch (Exception e) {
+            log.error("[Controller] VNPay IPN processing failed: {}", e.getMessage(), e);
+            return ResponseEntity.ok(VnPayIpnResponse.invalid(e.getMessage()));
         }
     }
 }

@@ -18,7 +18,7 @@ public class RideEventConsumer {
     private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
 
-    @KafkaListener(topics = {"ride.created", "ride.assigned", "ride.accepted", "ride.rejected", "ride.finished", "ride.arrived", "ride.started", "booking-events", "booking.timeout", "payment.completed", "pricing.surge.updated"}, groupId = "notification-group")
+    @KafkaListener(topics = {"ride.created", "ride.assigned", "ride.accepted", "ride.rejected", "ride.completed", "ride.arrived", "ride.started", "booking-events", "booking.timeout", "payment.completed", "pricing.surge.updated"}, groupId = "notification-group")
     public void consumeRideEvents(String message, @Header(KafkaHeaders.RECEIVED_TOPIC) String topic) {
         log.info("Consumed raw event from topic {}: {}", topic, message);
         
@@ -73,7 +73,7 @@ public class RideEventConsumer {
                         notificationMessage = "Thanh toán thành công! Chúc bạn một ngày tốt lành.";
                         title = "Thanh toán thành công";
                         break;
-                    case "ride.finished":
+                    case "ride.completed":
                         notificationMessage = "Chuyến đi đã hoàn thành. Cảm ơn bạn đã sử dụng dịch vụ!";
                         title = "Chuyến đi hoàn thành";
                         break;

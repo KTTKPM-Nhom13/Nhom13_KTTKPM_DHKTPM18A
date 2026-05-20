@@ -1,7 +1,9 @@
 package com.cab.ride.core.listener;
 
-import com.cab.ride.core.dto.event.inbound.PaymentCompletedEvent;
+import com.cab.ride.core.dto.event.inbound.DriverAcceptedEvent;
+import com.cab.ride.core.dto.event.inbound.RideCancelledEvent;
 import com.cab.ride.core.dto.event.inbound.RideAssignedEvent;
+import com.cab.ride.core.dto.event.inbound.RideCreatedEvent;
 import com.cab.ride.core.enums.RideStatus;
 import com.cab.ride.core.service.RideService;
 import lombok.RequiredArgsConstructor;
@@ -9,17 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
-/**
- * Kafka consumer của ride-service.
- *
- * <p>Lắng nghe các topic từ các service khác trong hệ thống và điều phối
- * việc cập nhật vòng đời chuyến đi ({@link com.cab.ride.core.enums.RideStatus}).
- *
- * <ul>
- *   <li>{@code ride.assigned}     — từ matching-service → chuyển sang ASSIGNED.</li>
- *   <li>{@code payment.completed} — từ payment-service  → chuyển sang PAID.</li>
- * </ul>
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -29,75 +20,61 @@ public class RideEventConsumer {
 
     private final RideService rideService;
 
-    // ══════════════════════════════════════════════════════════════════════
-    // Topic: ride.assigned  (matching-service → ride-service)
-    // ══════════════════════════════════════════════════════════════════════
-
-    /**
-     * Nhận sự kiện khi matching-service đã chọn được tài xế phù hợp.
-     * Cập nhật trạng thái cuốc xe sang {@link RideStatus#ASSIGNED} và lưu driverId vào DB.
-     *
-     * @param event {@link RideAssignedEvent} chứa rideId và driverId.
-     */
-    @KafkaListener(topics = "ride.assigned", groupId = GROUP_ID)
-    public void handleRideAssigned(RideAssignedEvent event) {
-        log.info("[RideEventConsumer] ← ride.assigned: rideId={} | driverId={}",
-                event.getRideId(), event.getDriverId());
-
-        if (event.getRideId() == null || event.getRideId().isBlank()) {
-            log.error("[RideEventConsumer] ride.assigned — rideId is null/blank, skipping.");
-            return;
-        }
-        if (event.getDriverId() == null || event.getDriverId().isBlank()) {
-            log.error("[RideEventConsumer] ride.assigned — driverId is null/blank, skipping.");
-            return;
-        }
-
+    @KafkaListener(topics = "ride.created", groupId = GROUP_ID)
+    public void handleRideCreated(RideCreatedEvent event) {
+        log.info("[ride.created] rideId={} | customerId={}", event.aggregateId(), event.getCustomerId());
         try {
-            rideService.assignDriverToRide(
-                    event.getRideId(),
-                    event.getDriverId(),
-                    RideStatus.ASSIGNED
-            );
-            log.info("[RideEventConsumer] ride.assigned handled ✓ rideId={}", event.getRideId());
+            rideService.createRideFromBooking(event);
         } catch (Exception ex) {
-            log.error("[RideEventConsumer] ride.assigned — FAILED for rideId={}: {}",
-                    event.getRideId(), ex.getMessage(), ex);
-            // Không re-throw để tránh Kafka retry vô tận với dữ liệu lỗi cứng.
-            // Cần cấu hình Dead Letter Topic (DLT) ở production.
+            log.error("Failed to create ride from ride.created event rideId={}: {}",
+                    event.aggregateId(), ex.getMessage(), ex);
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // Topic: payment.completed  (payment-service → ride-service)
-    // ══════════════════════════════════════════════════════════════════════
+    @KafkaListener(topics = "ride.assigned", groupId = GROUP_ID)
+    public void handleRideAssigned(RideAssignedEvent event) {
+        handleAssigned(event);
+    }
 
-    /**
-     * Nhận sự kiện khi thanh toán thành công.
-     * Cập nhật trạng thái cuốc xe sang {@link RideStatus#PAID}.
-     *
-     * @param event {@link PaymentCompletedEvent} chứa rideId và eventId.
-     */
-    @KafkaListener(topics = "payment.completed", groupId = GROUP_ID)
-    public void handlePaymentCompleted(PaymentCompletedEvent event) {
-        log.info("[RideEventConsumer] ← payment.completed: rideId={} | eventId={} | amount={}",
-                event.getRideId(), event.getEventId(), event.getAmount());
+    @KafkaListener(topics = "ride.accepted", groupId = GROUP_ID)
+    public void handleRideAccepted(DriverAcceptedEvent event) {
+        log.info("[ride.accepted] rideId={} | driverId={}", event.aggregateId(), event.getDriverId());
+        try {
+            rideService.markDriverAccepted(event);
+        } catch (Exception ex) {
+            log.error("Failed to handle ride.accepted for rideId={}: {}",
+                    event.aggregateId(), ex.getMessage(), ex);
+        }
+    }
 
-        if (event.getRideId() == null || event.getRideId().isBlank()) {
-            log.error("[RideEventConsumer] payment.completed — rideId is null/blank, skipping.");
+    @KafkaListener(topics = "ride.cancelled", groupId = GROUP_ID)
+    public void handleRideCancelled(RideCancelledEvent event) {
+        log.info("[ride.cancelled] rideId={} | driverId={} | reason={}",
+                event.aggregateId(), event.getDriverId(), event.getReason());
+        try {
+            rideService.markRideCancelled(event);
+        } catch (Exception ex) {
+            log.error("Failed to handle ride.cancelled for rideId={}: {}",
+                    event.aggregateId(), ex.getMessage(), ex);
+        }
+    }
+
+    private void handleAssigned(RideAssignedEvent event) {
+        log.info("[ride.assigned] rideId={} | driverId={}", event.aggregateId(), event.getDriverId());
+
+        if (event.aggregateId() == null || event.aggregateId().isBlank()) {
+            log.error("Assignment event has no rideId/bookingId, skipping.");
+            return;
+        }
+        if (event.getDriverId() == null || event.getDriverId().isBlank()) {
+            log.error("Assignment event has no driverId, skipping rideId={}", event.aggregateId());
             return;
         }
 
         try {
-            rideService.updateRideStatus(event.getRideId(), RideStatus.PAID);
-            log.info("[RideEventConsumer] payment.completed handled ✓ rideId={} → PAID",
-                    event.getRideId());
-        } catch (jakarta.persistence.EntityNotFoundException ex) {
-            log.error("[RideEventConsumer] payment.completed — Ride NOT FOUND: rideId={}",
-                    event.getRideId());
+            rideService.assignDriverToRide(event.aggregateId(), event.getDriverId(), RideStatus.ASSIGNED);
         } catch (Exception ex) {
-            log.error("[RideEventConsumer] payment.completed — FAILED for rideId={}: {}",
-                    event.getRideId(), ex.getMessage(), ex);
+            log.error("Failed to handle assignment for rideId={}: {}", event.aggregateId(), ex.getMessage(), ex);
         }
     }
 }

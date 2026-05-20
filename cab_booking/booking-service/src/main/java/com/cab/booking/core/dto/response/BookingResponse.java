@@ -51,7 +51,7 @@ public class BookingResponse {
                 .dropoffCoordinates(booking.getDropoffLat() != null && booking.getDropoffLng() != null
                         ? Map.of("lat", booking.getDropoffLat(), "lng", booking.getDropoffLng())
                         : null)
-                .vehicleType(booking.getVehicleType())
+                .vehicleType(booking.getVehicleType() == null ? null : booking.getVehicleType().name())
                 .paymentMethod(booking.getPaymentMethod())
                 .estimatedFare(booking.getEstimatedFare())
                 .promoCode(booking.getPromoCode())

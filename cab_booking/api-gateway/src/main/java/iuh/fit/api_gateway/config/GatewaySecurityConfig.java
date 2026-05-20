@@ -33,6 +33,9 @@ public class GatewaySecurityConfig {
             // "/api/reviews/**",
             "/api/pricing/**",
             "/api/v1/ai-agent/health",
+            "/api/payments/momo/**",
+            "/api/payments/zalopay/**",
+            "/api/payments/vnpay/**",
             // "/pricing/**"
     };
 

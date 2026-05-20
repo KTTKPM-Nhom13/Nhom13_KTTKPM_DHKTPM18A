@@ -31,11 +31,12 @@ import java.util.Map;
 @Slf4j
 public class KafkaConfig {
 
-    public static final String TOPIC_RIDE_FINISHED = "ride.finished";
+    public static final String TOPIC_RIDE_COMPLETED = "ride.completed";
     public static final String TOPIC_PAYMENT_COMPLETED = "payment.completed";
     public static final String TOPIC_PAYMENT_FAILED = "payment.failed";
     public static final String TOPIC_PAYMENT_INITIATED = "payment.initiated";
     public static final String TOPIC_PAYMENT_REFUNDED = "payment.refunded";
+    public static final String TOPIC_DRIVER_EARNING_SETTLED = "driver.earning.settled";
     public static final String TOPIC_BOOKING_FAILED = "booking.failed";
 
     @Value("${spring.kafka.bootstrap-servers}")
@@ -74,6 +75,7 @@ public class KafkaConfig {
         configProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         configProps.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
         configProps.put(JsonDeserializer.VALUE_DEFAULT_TYPE, Map.class.getName());
+        configProps.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
         configProps.put(JsonSerializer.ADD_TYPE_INFO_HEADERS, false);
         return new DefaultKafkaConsumerFactory<>(configProps);
     }
@@ -110,8 +112,8 @@ public class KafkaConfig {
     }
 
     @Bean
-    public NewTopic rideFinishedTopic() {
-        return TopicBuilder.name(TOPIC_RIDE_FINISHED)
+    public NewTopic rideCompletedTopic() {
+        return TopicBuilder.name(TOPIC_RIDE_COMPLETED)
                 .partitions(3)
                 .replicas(1)
                 .build();
@@ -144,6 +146,14 @@ public class KafkaConfig {
     @Bean
     public NewTopic paymentRefundedTopic() {
         return TopicBuilder.name(TOPIC_PAYMENT_REFUNDED)
+                .partitions(3)
+                .replicas(1)
+                .build();
+    }
+
+    @Bean
+    public NewTopic driverEarningSettledTopic() {
+        return TopicBuilder.name(TOPIC_DRIVER_EARNING_SETTLED)
                 .partitions(3)
                 .replicas(1)
                 .build();
