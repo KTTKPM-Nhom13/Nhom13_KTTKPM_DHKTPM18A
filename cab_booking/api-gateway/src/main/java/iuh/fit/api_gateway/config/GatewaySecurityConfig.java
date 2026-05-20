@@ -32,6 +32,7 @@ public class GatewaySecurityConfig {
             // "/api/notifications/**",
             // "/api/reviews/**",
             "/api/pricing/**",
+            "/api/v1/ai-agent/health",
             // "/pricing/**"
     };
 

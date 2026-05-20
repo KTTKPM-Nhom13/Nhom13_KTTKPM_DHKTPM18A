@@ -21,6 +21,11 @@ public class ReviewService {
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public Review createReview(Review review) {
+        // Validation: Ensure the ride is finished
+        if (!finishedRideRepository.existsById(review.getRideId())) {
+            throw new RuntimeException("Cannot review a ride that is not finished or does not exist: " + review.getRideId());
+        }
+
         // Validation: Ensure only one review per ride
         reviewRepository.findByRideId(review.getRideId()).ifPresent(r -> {
             throw new RuntimeException("Review already exists for ride: " + review.getRideId());
