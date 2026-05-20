@@ -3,9 +3,11 @@ package iuh.fit.payment_service.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import iuh.fit.payment_service.config.RedisConfig.IdempotencyRedisService;
 import iuh.fit.payment_service.dto.event.BookingCreatedEvent;
+import iuh.fit.payment_service.dto.event.DriverEarningSettledEvent;
 import iuh.fit.payment_service.dto.event.PaymentCompletedEvent;
 import iuh.fit.payment_service.dto.event.PaymentFailedEvent;
 import iuh.fit.payment_service.dto.event.PaymentInitiatedEvent;
+import iuh.fit.payment_service.dto.event.RideFinishedEvent;
 import iuh.fit.payment_service.dto.momo.MoMoIpnResult;
 import iuh.fit.payment_service.dto.request.ChargePaymentRequest;
 import iuh.fit.payment_service.dto.request.GatewayChargeRequest;
@@ -27,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +46,11 @@ public class PaymentSagaService {
     private final ObjectMapper objectMapper;
 
     private static final int MAX_RETRY = 3;
+    private static final BigDecimal DRIVER_SHARE_PERCENT = new BigDecimal("70.00");
+    private static final BigDecimal PLATFORM_SHARE_PERCENT = new BigDecimal("30.00");
+    private static final BigDecimal DRIVER_SHARE_RATE = new BigDecimal("0.70");
+    private static final String SETTLEMENT_ONLINE_GATEWAY_CREDIT = "ONLINE_GATEWAY_CREDIT";
+    private static final String SETTLEMENT_CASH_PLATFORM_FEE_DEBIT = "CASH_PLATFORM_FEE_DEBIT";
 
     public PaymentResponse startPaymentSaga(ChargePaymentRequest request) {
         String idempotencyKey = request.getIdempotencyKey();
@@ -112,6 +120,90 @@ public class PaymentSagaService {
 
         String reason = gatewayResponse.getErrorCode() + ": " + gatewayResponse.getMessage();
         markAndPublishFailed(transaction, reason, false);
+    }
+
+    @Transactional
+    public void settleDriverEarningFromRideFinished(RideFinishedEvent event) {
+        if (event == null || event.getRideId() == null || event.getRideId().isBlank()) {
+            log.warn("[Settlement] ride.finished has blank rideId, skipping driver earning settlement");
+            return;
+        }
+        if (event.getDriverId() == null || event.getDriverId().isBlank()) {
+            log.warn("[Settlement] ride.finished has blank driverId, rideId={}, skipping driver earning settlement",
+                    event.getRideId());
+            return;
+        }
+
+        PaymentMethod method = resolvePaymentMethod(event.getPaymentMethod());
+        if (method == PaymentMethod.CASH) {
+            settleCashRide(event);
+            return;
+        }
+
+        settleOnlineRide(event, method);
+    }
+
+    private void settleCashRide(RideFinishedEvent event) {
+        BigDecimal amount = event.getFinalFare();
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("[Settlement] Skipping CASH settlement - invalid finalFare={} rideId={}",
+                    amount, event.getRideId());
+            return;
+        }
+
+        ChargePaymentRequest request = ChargePaymentRequest.builder()
+                .bookingId(event.getRideId())
+                .customerId(event.getCustomerId())
+                .driverId(event.getDriverId())
+                .amount(amount)
+                .currency("VND")
+                .paymentMethod(PaymentMethod.CASH)
+                .description("Cash collected by driver for ride " + event.getRideId())
+                .idempotencyKey("ride-finished-" + event.getRideId())
+                .build();
+
+        PaymentResponse response = startPaymentSaga(request);
+        PaymentTransaction transaction = paymentRepository.findByTransactionId(response.getTransactionId())
+                .orElseThrow(() -> new PaymentException(ErrorCode.PAYMENT_NOT_FOUND,
+                        "Transaction not found after CASH settlement: " + response.getTransactionId()));
+
+        publishDriverEarningSettled(transaction, event.getRideId(), event.getDriverId(),
+                SETTLEMENT_CASH_PLATFORM_FEE_DEBIT);
+        log.info("[Settlement] CASH driver earning settled - rideId={}, driverId={}, txnId={}",
+                event.getRideId(), event.getDriverId(), transaction.getTransactionId());
+    }
+
+    private void settleOnlineRide(RideFinishedEvent event, PaymentMethod method) {
+        PaymentTransaction transaction = paymentRepository.findByBookingId(event.getRideId())
+                .orElseThrow(() -> new PaymentException(ErrorCode.PAYMENT_NOT_FOUND,
+                        "Payment not found for finished ride: " + event.getRideId()));
+
+        if (transaction.getStatus() != PaymentStatus.SUCCESS) {
+            log.warn("[Settlement] Skipping online driver earning settlement - payment not SUCCESS, rideId={}, txnId={}, status={}",
+                    event.getRideId(), transaction.getTransactionId(), transaction.getStatus());
+            return;
+        }
+
+        if (transaction.getPaymentMethod() == PaymentMethod.CASH) {
+            log.warn("[Settlement] Expected online payment but transaction is CASH, rideId={}, txnId={}",
+                    event.getRideId(), transaction.getTransactionId());
+            return;
+        }
+
+        if (transaction.getPaymentMethod() != method) {
+            log.warn("[Settlement] ride.finished paymentMethod={} differs from transaction method={} for rideId={}",
+                    method, transaction.getPaymentMethod(), event.getRideId());
+        }
+
+        if (transaction.getDriverId() == null || transaction.getDriverId().isBlank()) {
+            transaction.setDriverId(event.getDriverId());
+            paymentRepository.save(transaction);
+        }
+
+        publishDriverEarningSettled(transaction, event.getRideId(), event.getDriverId(),
+                SETTLEMENT_ONLINE_GATEWAY_CREDIT);
+        log.info("[Settlement] Online driver earning settled - rideId={}, driverId={}, txnId={}, method={}",
+                event.getRideId(), event.getDriverId(), transaction.getTransactionId(), transaction.getPaymentMethod());
     }
 
     @Transactional
@@ -370,6 +462,37 @@ public class PaymentSagaService {
                         transaction.getPaymentMethod().name(),
                         transaction.getStatus().name(),
                         gatewayResponse
+                )
+        );
+    }
+
+    private void publishDriverEarningSettled(
+            PaymentTransaction transaction,
+            String rideId,
+            String driverId,
+            String settlementType
+    ) {
+        BigDecimal grossAmount = transaction.getAmount().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal driverAmount = grossAmount.multiply(DRIVER_SHARE_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal platformAmount = grossAmount.subtract(driverAmount).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal balanceDelta = SETTLEMENT_CASH_PLATFORM_FEE_DEBIT.equals(settlementType)
+                ? platformAmount.negate()
+                : driverAmount;
+
+        outboxService.saveOutboxEventInTx(
+                "DriverEarning",
+                rideId,
+                "DRIVER_EARNING_SETTLED",
+                DriverEarningSettledEvent.fromTransaction(
+                        transaction,
+                        rideId,
+                        driverId,
+                        driverAmount,
+                        platformAmount,
+                        DRIVER_SHARE_PERCENT,
+                        PLATFORM_SHARE_PERCENT,
+                        balanceDelta,
+                        settlementType
                 )
         );
     }
