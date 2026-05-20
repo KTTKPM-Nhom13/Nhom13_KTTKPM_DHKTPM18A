@@ -235,9 +235,16 @@ public class DriverProfileService {
     private DriverCurrentRideResponse toCurrentRideResponse(DriverProfile profile) {
         return DriverCurrentRideResponse.builder()
                 .rideId(profile.getCurrentRideId())
+                .bookingId(profile.getCurrentBookingId())
+                .customerId(profile.getCurrentRideCustomerId())
                 .rideStatus(profile.getCurrentRideStatus() == null ? null : profile.getCurrentRideStatus().name())
                 .pickupAddress(profile.getCurrentRidePickup())
                 .destinationAddress(profile.getCurrentRideDestination())
+                .pickupLocation(toLocationPayload(profile.getCurrentRidePickupLat(), profile.getCurrentRidePickupLng()))
+                .destinationLocation(toLocationPayload(profile.getCurrentRideDropoffLat(), profile.getCurrentRideDropoffLng()))
+                .vehicleType(profile.getCurrentRideVehicleType())
+                .paymentMethod(profile.getCurrentRidePaymentMethod())
+                .estimatedFare(profile.getCurrentRideEstimatedFare())
                 .requestedAt(profile.getCurrentRideRequestedAt())
                 .driverAvailabilityStatus(profile.getAvailabilityStatus().name())
                 .currentLocation(toLocationPayload(profile))
@@ -245,9 +252,16 @@ public class DriverProfileService {
     }
 
     private DriverLocationPayload toLocationPayload(DriverProfile profile) {
+        return toLocationPayload(profile.getCurrentLatitude(), profile.getCurrentLongitude());
+    }
+
+    private DriverLocationPayload toLocationPayload(BigDecimal lat, BigDecimal lng) {
+        if (lat == null && lng == null) {
+            return null;
+        }
         return DriverLocationPayload.builder()
-                .lat(profile.getCurrentLatitude())
-                .lng(profile.getCurrentLongitude())
+                .lat(lat)
+                .lng(lng)
                 .build();
     }
 

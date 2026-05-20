@@ -186,6 +186,14 @@ public class MatchingService {
                         .rideId(event.rideId())
                         .bookingId(event.rideId())
                         .driverId(driverId)
+                        .customerId(event.customerId())
+                        .pickupAddress(event.pickupAddress())
+                        .dropoffAddress(event.dropoffAddress())
+                        .pickup(event.pickup())
+                        .dropoff(event.dropoff())
+                        .vehicleType(event.vehicleType())
+                        .paymentMethod(event.paymentMethod())
+                        .estimatedFare(event.estimatedFare())
                         .timestamp(Instant.now().toString())
                         .build();
 
@@ -339,6 +347,8 @@ public class MatchingService {
                 event.rideId(),
                 event.customerId(),
                 event.customerNote(),
+                event.pickupAddress(),
+                event.dropoffAddress(),
                 event.pickup(),
                 event.dropoff(),
                 normalizedVehicleType,
@@ -449,6 +459,8 @@ public class MatchingService {
         put(values, "rideId", event.rideId());
         put(values, "customerId", event.customerId());
         put(values, "customerNote", event.customerNote());
+        put(values, "pickupAddress", event.pickupAddress());
+        put(values, "dropoffAddress", event.dropoffAddress());
         put(values, "pickupLat", event.pickupLat());
         put(values, "pickupLng", event.pickupLng());
         put(values, "dropoffLat", coordinate(event.dropoff(), "lat"));
@@ -491,6 +503,8 @@ public class MatchingService {
                 rideId,
                 stringValue(raw.get("customerId"), null),
                 stringValue(raw.get("customerNote"), null),
+                stringValue(raw.get("pickupAddress"), null),
+                stringValue(raw.get("dropoffAddress"), null),
                 coordinateMap(parseDoubleObject(raw.get("pickupLat")), parseDoubleObject(raw.get("pickupLng"))),
                 coordinateMap(parseDoubleObject(raw.get("dropoffLat")), parseDoubleObject(raw.get("dropoffLng"))),
                 stringValue(raw.get("vehicleType"), null),

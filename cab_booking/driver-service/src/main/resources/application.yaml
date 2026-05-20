@@ -33,3 +33,7 @@ spring:
           ride-cancelled:iuh.fit.driverservice.dto.event.RideLifecycleEvent,
           payment-completed:iuh.fit.driverservice.dto.event.PaymentCompletedEvent
         spring.json.value.default.type: java.util.Map
+
+driver:
+  assignment:
+    ttl-seconds: ${DRIVER_ASSIGNMENT_TTL_SECONDS:30}

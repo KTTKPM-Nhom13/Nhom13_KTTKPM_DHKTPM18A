@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: ride-service
+  config:
+    import: "optional:configserver:http://config-server:8888"
 
   # ── Database ──────────────────────────────────────────────────────────────
   datasource:
@@ -37,7 +39,9 @@ spring:
         spring.json.type.mapping: >
           ride-arrived:com.cab.ride.core.dto.event.outbound.RideArrivedEvent,
           ride-started:com.cab.ride.core.dto.event.outbound.RideStartedEvent,
-          ride-completed:com.cab.ride.core.dto.event.outbound.RideCompletedEvent
+          ride-completed:com.cab.ride.core.dto.event.outbound.RideCompletedEvent,
+          ride-finished:com.cab.ride.core.dto.event.outbound.RideCompletedEvent,
+          driver-location:com.cab.ride.core.dto.event.DriverLocationEvent
     consumer:
       group-id: ride-service-group
       auto-offset-reset: earliest
@@ -50,6 +54,7 @@ spring:
           ride-assigned:com.cab.ride.core.dto.event.inbound.RideAssignedEvent,
           ride-created:com.cab.ride.core.dto.event.inbound.RideCreatedEvent,
           ride-accepted:com.cab.ride.core.dto.event.inbound.DriverAcceptedEvent,
+          ride-cancelled:com.cab.ride.core.dto.event.inbound.RideCancelledEvent,
           driver-location:com.cab.ride.core.dto.event.DriverLocationEvent
 
 # ── Eureka ──────────────────────────────────────────────────────────────────

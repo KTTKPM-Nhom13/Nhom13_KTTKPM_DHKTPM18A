@@ -27,6 +27,10 @@ public class KafkaTopicConfig {
                         .partitions(1)
                         .replicas(1)
                         .build(),
+                TopicBuilder.name("ride.cancelled")
+                        .partitions(1)
+                        .replicas(1)
+                        .build(),
                 TopicBuilder.name("ride.arrived")
                         .partitions(1)
                         .replicas(1)
@@ -36,6 +40,10 @@ public class KafkaTopicConfig {
                         .replicas(1)
                         .build(),
                 TopicBuilder.name("ride.completed")
+                        .partitions(1)
+                        .replicas(1)
+                        .build(),
+                TopicBuilder.name("ride.finished")
                         .partitions(1)
                         .replicas(1)
                         .build()

@@ -20,13 +20,15 @@ public class RideCreatedEvent {
     private String rideId;
     private String bookingId;
     private String customerId;
+    private String pickupAddress;
+    private String dropoffAddress;
     private Map<String, Double> pickup;
     private Map<String, Double> dropoff;
     private String vehicleType;
     private String paymentMethod;
 
     public String aggregateId() {
-        return bookingId != null && !bookingId.isBlank() ? bookingId : rideId;
+        return rideId != null && !rideId.isBlank() ? rideId : bookingId;
     }
 
     public Double pickupLat() {
