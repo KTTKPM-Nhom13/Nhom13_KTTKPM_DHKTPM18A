@@ -23,10 +23,16 @@ public class BookingStateMachine {
             currentStatus = BookingStatus.CREATED;
         }
 
-        // Vòng đời: CREATED/REQUESTED → MATCHING → ASSIGNED → ACCEPTED → PICKUP → IN_PROGRESS → COMPLETED → PAID
-        // Ngoài ra, tất cả các trạng thái (trừ CREATED) đều có thể chuyển sang CANCELLED
+        // Vòng đời: CREATED → PENDING_PAYMENT (online) | MATCHING (cash) → ASSIGNED → ACCEPTED → PICKUP → IN_PROGRESS → COMPLETED → PAID
+        // Ngoài ra, tất cả các trạng thái (trừ PAID) đều có thể chuyển sang CANCELLED
         boolean isValid = switch (currentStatus) {
-            case CREATED -> nextStatus == BookingStatus.MATCHING || nextStatus == BookingStatus.ASSIGNED;
+            // CREATED: CASH đi thẳng MATCHING, ONLINE đi qua PENDING_PAYMENT
+            case CREATED -> nextStatus == BookingStatus.MATCHING
+                    || nextStatus == BookingStatus.PENDING_PAYMENT
+                    || nextStatus == BookingStatus.ASSIGNED;
+            // PENDING_PAYMENT: thanh toán xong → MATCHING, thanh toán thất bại → CANCELLED
+            case PENDING_PAYMENT -> nextStatus == BookingStatus.MATCHING
+                    || nextStatus == BookingStatus.CANCELLED;
             case MATCHING -> nextStatus == BookingStatus.ASSIGNED || nextStatus == BookingStatus.CANCELLED;
             case ASSIGNED -> nextStatus == BookingStatus.ACCEPTED
                     || nextStatus == BookingStatus.MATCHING

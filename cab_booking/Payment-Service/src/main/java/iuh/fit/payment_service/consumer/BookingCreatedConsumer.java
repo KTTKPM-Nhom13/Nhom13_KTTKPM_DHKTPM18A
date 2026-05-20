@@ -23,7 +23,7 @@ public class BookingCreatedConsumer {
     private final ObjectMapper objectMapper;
 
     @KafkaListener(
-            topics = "booking.created",
+            topics = "ride.created",
             groupId = "payment-booking-created-consumer-group",
             containerFactory = "kafkaListenerContainerFactory"
     )
@@ -36,12 +36,12 @@ public class BookingCreatedConsumer {
     ) {
         try {
             BookingCreatedEvent event = objectMapper.convertValue(payload, BookingCreatedEvent.class);
-            log.info("[Consumer] Received booking.created - key={}, partition={}, offset={}, bookingId={}, paymentMethod={}, amount={}",
+            log.info("[Consumer] Received ride.created - key={}, partition={}, offset={}, bookingId={}, paymentMethod={}, amount={}",
                     key, partition, offset, event.getBookingId(), event.getPaymentMethod(), event.getAmount());
             paymentSagaService.initiatePaymentFromBookingCreated(event);
             acknowledgment.acknowledge();
         } catch (Exception e) {
-            log.error("[Consumer] Error processing booking.created - key={}, partition={}, offset={}",
+            log.error("[Consumer] Error processing ride.created - key={}, partition={}, offset={}",
                     key, partition, offset, e);
             acknowledgment.acknowledge();
         }
