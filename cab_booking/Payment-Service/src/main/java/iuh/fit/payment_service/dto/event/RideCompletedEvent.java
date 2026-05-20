@@ -24,8 +24,10 @@ public class RideCompletedEvent {
     private String eventId;
 
     @JsonProperty("rideId")
-    @JsonAlias({"bookingId", "rideId"})
     private String rideId;
+
+    @JsonProperty("bookingId")
+    private String bookingId;
 
     @JsonProperty("customerId")
     private String customerId;
@@ -34,6 +36,7 @@ public class RideCompletedEvent {
     private String driverId;
 
     @JsonProperty("finalFare")
+    @JsonAlias({"amount", "fare", "finalFare"})
     private BigDecimal finalFare;
 
     @JsonProperty("distanceKm")
@@ -41,6 +44,13 @@ public class RideCompletedEvent {
 
     @JsonProperty("paymentMethod")
     private String paymentMethod;
+
+    @JsonProperty("timestamp")
+    private String timestamp;
+
+    public String aggregateId() {
+        return bookingId != null && !bookingId.isBlank() ? bookingId : rideId;
+    }
 
     public String getEventId() {
         if (eventId == null || eventId.isBlank()) {
