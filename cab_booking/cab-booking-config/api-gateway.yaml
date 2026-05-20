@@ -91,6 +91,11 @@ spring:
           predicates:
             - Path=/api/v1/ai/**
 
+        - id: ai-agent-service
+          uri: http://ai-agent-service:8099
+          predicates:
+            - Path=/api/v1/ai-agent/**
+
       default-filters:
         - name: Retry
           args:
