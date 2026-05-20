@@ -16,15 +16,19 @@ import iuh.fit.driverservice.entity.DriverVerificationStatus;
 import iuh.fit.driverservice.repository.DriverProfileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -40,12 +44,14 @@ public class DriverRideCommandService {
     private static final String PENDING_RIDE_KEY_PREFIX = "driver:";
     private static final String PENDING_RIDE_KEY_SUFFIX = ":pending-ride";
     private static final String ASSIGNMENT_TIMEOUT_REASON = "ASSIGNMENT_TIMEOUT";
-    private static final Duration ASSIGNMENT_TTL = Duration.ofSeconds(30);
 
     private final DriverProfileRepository driverProfileRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final DriverStatusService driverStatusService;
     private final StringRedisTemplate stringRedisTemplate;
+
+    @Value("${driver.assignment.ttl-seconds:30}")
+    private long assignmentTtlSeconds;
 
     @Transactional
     public void handleRideAssigned(RideAssignedEvent event) {
@@ -77,17 +83,28 @@ public class DriverRideCommandService {
         }
 
         profile.setCurrentRideId(rideId);
+        profile.setCurrentBookingId(hasText(event.getBookingId()) ? event.getBookingId().trim() : rideId);
+        profile.setCurrentRideCustomerId(normalize(event.getCustomerId()));
         profile.setCurrentRideStatus(DriverRideStatus.ASSIGNED);
-        profile.setCurrentRidePickup(event.getPickupAddress());
-        profile.setCurrentRideDestination(event.getDropoffAddress());
-        profile.setCurrentRideRequestedAt(LocalDateTime.now());
-        profile.setAvailabilityStatus(DriverAvailabilityStatus.ONLINE);
+        profile.setCurrentRidePickup(normalize(event.getPickupAddress()));
+        profile.setCurrentRideDestination(normalize(event.getDropoffAddress()));
+        profile.setCurrentRidePickupLat(coordinate(event.getPickup(), "lat"));
+        profile.setCurrentRidePickupLng(coordinate(event.getPickup(), "lng"));
+        profile.setCurrentRideDropoffLat(coordinate(event.getDropoff(), "lat"));
+        profile.setCurrentRideDropoffLng(coordinate(event.getDropoff(), "lng"));
+        profile.setCurrentRideVehicleType(normalize(event.getVehicleType()));
+        profile.setCurrentRidePaymentMethod(normalize(event.getPaymentMethod()));
+        profile.setCurrentRideEstimatedFare(event.getEstimatedFare());
+        profile.setCurrentRideRequestedAt(parseEventTimestamp(event.getTimestamp()));
+        profile.setAvailabilityStatus(DriverAvailabilityStatus.ON_TRIP);
         profile.setLastOnlineAt(LocalDateTime.now());
 
         DriverProfile savedProfile = driverProfileRepository.save(profile);
         writePendingRide(savedProfile, event);
         driverStatusService.writeDriverStatus(savedProfile);
-        log.info("Stored pending ride assignment | rideId={} | driverId={}", rideId, driverId);
+        log.info("Current ride updated | rideId={} | bookingId={} | driverId={} | rideStatus={} | availability={}",
+                rideId, savedProfile.getCurrentBookingId(), driverId,
+                savedProfile.getCurrentRideStatus(), savedProfile.getAvailabilityStatus());
     }
 
     @Transactional
@@ -153,20 +170,23 @@ public class DriverRideCommandService {
     @Scheduled(fixedDelay = 5000)
     @Transactional
     public void cleanupExpiredAssignments() {
-        LocalDateTime cutoff = LocalDateTime.now().minus(ASSIGNMENT_TTL);
+        LocalDateTime cutoff = LocalDateTime.now().minus(assignmentTtl());
         for (DriverProfile profile : driverProfileRepository
                 .findByCurrentRideStatusAndCurrentRideRequestedAtBefore(DriverRideStatus.ASSIGNED, cutoff)) {
             String rideId = profile.getCurrentRideId();
             String driverId = profile.getExternalUserId();
-            log.warn("Assignment timeout detected | rideId={} | driverId={} | publishing ride.rejected | reason={}",
+            log.warn("Assignment timeout detected | rideId={} | driverId={} | reason={}",
+                    rideId, driverId, ASSIGNMENT_TIMEOUT_REASON);
+
+            publishDriverRejected(rideId, driverId, ASSIGNMENT_TIMEOUT_REASON);
+            log.info("Publishing ride.rejected | rideId={} | driverId={} | reason={}",
                     rideId, driverId, ASSIGNMENT_TIMEOUT_REASON);
 
             clearCurrentRide(profile, DriverAvailabilityStatus.ONLINE);
             DriverProfile savedProfile = driverProfileRepository.save(profile);
             clearPendingRide(savedProfile.getExternalUserId());
             driverStatusService.writeDriverStatus(savedProfile);
-            publishDriverRejected(rideId, savedProfile.getExternalUserId(), ASSIGNMENT_TIMEOUT_REASON);
-            log.info("Driver assignment expired, driver returned to AVAILABLE | rideId={} | driverId={}",
+            log.info("Driver returned to ONLINE | rideId={} | driverId={}",
                     rideId, savedProfile.getExternalUserId());
         }
     }
@@ -200,9 +220,18 @@ public class DriverRideCommandService {
 
     private void clearCurrentRide(DriverProfile profile, DriverAvailabilityStatus nextAvailabilityStatus) {
         profile.setCurrentRideId(null);
+        profile.setCurrentBookingId(null);
+        profile.setCurrentRideCustomerId(null);
         profile.setCurrentRideStatus(null);
         profile.setCurrentRidePickup(null);
         profile.setCurrentRideDestination(null);
+        profile.setCurrentRidePickupLat(null);
+        profile.setCurrentRidePickupLng(null);
+        profile.setCurrentRideDropoffLat(null);
+        profile.setCurrentRideDropoffLng(null);
+        profile.setCurrentRideVehicleType(null);
+        profile.setCurrentRidePaymentMethod(null);
+        profile.setCurrentRideEstimatedFare(null);
         profile.setCurrentRideRequestedAt(null);
         profile.setAvailabilityStatus(nextAvailabilityStatus);
     }
@@ -242,7 +271,7 @@ public class DriverRideCommandService {
         String rideId = event.aggregateId();
         String key = pendingRideKey(profile.getExternalUserId());
         Instant assignedAt = Instant.now();
-        Instant expiredAt = assignedAt.plus(ASSIGNMENT_TTL);
+        Instant expiredAt = assignedAt.plus(assignmentTtl());
 
         Map<String, String> pendingRide = new HashMap<>();
         pendingRide.put("rideId", rideId);
@@ -251,18 +280,21 @@ public class DriverRideCommandService {
         pendingRide.put("status", DriverRideStatus.ASSIGNED.name());
         pendingRide.put("assignedAt", assignedAt.toString());
         pendingRide.put("expiredAt", expiredAt.toString());
-        if (event.getPickupAddress() != null) {
-            pendingRide.put("pickupLocation", event.getPickupAddress());
-        }
-        if (event.getDropoffAddress() != null) {
-            pendingRide.put("dropoffLocation", event.getDropoffAddress());
-        }
+        put(pendingRide, "customerId", event.getCustomerId());
+        put(pendingRide, "pickupLocation", event.getPickupAddress());
+        put(pendingRide, "dropoffLocation", event.getDropoffAddress());
+        put(pendingRide, "pickupLat", coordinate(event.getPickup(), "lat"));
+        put(pendingRide, "pickupLng", coordinate(event.getPickup(), "lng"));
+        put(pendingRide, "dropoffLat", coordinate(event.getDropoff(), "lat"));
+        put(pendingRide, "dropoffLng", coordinate(event.getDropoff(), "lng"));
+        put(pendingRide, "vehicleType", event.getVehicleType());
+        put(pendingRide, "paymentMethod", event.getPaymentMethod());
         if (event.getEstimatedFare() != null) {
             pendingRide.put("fare", event.getEstimatedFare().toPlainString());
         }
 
         stringRedisTemplate.opsForHash().putAll(key, pendingRide);
-        stringRedisTemplate.expire(key, ASSIGNMENT_TTL.toSeconds(), TimeUnit.SECONDS);
+        stringRedisTemplate.expire(key, assignmentTtl().toSeconds(), TimeUnit.SECONDS);
     }
 
     private void clearPendingRide(String driverId) {
@@ -277,18 +309,65 @@ public class DriverRideCommandService {
         return value == null ? null : value.trim();
     }
 
+    private BigDecimal coordinate(Map<String, Double> coordinates, String key) {
+        if (coordinates == null || coordinates.get(key) == null) {
+            return null;
+        }
+        return BigDecimal.valueOf(coordinates.get(key));
+    }
+
+    private void put(Map<String, String> target, String key, Object value) {
+        if (value != null) {
+            target.put(key, value.toString());
+        }
+    }
+
+    private LocalDateTime parseEventTimestamp(String timestamp) {
+        if (!hasText(timestamp)) {
+            return LocalDateTime.now();
+        }
+        try {
+            return LocalDateTime.ofInstant(Instant.parse(timestamp.trim()), ZoneOffset.UTC);
+        } catch (DateTimeParseException ex) {
+            log.warn("Invalid ride.assigned timestamp, using current time | timestamp={}", timestamp);
+            return LocalDateTime.now();
+        }
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private Duration assignmentTtl() {
+        return Duration.ofSeconds(Math.max(1, assignmentTtlSeconds));
+    }
+
     private DriverCurrentRideResponse toCurrentRideResponse(DriverProfile profile) {
         return DriverCurrentRideResponse.builder()
                 .rideId(profile.getCurrentRideId())
+                .bookingId(profile.getCurrentBookingId())
+                .customerId(profile.getCurrentRideCustomerId())
                 .rideStatus(profile.getCurrentRideStatus() == null ? null : profile.getCurrentRideStatus().name())
                 .pickupAddress(profile.getCurrentRidePickup())
                 .destinationAddress(profile.getCurrentRideDestination())
+                .pickupLocation(toLocationPayload(profile.getCurrentRidePickupLat(), profile.getCurrentRidePickupLng()))
+                .destinationLocation(toLocationPayload(profile.getCurrentRideDropoffLat(), profile.getCurrentRideDropoffLng()))
+                .vehicleType(profile.getCurrentRideVehicleType())
+                .paymentMethod(profile.getCurrentRidePaymentMethod())
+                .estimatedFare(profile.getCurrentRideEstimatedFare())
                 .requestedAt(profile.getCurrentRideRequestedAt())
                 .driverAvailabilityStatus(profile.getAvailabilityStatus().name())
-                .currentLocation(DriverLocationPayload.builder()
-                        .lat(profile.getCurrentLatitude())
-                        .lng(profile.getCurrentLongitude())
-                        .build())
+                .currentLocation(toLocationPayload(profile.getCurrentLatitude(), profile.getCurrentLongitude()))
+                .build();
+    }
+
+    private DriverLocationPayload toLocationPayload(BigDecimal lat, BigDecimal lng) {
+        if (lat == null && lng == null) {
+            return null;
+        }
+        return DriverLocationPayload.builder()
+                .lat(lat)
+                .lng(lng)
                 .build();
     }
 

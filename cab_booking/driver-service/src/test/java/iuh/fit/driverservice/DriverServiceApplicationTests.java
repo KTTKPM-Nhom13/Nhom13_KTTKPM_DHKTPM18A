@@ -1,6 +1,7 @@
 package iuh.fit.driverservice;
 
 import iuh.fit.driverservice.dto.event.DriverAcceptedEvent;
+import iuh.fit.driverservice.dto.event.RideAssignedEvent;
 import iuh.fit.driverservice.dto.request.HandleDriverAssignmentRequest;
 import iuh.fit.driverservice.dto.request.UpdateDriverAvailabilityRequest;
 import iuh.fit.driverservice.dto.request.UpsertDriverProfileRequest;
@@ -25,6 +26,7 @@ import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
@@ -115,8 +117,18 @@ class DriverServiceApplicationTests {
         availabilityRequest.setCurrentLongitude(new BigDecimal("106.700806"));
         driverProfileService.updateAvailability("driver-2", availabilityRequest);
 
+        String rideId = "2f52e5f8-0f91-4801-98db-ece474d38a13";
+        driverRideCommandService.handleRideAssigned(RideAssignedEvent.builder()
+                .rideId(rideId)
+                .bookingId(rideId)
+                .driverId("driver-2")
+                .pickupAddress("1 Vo Van Ngan, Thu Duc")
+                .dropoffAddress("268 Ly Thuong Kiet, District 10")
+                .build());
+        when(stringRedisTemplate.hasKey(eq("driver:driver-2:pending-ride"))).thenReturn(true);
+
         HandleDriverAssignmentRequest assignmentRequest = new HandleDriverAssignmentRequest();
-        assignmentRequest.setRideId("2f52e5f8-0f91-4801-98db-ece474d38a13");
+        assignmentRequest.setRideId(rideId);
         assignmentRequest.setAction("ACCEPT");
         assignmentRequest.setPickupAddress("1 Vo Van Ngan, Thu Duc");
         assignmentRequest.setDestinationAddress("268 Ly Thuong Kiet, District 10");
@@ -124,9 +136,9 @@ class DriverServiceApplicationTests {
         driverRideCommandService.handleAssignment("driver-2", assignmentRequest);
 
         ArgumentCaptor<Object> rideAcceptedCaptor = ArgumentCaptor.forClass(Object.class);
-        verify(kafkaTemplate).send(eq("ride.accepted"), eq("2f52e5f8-0f91-4801-98db-ece474d38a13"), rideAcceptedCaptor.capture());
+        verify(kafkaTemplate).send(eq("ride.accepted"), eq(rideId), rideAcceptedCaptor.capture());
         DriverAcceptedEvent event = (DriverAcceptedEvent) rideAcceptedCaptor.getValue();
-        assertThat(event.getRideId()).isEqualTo("2f52e5f8-0f91-4801-98db-ece474d38a13");
+        assertThat(event.getRideId()).isEqualTo(rideId);
         assertThat(event.getDriverId()).isEqualTo("driver-2");
         assertThat(event.getEventType()).isEqualTo("RIDE_ACCEPTED");
     }
@@ -150,6 +162,7 @@ class DriverServiceApplicationTests {
         availabilityRequest.setCurrentLatitude(new BigDecimal("10.780000"));
         availabilityRequest.setCurrentLongitude(new BigDecimal("106.690000"));
         driverProfileService.updateAvailability("driver-3", availabilityRequest);
+        clearInvocations(valueOperations);
 
         DriverStatusCheckResponse response = driverProfileService.checkAvailability("driver-3");
 

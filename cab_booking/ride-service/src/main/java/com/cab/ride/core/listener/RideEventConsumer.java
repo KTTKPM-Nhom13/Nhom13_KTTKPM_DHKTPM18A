@@ -1,6 +1,7 @@
 package com.cab.ride.core.listener;
 
 import com.cab.ride.core.dto.event.inbound.DriverAcceptedEvent;
+import com.cab.ride.core.dto.event.inbound.RideCancelledEvent;
 import com.cab.ride.core.dto.event.inbound.RideAssignedEvent;
 import com.cab.ride.core.dto.event.inbound.RideCreatedEvent;
 import com.cab.ride.core.enums.RideStatus;
@@ -42,6 +43,18 @@ public class RideEventConsumer {
             rideService.markDriverAccepted(event);
         } catch (Exception ex) {
             log.error("Failed to handle ride.accepted for rideId={}: {}",
+                    event.aggregateId(), ex.getMessage(), ex);
+        }
+    }
+
+    @KafkaListener(topics = "ride.cancelled", groupId = GROUP_ID)
+    public void handleRideCancelled(RideCancelledEvent event) {
+        log.info("[ride.cancelled] rideId={} | driverId={} | reason={}",
+                event.aggregateId(), event.getDriverId(), event.getReason());
+        try {
+            rideService.markRideCancelled(event);
+        } catch (Exception ex) {
+            log.error("Failed to handle ride.cancelled for rideId={}: {}",
                     event.aggregateId(), ex.getMessage(), ex);
         }
     }

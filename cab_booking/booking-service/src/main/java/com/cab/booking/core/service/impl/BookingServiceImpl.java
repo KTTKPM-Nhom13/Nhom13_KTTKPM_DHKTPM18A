@@ -119,6 +119,8 @@ public class BookingServiceImpl implements BookingService {
                 .rideId(booking.getId().toString())
                 .customerId(customerId)
                 .customerNote(booking.getCustomerNote())
+                .pickupAddress(booking.getPickupLocation())
+                .dropoffAddress(booking.getDropoffLocation())
                 .pickup(request.getPickupCoordinates())
                 .dropoff(request.getDropoffCoordinates())
                 .vehicleType(vehicleType.name())

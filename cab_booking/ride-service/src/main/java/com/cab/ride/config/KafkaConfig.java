@@ -37,7 +37,9 @@ public class KafkaConfig {
         configProps.put("spring.json.type.mapping",
                 "ride-arrived:com.cab.ride.core.dto.event.outbound.RideArrivedEvent,"
                         + "ride-started:com.cab.ride.core.dto.event.outbound.RideStartedEvent,"
-                        + "ride-completed:com.cab.ride.core.dto.event.outbound.RideCompletedEvent");
+                        + "ride-completed:com.cab.ride.core.dto.event.outbound.RideCompletedEvent,"
+                        + "ride-finished:com.cab.ride.core.dto.event.outbound.RideCompletedEvent,"
+                        + "driver-location:com.cab.ride.core.dto.event.DriverLocationEvent");
 
         return new DefaultKafkaProducerFactory<>(
                 configProps,

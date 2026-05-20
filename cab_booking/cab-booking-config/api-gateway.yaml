@@ -74,7 +74,7 @@ spring:
         - id: ride-service
           uri: lb://ride-service
           predicates:
-            - Path=/api/v1/rides/**
+            - Path=/api/rides/**,/api/v1/rides/**
 
         - id: pricing-service
           uri: lb://pricing-service
