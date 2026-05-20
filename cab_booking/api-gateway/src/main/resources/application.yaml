@@ -75,6 +75,11 @@ spring:
           predicates:
             - Path=/api/notifications/**
 
+        - id: ai-agent-service
+          uri: http://ai-agent-service:8099
+          predicates:
+            - Path=/api/v1/ai-agent/**
+
       # ── Mặc định khi bị 429: trả JSON thay vì body rỗng ────────
       default-filters:
         - name: Retry

@@ -506,7 +506,7 @@ def main() -> int:
             "phoneNumber": "0911222333",
             "avatarUrl": "https://cdn.example.com/avatars/qa-driver-updated.png",
             "licenseNumber": f"79A-{stamp}",
-            "vehicleType": "SEDAN",
+            "vehicleType": "CAR4",
             "vehiclePlate": f"51H{stamp[-5:]}",
             "vehicleModel": "Toyota Vios",
             "vehicleColor": "Black",

@@ -1,5 +1,9 @@
 server:
-  port: ${NOTIFICATION_SERVICE_PORT:8085}
+  port: ${NOTIFICATION_SERVICE_PORT:8092}
+
+socket-server:
+  host: 0.0.0.0
+  port: 9093
 
 spring:
   data:
@@ -30,6 +34,15 @@ eureka:
       defaultZone: http://eureka-server:8761/eureka/
   instance:
     prefer-ip-address: true
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  level:
+    root: INFO
+    org.springframework: WARN
+    org.apache.kafka: WARN
+    com.netflix: WARN
 
 app:
   security:

@@ -1,0 +1,396 @@
+{
+  "info": {
+    "_postman_id": "c1a2b3c4-d5e6-4f7g-8h9i-j0k1l2m3n4o5",
+    "name": "CAB Booking - AI Agent System Test",
+    "description": "Bộ API kiểm thử hoàn chỉnh cho dịch vụ AI Agent tích hợp Gemini 1.5 Flash. Hỗ trợ đầy đủ phân quyền theo Role (Khách hàng, Tài xế, Quản trị viên) và xác thực bằng token JWT Spring Security.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0. Kiểm tra trạng thái hoạt động (Health Check)",
+      "item": [
+        {
+          "name": "Health check qua Gateway",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8080/api/v1/ai-agent/health",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "ai-agent",
+                "health"
+              ]
+            },
+            "description": "Kiểm tra xem Spring Cloud Gateway đã định tuyến thành công tới dịch vụ AI Agent Python chưa."
+          },
+          "response": []
+        },
+        {
+          "name": "Health check trực tiếp Python Service",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8099/health",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8099",
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Kiểm tra trực tiếp cổng 8099 của AI Agent Service."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Xác thực người dùng (Auth)",
+      "item": [
+        {
+          "name": "Đăng ký Khách hàng mới (ROLE_USER)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Khách Hàng Thử Nghiệm\",\n  \"email\": \"khachhang@example.com\",\n  \"password\": \"UserPassword123\",\n  \"phoneNumber\": \"0987654321\",\n  \"role\": \"USER\",\n  \"deviceId\": \"postman_mobile_client\",\n  \"platform\": \"ANDROID\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/auth/register",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Đăng ký tài khoản khách hàng mới. Dữ liệu sẽ tự động đồng bộ sang User Service DB."
+          },
+          "response": []
+        },
+        {
+          "name": "Đăng ký Tài xế mới (ROLE_DRIVER)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Tài Xế Thử Nghiệm\",\n  \"email\": \"taixe@example.com\",\n  \"password\": \"DriverPassword123\",\n  \"phoneNumber\": \"0909090909\",\n  \"role\": \"DRIVER\",\n  \"deviceId\": \"postman_driver_client\",\n  \"platform\": \"ANDROID\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/auth/register",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Đăng ký tài khoản tài xế mới. Dữ liệu sẽ tự động đồng bộ sang Driver Service DB."
+          },
+          "response": []
+        },
+        {
+          "name": "Đăng nhập Tài khoản Admin (System Administrator)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData && jsonData.result && jsonData.result.accessToken) {",
+                  "    pm.environment.set(\"adminToken\", jsonData.result.accessToken);",
+                  "    pm.collectionVariables.set(\"adminToken\", jsonData.result.accessToken);",
+                  "    console.log(\"Captured JWT Admin Token successfully!\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@cab.local\",\n  \"password\": \"AdminPassword123\",\n  \"deviceId\": \"postman_test_client\",\n  \"platform\": \"POSTMAN\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/auth/login",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Đăng nhập tài khoản Admin mặc định được seed sẵn trong hệ thống để tự động lưu Token JWT vào biến môi trường `adminToken`."
+          },
+          "response": []
+        },
+        {
+          "name": "Đăng nhập Khách hàng (ROLE_USER)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData && jsonData.result && jsonData.result.accessToken) {",
+                  "    pm.environment.set(\"customerToken\", jsonData.result.accessToken);",
+                  "    pm.collectionVariables.set(\"customerToken\", jsonData.result.accessToken);",
+                  "    console.log(\"Captured JWT Customer Token successfully!\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"khachhang@example.com\",\n  \"password\": \"UserPassword123\",\n  \"deviceId\": \"postman_mobile_client\",\n  \"platform\": \"ANDROID\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/auth/login",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Đăng nhập bằng tài khoản Khách hàng vừa đăng ký."
+          },
+          "response": []
+        },
+        {
+          "name": "Đăng nhập Tài xế (ROLE_DRIVER)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData && jsonData.result && jsonData.result.accessToken) {",
+                  "    pm.environment.set(\"driverToken\", jsonData.result.accessToken);",
+                  "    pm.collectionVariables.set(\"driverToken\", jsonData.result.accessToken);",
+                  "    console.log(\"Captured JWT Driver Token successfully!\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"taixe@example.com\",\n  \"password\": \"DriverPassword123\",\n  \"deviceId\": \"postman_driver_client\",\n  \"platform\": \"ANDROID\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/auth/login",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Đăng nhập bằng tài khoản Tài xế vừa đăng ký."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Kiểm thử AI Agent theo phân quyền (Roles)",
+      "item": [
+        {
+          "name": "Khách hàng (ROLE_USER) - Ước tính cước xe & Đặt xe",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Chào bạn, tôi muốn đi từ Trường Đại học Công nghiệp TPHCM (vĩ độ 10.822, kinh độ 106.687) tới Sân bay Tân Sơn Nhất (vĩ độ 10.815, kinh độ 106.663), hãy tính tiền giúp tôi cho loại xe ECONOMY.\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/ai-agent/chat",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "ai-agent",
+                "chat"
+              ]
+            },
+            "description": "Gửi tin nhắn đặt xe dưới vai trò Khách hàng. Agent sẽ kích hoạt Function Calling gọi API Pricing để trả về báo giá thật kèm mã token."
+          },
+          "response": []
+        },
+        {
+          "name": "Tài xế (ROLE_DRIVER) - Lời khuyên siêu ngắn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driverToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Tôi đang lái xe và gặp mưa to gió lớn quá, tôi nên chú ý điều gì lúc này?\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/ai-agent/chat",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "ai-agent",
+                "chat"
+              ]
+            },
+            "description": "Gửi câu hỏi dưới vai trò Tài xế. Con AI sẽ phản hồi cực kỳ ngắn gọn (không quá 2 câu), tập trung vào chỉ dẫn an toàn lái xe thực tế."
+          },
+          "response": []
+        },
+        {
+          "name": "Quản trị viên (ROLE_ADMIN) - Hỗ trợ hệ thống",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Nhiệm vụ chính của bạn với tư cách trợ lý Admin Portal của hệ thống CAB Booking là gì?\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/ai-agent/chat",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "v1",
+                "ai-agent",
+                "chat"
+              ]
+            },
+            "description": "Gửi câu hỏi dưới vai trò Admin để kiểm chứng thái độ và hệ thống prompt định hướng công việc quản trị."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "customerToken",
+      "value": "customer_jwt_token_here",
+      "type": "string"
+    },
+    {
+      "key": "driverToken",
+      "value": "driver_jwt_token_here",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "admin_jwt_token_here",
+      "type": "string"
+    }
+  ]
+}
