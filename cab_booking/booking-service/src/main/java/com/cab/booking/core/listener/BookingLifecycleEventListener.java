@@ -31,6 +31,7 @@ public class BookingLifecycleEventListener {
     private final BookingRepository bookingRepository;
     private final BookingService bookingService;
     private final BookingStateMachine bookingStateMachine;
+    private final com.cab.booking.core.service.BookingEventPublisher bookingEventPublisher;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @KafkaListener(topics = "ride.assigned", groupId = "booking-service-group")
@@ -128,6 +129,20 @@ public class BookingLifecycleEventListener {
             return;
         }
 
+        // ✅ LUỒNG MỚI: thanh toán online trước chuyến → trigger matching
+        if (booking.getStatus() == BookingStatus.PENDING_PAYMENT) {
+            bookingStateMachine.transitionTo(booking, BookingStatus.MATCHING);
+            bookingRepository.save(booking);
+            log.info("💳 Payment completed, triggering driver matching for booking {}", rideId);
+
+            // Bắn ride.created để matching-service tìm tài xế
+            if (bookingService instanceof com.cab.booking.core.service.impl.BookingServiceImpl impl) {
+                com.cab.booking.core.dto.event.outbound.RideCreatedEvent rideCreatedEvent = impl.buildRideCreatedEventFromBooking(booking);
+                bookingEventPublisher.publishRideCreated(rideCreatedEvent);
+            }
+            return;
+        }
+
         if (booking.getStatus() == BookingStatus.PAID) {
             log.info("Booking {} is already PAID, ignoring duplicate payment.completed", booking.getId());
             return;
@@ -158,8 +173,17 @@ public class BookingLifecycleEventListener {
         if (rideId == null) {
             return;
         }
-        if (!bookingRepository.existsById(rideId)) {
+        
+        Booking booking = bookingRepository.findById(rideId).orElse(null);
+        if (booking == null) {
             log.warn("Booking not found for payment.failed | rideId={} | reason={}", rideId, event.getReason());
+            return;
+        }
+
+        // ✅ THÊM MỚI: Hủy booking nếu đang chờ thanh toán
+        if (booking.getStatus() == BookingStatus.PENDING_PAYMENT) {
+            log.warn("❌ Payment failed, booking {} CANCELLED. Reason: {}", rideId, event.getReason());
+            bookingService.cancelRide(rideId, "Thanh toán thất bại: " + event.getReason());
         }
     }
 
@@ -253,13 +277,14 @@ public class BookingLifecycleEventListener {
     private int statusRank(BookingStatus status) {
         return switch (status) {
             case CREATED -> 0;
-            case MATCHING -> 1;
-            case ASSIGNED -> 2;
-            case ACCEPTED -> 3;
-            case PICKUP -> 4;
-            case IN_PROGRESS -> 5;
-            case COMPLETED -> 6;
-            case PAID -> 7;
+            case PENDING_PAYMENT -> 1;
+            case MATCHING -> 2;
+            case ASSIGNED -> 3;
+            case ACCEPTED -> 4;
+            case PICKUP -> 5;
+            case IN_PROGRESS -> 6;
+            case COMPLETED -> 7;
+            case PAID -> 8;
             case CANCELLED -> 99;
         };
     }
