@@ -3,6 +3,7 @@ package iuh.fit.driverservice.service;
 import iuh.fit.common.exception.AppException;
 import iuh.fit.common.exception.ErrorCode;
 import iuh.fit.driverservice.dto.event.PaymentCompletedEvent;
+import iuh.fit.driverservice.dto.event.RideFinishedEvent;
 import iuh.fit.driverservice.entity.DriverEarning;
 import iuh.fit.driverservice.entity.DriverProfile;
 import iuh.fit.driverservice.repository.DriverEarningRepository;
@@ -81,6 +82,62 @@ public class DriverEarningService {
                 event.getDriverId(), rideId, event.getPaymentMethod(), settlementType, grossAmount, driverAmount, platformAmount, balanceDelta);
     }
 
+    @Transactional
+    public void creditDriverFromRideFinished(RideFinishedEvent event) {
+        validateRideFinishedEvent(event);
+
+        String rideId = resolveRideFinishedId(event);
+        if (hasText(event.getEventId()) && driverEarningRepository.existsByPaymentEventId(event.getEventId())) {
+            log.info("[DriverEarning] ride.finished already credited by eventId={}, rideId={}",
+                    event.getEventId(), rideId);
+            return;
+        }
+        if (driverEarningRepository.existsByRideIdAndDriverId(rideId, event.getDriverId())) {
+            log.info("[DriverEarning] ride.finished already credited by rideId={}, driverId={}",
+                    rideId, event.getDriverId());
+            return;
+        }
+
+        DriverProfile profile = driverProfileRepository.findByExternalUserId(event.getDriverId())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_PROFILE_NOT_FOUND));
+
+        BigDecimal rawAmount = event.getAmount() != null ? event.getAmount() : event.getFinalFare();
+        if (rawAmount == null) {
+            rawAmount = BigDecimal.ZERO;
+        }
+        BigDecimal grossAmount = rawAmount.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal driverAmount = grossAmount.multiply(DRIVER_SHARE_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal platformAmount = grossAmount.subtract(driverAmount).setScale(2, RoundingMode.HALF_UP);
+        boolean cashPayment = isCashPayment(event.getPaymentMethod());
+        BigDecimal balanceDelta = cashPayment ? platformAmount.negate() : driverAmount;
+        String settlementType = cashPayment ? SETTLEMENT_CASH_PLATFORM_FEE_DEBIT : SETTLEMENT_ONLINE_GATEWAY_CREDIT;
+
+        DriverEarning earning = new DriverEarning();
+        earning.setPaymentEventId(event.getEventId());
+        earning.setRideId(rideId);
+        earning.setBookingId(event.getBookingId());
+        earning.setDriverId(event.getDriverId());
+        earning.setGrossAmount(grossAmount);
+        earning.setDriverAmount(driverAmount);
+        earning.setPlatformAmount(platformAmount);
+        earning.setBalanceDelta(balanceDelta);
+        earning.setSettlementType(settlementType);
+        earning.setDriverSharePercent(DRIVER_SHARE_PERCENT);
+        earning.setCurrency(hasText(event.getCurrency()) ? event.getCurrency() : "VND");
+        earning.setPaymentMethod(event.getPaymentMethod());
+        earning.setGatewayTransactionId(event.getGatewayTransactionId());
+        driverEarningRepository.save(earning);
+
+        BigDecimal currentEarnings = profile.getTotalEarnings() == null
+                ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                : profile.getTotalEarnings();
+        profile.setTotalEarnings(currentEarnings.add(balanceDelta).setScale(2, RoundingMode.HALF_UP));
+        driverProfileRepository.save(profile);
+
+        log.info("[DriverEarning] Settled driver earning from ride.finished - driverId={}, rideId={}, paymentMethod={}, settlementType={}, grossAmount={}, driverAmount={}, platformAmount={}, balanceDelta={}",
+                event.getDriverId(), rideId, event.getPaymentMethod(), settlementType, grossAmount, driverAmount, platformAmount, balanceDelta);
+    }
+
     private void validateEvent(PaymentCompletedEvent event) {
         if (event == null || !hasText(event.getDriverId()) || event.getAmount() == null
                 || event.getAmount().compareTo(BigDecimal.ZERO) <= 0 || !hasText(resolveRideId(event))) {
@@ -88,7 +145,19 @@ public class DriverEarningService {
         }
     }
 
+    private void validateRideFinishedEvent(RideFinishedEvent event) {
+        BigDecimal rawAmount = event != null ? (event.getAmount() != null ? event.getAmount() : event.getFinalFare()) : null;
+        if (event == null || !hasText(event.getDriverId()) || rawAmount == null
+                || rawAmount.compareTo(BigDecimal.ZERO) <= 0 || !hasText(resolveRideFinishedId(event))) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
+    }
+
     private String resolveRideId(PaymentCompletedEvent event) {
+        return hasText(event.getRideId()) ? event.getRideId() : event.getBookingId();
+    }
+
+    private String resolveRideFinishedId(RideFinishedEvent event) {
         return hasText(event.getRideId()) ? event.getRideId() : event.getBookingId();
     }
 

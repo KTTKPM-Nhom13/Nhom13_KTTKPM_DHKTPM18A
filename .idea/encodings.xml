@@ -6,9 +6,11 @@
     <file url="file://$PROJECT_DIR$/cab_booking/auth-service/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/cab_booking/common/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/cab_booking/config-server/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/cab_booking/driver-service/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/cab_booking/eureka/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/cab_booking/notification-service/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/cab_booking/review-service/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/cab_booking/service/auth_service/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/cab_booking/user-service/src/main/java" charset="UTF-8" />
   </component>
 </project>
