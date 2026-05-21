@@ -1,7 +1,7 @@
 package iuh.fit.driverservice;
 
-import iuh.fit.driverservice.dto.event.DriverStatusEvent;
-import iuh.fit.driverservice.dto.event.RideAcceptedEvent;
+import iuh.fit.driverservice.dto.event.DriverAcceptedEvent;
+import iuh.fit.driverservice.dto.event.RideAssignedEvent;
 import iuh.fit.driverservice.dto.request.HandleDriverAssignmentRequest;
 import iuh.fit.driverservice.dto.request.UpdateDriverAvailabilityRequest;
 import iuh.fit.driverservice.dto.request.UpsertDriverProfileRequest;
@@ -11,18 +11,23 @@ import iuh.fit.driverservice.entity.DriverProfile;
 import iuh.fit.driverservice.entity.VehicleType;
 import iuh.fit.driverservice.repository.DriverProfileRepository;
 import iuh.fit.driverservice.service.DriverProfileService;
+import iuh.fit.driverservice.service.DriverRideCommandService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.kafka.core.KafkaTemplate;
 
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
 @SpringBootTest(properties = {
@@ -39,10 +44,28 @@ class DriverServiceApplicationTests {
     DriverProfileService driverProfileService;
 
     @Autowired
+    DriverRideCommandService driverRideCommandService;
+
+    @Autowired
     DriverProfileRepository driverProfileRepository;
 
     @MockBean
     KafkaTemplate<String, Object> kafkaTemplate;
+
+    @MockBean
+    StringRedisTemplate stringRedisTemplate;
+
+    @MockBean
+    ValueOperations<String, String> valueOperations;
+
+    @MockBean
+    HashOperations<String, Object, Object> hashOperations;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUpRedisMock() {
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(stringRedisTemplate.opsForHash()).thenReturn(hashOperations);
+    }
 
     @Test
     void contextLoads() {
@@ -73,18 +96,11 @@ class DriverServiceApplicationTests {
         assertThat(savedProfile.getCurrentLatitude()).isEqualByComparingTo("10.762622");
         assertThat(savedProfile.getCurrentLongitude()).isEqualByComparingTo("106.660172");
 
-        ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
-        verify(kafkaTemplate, atLeastOnce()).send(eq("driver.status.changed"), eventCaptor.capture());
-        DriverStatusEvent event = (DriverStatusEvent) eventCaptor.getValue();
-        assertThat(event.getDriverId()).isEqualTo("driver-1");
-        assertThat(event.getAvailabilityStatus()).isEqualTo("ONLINE");
-        assertThat(event.getCurrentLocation().getLat()).isEqualByComparingTo("10.762622");
-        assertThat(event.getCurrentLocation().getLng()).isEqualByComparingTo("106.660172");
-        assertThat(event.getActiveForBooking()).isTrue();
+        verify(valueOperations).set(eq("driver:status:driver-1"), eq("AVAILABLE"));
     }
 
     @Test
-    void handleAssignmentShouldPublishRideAssignedForBookingService() {
+    void handleAssignmentShouldPublishRideAcceptedForBookingService() {
         UpsertDriverProfileRequest profileRequest = new UpsertDriverProfileRequest();
         profileRequest.setFullName("Driver Two");
         profileRequest.setEmail("driver2@example.com");
@@ -101,20 +117,30 @@ class DriverServiceApplicationTests {
         availabilityRequest.setCurrentLongitude(new BigDecimal("106.700806"));
         driverProfileService.updateAvailability("driver-2", availabilityRequest);
 
+        String rideId = "2f52e5f8-0f91-4801-98db-ece474d38a13";
+        driverRideCommandService.handleRideAssigned(RideAssignedEvent.builder()
+                .rideId(rideId)
+                .bookingId(rideId)
+                .driverId("driver-2")
+                .pickupAddress("1 Vo Van Ngan, Thu Duc")
+                .dropoffAddress("268 Ly Thuong Kiet, District 10")
+                .build());
+        when(stringRedisTemplate.hasKey(eq("driver:driver-2:pending-ride"))).thenReturn(true);
+
         HandleDriverAssignmentRequest assignmentRequest = new HandleDriverAssignmentRequest();
-        assignmentRequest.setRideId("2f52e5f8-0f91-4801-98db-ece474d38a13");
+        assignmentRequest.setRideId(rideId);
         assignmentRequest.setAction("ACCEPT");
         assignmentRequest.setPickupAddress("1 Vo Van Ngan, Thu Duc");
         assignmentRequest.setDestinationAddress("268 Ly Thuong Kiet, District 10");
 
-        driverProfileService.handleAssignment("driver-2", assignmentRequest);
+        driverRideCommandService.handleAssignment("driver-2", assignmentRequest);
 
         ArgumentCaptor<Object> rideAcceptedCaptor = ArgumentCaptor.forClass(Object.class);
-        verify(kafkaTemplate).send(eq("ride.accepted"), eq("2f52e5f8-0f91-4801-98db-ece474d38a13"), rideAcceptedCaptor.capture());
-        RideAcceptedEvent event = (RideAcceptedEvent) rideAcceptedCaptor.getValue();
-        assertThat(event.getRideId()).isEqualTo("2f52e5f8-0f91-4801-98db-ece474d38a13");
+        verify(kafkaTemplate).send(eq("ride.accepted"), eq(rideId), rideAcceptedCaptor.capture());
+        DriverAcceptedEvent event = (DriverAcceptedEvent) rideAcceptedCaptor.getValue();
+        assertThat(event.getRideId()).isEqualTo(rideId);
         assertThat(event.getDriverId()).isEqualTo("driver-2");
-        assertThat(event.getType()).isEqualTo("RideAccepted");
+        assertThat(event.getEventType()).isEqualTo("RIDE_ACCEPTED");
     }
 
     @Test
@@ -136,6 +162,7 @@ class DriverServiceApplicationTests {
         availabilityRequest.setCurrentLatitude(new BigDecimal("10.780000"));
         availabilityRequest.setCurrentLongitude(new BigDecimal("106.690000"));
         driverProfileService.updateAvailability("driver-3", availabilityRequest);
+        clearInvocations(valueOperations);
 
         DriverStatusCheckResponse response = driverProfileService.checkAvailability("driver-3");
 
@@ -145,11 +172,6 @@ class DriverServiceApplicationTests {
         assertThat(response.isOffline()).isFalse();
         assertThat(response.isActiveForBooking()).isTrue();
 
-        ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
-        verify(kafkaTemplate, atLeastOnce()).send(eq("driver.status.changed"), eventCaptor.capture());
-        DriverStatusEvent event = (DriverStatusEvent) eventCaptor.getValue();
-        assertThat(event.getDriverId()).isEqualTo("driver-3");
-        assertThat(event.getAvailabilityStatus()).isEqualTo("ONLINE");
-        assertThat(event.getActiveForBooking()).isTrue();
+        verify(valueOperations).set(eq("driver:status:driver-3"), eq("AVAILABLE"));
     }
 }

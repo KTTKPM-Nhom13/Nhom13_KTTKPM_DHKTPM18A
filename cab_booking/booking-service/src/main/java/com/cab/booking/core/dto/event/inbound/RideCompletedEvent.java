@@ -15,9 +15,14 @@ public class RideCompletedEvent {
     private String eventId;
     private String type;
     private String rideId;
+    private String bookingId;
     private String customerId;
     private String driverId;
     private BigDecimal finalFare;
     private String paymentMethod;
     private String timestamp;
+
+    public String aggregateId() {
+        return bookingId != null && !bookingId.isBlank() ? bookingId : rideId;
+    }
 }

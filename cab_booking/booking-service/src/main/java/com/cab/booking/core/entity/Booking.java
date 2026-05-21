@@ -1,6 +1,7 @@
 package com.cab.booking.core.entity;
 
 import com.cab.booking.core.enums.BookingStatus;
+import com.cab.booking.core.enums.VehicleType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -55,7 +56,9 @@ public class Booking extends BaseEntity {
     @Column
     private Double dropoffLng;
 
-    private String vehicleType;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "vehicle_type", nullable = false, length = 20)
+    private VehicleType vehicleType;
     private String paymentMethod;
 
     @Column(precision = 12, scale = 2)

@@ -90,6 +90,33 @@ public class DriverProfile extends BaseEntity {
     @Column(name = "current_ride_id", length = 100)
     String currentRideId;
 
+    @Column(name = "current_booking_id", length = 100)
+    String currentBookingId;
+
+    @Column(name = "current_ride_customer_id", length = 100)
+    String currentRideCustomerId;
+
+    @Column(name = "current_ride_pickup_lat", precision = 10, scale = 6)
+    BigDecimal currentRidePickupLat;
+
+    @Column(name = "current_ride_pickup_lng", precision = 10, scale = 6)
+    BigDecimal currentRidePickupLng;
+
+    @Column(name = "current_ride_dropoff_lat", precision = 10, scale = 6)
+    BigDecimal currentRideDropoffLat;
+
+    @Column(name = "current_ride_dropoff_lng", precision = 10, scale = 6)
+    BigDecimal currentRideDropoffLng;
+
+    @Column(name = "current_ride_vehicle_type", length = 50)
+    String currentRideVehicleType;
+
+    @Column(name = "current_ride_payment_method", length = 50)
+    String currentRidePaymentMethod;
+
+    @Column(name = "current_ride_estimated_fare", precision = 12, scale = 2)
+    BigDecimal currentRideEstimatedFare;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "current_ride_status", length = 30)
     DriverRideStatus currentRideStatus;

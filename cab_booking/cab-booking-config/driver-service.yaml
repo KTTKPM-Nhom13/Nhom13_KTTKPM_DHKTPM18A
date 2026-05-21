@@ -24,6 +24,10 @@ integration:
   auth-service:
     url: ${AUTH_SERVICE_URL:http://auth-service:8081}
 
+driver:
+  assignment:
+    ttl-seconds: ${DRIVER_ASSIGNMENT_TTL_SECONDS:30}
+
 app:
   security:
     public-endpoints: /api/drivers/**,/api/admin/drivers/**

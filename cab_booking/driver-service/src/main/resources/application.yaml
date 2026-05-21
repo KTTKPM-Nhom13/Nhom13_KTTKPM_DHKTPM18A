@@ -17,14 +17,8 @@ spring:
         spring.json.add.type.headers: true
         spring.json.type.mapping: >
           driver-status:iuh.fit.driverservice.dto.event.DriverStatusEvent,
-          ride-accept-requested:iuh.fit.driverservice.dto.event.RideAcceptRequestedEvent,
-          ride-reject-requested:iuh.fit.driverservice.dto.event.RideRejectRequestedEvent,
-          ride-accepted:iuh.fit.driverservice.dto.event.RideAcceptedEvent,
-          ride-rejected:iuh.fit.driverservice.dto.event.RideRejectedEvent,
-          driver-arrived:iuh.fit.driverservice.dto.event.DriverArrivedEvent,
-          ride-started:iuh.fit.driverservice.dto.event.RideStartedEvent,
-          ride-completed:iuh.fit.driverservice.dto.event.RideCompletedEvent,
-          ride-finished:iuh.fit.driverservice.dto.event.RideFinishedEvent
+          ride-accepted:iuh.fit.driverservice.dto.event.DriverAcceptedEvent,
+          ride-rejected:iuh.fit.driverservice.dto.event.DriverRejectedEvent
     consumer:
       group-id: driver-service-group
       auto-offset-reset: earliest
@@ -35,5 +29,11 @@ spring:
         spring.json.trusted.packages: "*"
         spring.json.type.mapping: >
           ride-assigned:iuh.fit.driverservice.dto.event.RideAssignedEvent,
-          ride-accepted:iuh.fit.driverservice.dto.event.RideAcceptedEvent,
-          ride-cancelled:iuh.fit.driverservice.dto.event.RideCancelledEvent
+          ride-completed:iuh.fit.driverservice.dto.event.RideLifecycleEvent,
+          ride-cancelled:iuh.fit.driverservice.dto.event.RideLifecycleEvent,
+          payment-completed:iuh.fit.driverservice.dto.event.PaymentCompletedEvent
+        spring.json.value.default.type: java.util.Map
+
+driver:
+  assignment:
+    ttl-seconds: ${DRIVER_ASSIGNMENT_TTL_SECONDS:30}

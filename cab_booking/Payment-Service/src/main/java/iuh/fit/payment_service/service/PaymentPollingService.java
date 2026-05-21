@@ -110,6 +110,7 @@ public class PaymentPollingService {
                 "PAYMENT_COMPLETED",
                 PaymentCompletedEvent.fromTransaction(
                         transaction.getBookingId(),
+                        transaction.getDriverId(),
                         transaction.getAmount(),
                         transaction.getCurrency(),
                         transaction.getGatewayTransactionId(),

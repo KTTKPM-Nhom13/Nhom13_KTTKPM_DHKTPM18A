@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: ride-service
+  config:
+    import: "optional:configserver:http://config-server:8888"
 
   # ── Database ──────────────────────────────────────────────────────────────
   datasource:
@@ -35,9 +37,11 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
         spring.json.type.mapping: >
-          ride-finished:com.cab.ride.core.dto.event.outbound.RideFinishedEvent,
+          ride-arrived:com.cab.ride.core.dto.event.outbound.RideArrivedEvent,
           ride-started:com.cab.ride.core.dto.event.outbound.RideStartedEvent,
-          driver-arrived:com.cab.ride.core.dto.event.outbound.DriverArrivedEvent
+          ride-completed:com.cab.ride.core.dto.event.outbound.RideCompletedEvent,
+          ride-finished:com.cab.ride.core.dto.event.outbound.RideCompletedEvent,
+          driver-location:com.cab.ride.core.dto.event.DriverLocationEvent
     consumer:
       group-id: ride-service-group
       auto-offset-reset: earliest
@@ -48,8 +52,9 @@ spring:
         spring.json.trusted.packages: "*"
         spring.json.type.mapping: >
           ride-assigned:com.cab.ride.core.dto.event.inbound.RideAssignedEvent,
-          payment-completed:com.cab.ride.core.dto.event.inbound.PaymentCompletedEvent,
           ride-created:com.cab.ride.core.dto.event.inbound.RideCreatedEvent,
+          ride-accepted:com.cab.ride.core.dto.event.inbound.DriverAcceptedEvent,
+          ride-cancelled:com.cab.ride.core.dto.event.inbound.RideCancelledEvent,
           driver-location:com.cab.ride.core.dto.event.DriverLocationEvent
 
 # ── Eureka ──────────────────────────────────────────────────────────────────

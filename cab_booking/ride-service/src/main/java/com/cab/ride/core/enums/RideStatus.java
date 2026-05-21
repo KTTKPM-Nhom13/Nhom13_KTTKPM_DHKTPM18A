@@ -20,6 +20,8 @@ public enum RideStatus {
     /** Tài xế đã được chỉ định, đang trên đường đến đón khách. */
     ASSIGNED,
 
+    ACCEPTED,
+
     /** Tài xế đã đến điểm đón, chờ khách lên xe. */
     PICKUP,
 

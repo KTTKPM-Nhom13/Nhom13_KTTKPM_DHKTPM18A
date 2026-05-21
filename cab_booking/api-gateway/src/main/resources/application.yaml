@@ -65,10 +65,20 @@ spring:
           predicates:
             - Path=/api/pricing/**
 
+        - id: payment-service
+          uri: lb://payment-service
+          predicates:
+            - Path=/api/payments/**
+
         - id: review-service
           uri: lb://review-service
           predicates:
             - Path=/api/reviews/**
+
+        - id: ride-service
+          uri: lb://ride-service
+          predicates:
+            - Path=/api/rides/**,/api/v1/rides/**
 
         - id: notification-service
           uri: lb://notification-service

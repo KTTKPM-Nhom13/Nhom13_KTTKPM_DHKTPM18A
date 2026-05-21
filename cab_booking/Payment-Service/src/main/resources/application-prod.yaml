@@ -10,3 +10,11 @@ zalopay:
   endpoint: ${ZALOPAY_ENDPOINT:https://openapi.zalopay.vn/v2}
   callbackUrl: ${ZALOPAY_CALLBACK_URL:https://production.example.com/api/payments/zalopay/callback}
   redirectUrl: ${ZALOPAY_REDIRECT_URL:https://production.example.com/payment-result}
+
+vnpay:
+  paymentUrl: ${VNPAY_PAYMENT_URL:https://pay.vnpay.vn/vpcpay.html}
+  tmnCode: ${VNPAY_TMN_CODE:}
+  hashSecret: ${VNPAY_HASH_SECRET:}
+  returnUrl: ${VNPAY_RETURN_URL:https://production.example.com/api/payments/vnpay/return}
+  ipnUrl: ${VNPAY_IPN_URL:https://production.example.com/api/payments/vnpay/ipn}
+  bankCode: ${VNPAY_BANK_CODE:}

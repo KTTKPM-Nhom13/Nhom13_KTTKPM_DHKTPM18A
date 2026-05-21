@@ -188,7 +188,7 @@ Chay folder `6. Complete Flow`:
 7. Doi 1-3 giay.
 8. `6.4 Driver Start`
 9. Doi 1-3 giay.
-10. `6.5 Driver Complete -> ride.completed + legacy ride.finished`
+10. `6.5 Driver Complete -> ride.completed`
 11. `6.6 Poll Booking Active Or History After Complete`
 
 Expected lifecycle:
@@ -210,7 +210,6 @@ ride.accepted
 ride.arrived
 ride.started
 ride.completed
-ride.finished  # legacy alias
 ```
 
 Expected Redis after complete:
@@ -237,7 +236,6 @@ ride.rejected
 ride.arrived
 ride.started
 ride.completed
-ride.finished
 ride.cancelled
 driver.status.changed
 driver.location.updated

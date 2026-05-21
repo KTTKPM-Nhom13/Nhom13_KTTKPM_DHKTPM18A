@@ -5,10 +5,11 @@ import com.cab.booking.core.dto.request.BookingRequest;
 import com.cab.booking.core.dto.response.BookingResponse;
 import com.cab.booking.core.entity.Booking;
 import com.cab.booking.core.enums.BookingStatus;
+import com.cab.booking.core.enums.VehicleType;
+import com.cab.booking.core.enums.VehicleTypeNormalizer;
 import com.cab.booking.core.repository.BookingRepository;
 import com.cab.booking.core.service.BookingEventPublisher;
 import com.cab.booking.core.service.BookingService;
-import com.cab.booking.integration.driver.client.DriverFeignClient;
 import com.cab.booking.core.statemachine.BookingStateMachine;
 import iuh.fit.common.exception.AppException;
 import iuh.fit.common.exception.ErrorCode;
@@ -17,7 +18,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
@@ -41,10 +41,7 @@ public class BookingServiceImpl implements BookingService {
 
     private final BookingRepository bookingRepository;
     private final BookingStateMachine bookingStateMachine;
-    @SuppressWarnings("unused")
-    private final DriverFeignClient driverFeignClient; // TODO: re-add driver matching call khi Driver Service hoàn thiện
     private final RedisTemplate<String, Object> redisTemplate;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
     private final BookingEventPublisher bookingEventPublisher;
 
     // ================================================================
@@ -82,6 +79,7 @@ public class BookingServiceImpl implements BookingService {
 
         // BƯỚC 2: Verify fare
         BigDecimal verifiedFare = verifyAndExtractFare(request);
+        VehicleType vehicleType = normalizeRequestedVehicleType(request.getVehicleType());
 
         // BƯỚC 3: Build entity
         Booking booking = Booking.builder()
@@ -93,7 +91,7 @@ public class BookingServiceImpl implements BookingService {
                 .pickupLng(extractLng(request.getPickupCoordinates()))
                 .dropoffLat(extractLat(request.getDropoffCoordinates()))
                 .dropoffLng(extractLng(request.getDropoffCoordinates()))
-                .vehicleType(request.getVehicleType())
+                .vehicleType(vehicleType)
                 .paymentMethod(request.getPaymentMethod())
                 .estimatedFare(verifiedFare)
                 .promoCode(request.getPromoCode())
@@ -102,28 +100,58 @@ public class BookingServiceImpl implements BookingService {
                 .status(BookingStatus.CREATED)
                 .build();
 
-        // BƯỚC 4: Lưu DB → CREATED → MATCHING
+        // BƯỚC 4: Lưu DB và chuyển trạng thái
         try {
-            booking = bookingRepository.saveAndFlush(booking); // Dùng saveAndFlush để kích hoạt Unique Constraint ngay lập tức
+            booking = bookingRepository.saveAndFlush(booking);
         } catch (DataIntegrityViolationException ex) {
             log.info("♻️ Bắt được DataIntegrityViolationException do trùng key {}. Trả về booking cũ.", request.getIdempotencyKey());
             Booking existing = bookingRepository.findByIdempotencyKey(request.getIdempotencyKey())
                     .orElseThrow(() -> new IllegalStateException("Lỗi tranh chấp dữ liệu IdempotencyKey."));
             return BookingResponse.fromEntity(existing);
         }
-        bookingStateMachine.transitionTo(booking, BookingStatus.MATCHING);
-        booking = bookingRepository.saveAndFlush(booking);
 
-        // BƯỚC 5: Gửi Kafka event
-        RideCreatedEvent event = RideCreatedEvent.builder()
+        boolean isOnlinePayment = request.getPaymentMethod() != null
+                && !request.getPaymentMethod().trim().equalsIgnoreCase("CASH");
+
+        if (isOnlinePayment) {
+            // ONLINE (MoMo/VNPay/ZaloPay): dừng ở PENDING_PAYMENT, chờ payment.completed rồi mới matching
+            bookingStateMachine.transitionTo(booking, BookingStatus.PENDING_PAYMENT);
+            booking = bookingRepository.saveAndFlush(booking);
+            log.info("⏳ Online payment required — bookingId={} | method={} | Đang chờ thanh toán xác nhận.",
+                    booking.getId(), request.getPaymentMethod());
+        } else {
+            // CASH: chuyển MATCHING và tìm tài xế ngay
+            bookingStateMachine.transitionTo(booking, BookingStatus.MATCHING);
+            booking = bookingRepository.saveAndFlush(booking);
+
+            // BƯỚC 5: Gửi Kafka event ride.created → matching-service tìm tài xế
+            RideCreatedEvent event = buildRideCreatedEvent(booking, request, customerId, vehicleType, verifiedFare);
+            bookingEventPublisher.publishRideCreated(event);
+            log.info("✅ RideCreated → Kafka | bookingId={} | fare={}", booking.getId(), verifiedFare);
+        }
+
+        // BƯỚC 6: Cache Redis
+        redisTemplate.opsForValue().set("booking:" + booking.getId(), booking, Duration.ofHours(2));
+
+        // BƯỚC 7: Push vào Timeout Queue (Redis ZSet) — chạy với cả CASH và ONLINE
+        long timeoutScore = Instant.now().plus(Duration.ofMinutes(3)).toEpochMilli();
+        redisTemplate.opsForZSet().add("booking:timeout:queue", booking.getId().toString(), timeoutScore);
+
+        return BookingResponse.fromEntity(booking);
+    }
+
+    private RideCreatedEvent buildRideCreatedEvent(Booking booking, BookingRequest request, String customerId, VehicleType vehicleType, BigDecimal verifiedFare) {
+        return RideCreatedEvent.builder()
                 .eventId(UUID.randomUUID().toString())
                 .type(RideCreatedEvent.EVENT_TYPE)
                 .rideId(booking.getId().toString())
                 .customerId(customerId)
                 .customerNote(booking.getCustomerNote())
+                .pickupAddress(booking.getPickupLocation())
+                .dropoffAddress(booking.getDropoffLocation())
                 .pickup(request.getPickupCoordinates())
                 .dropoff(request.getDropoffCoordinates())
-                .vehicleType(request.getVehicleType())
+                .vehicleType(vehicleType.name())
                 .paymentMethod(request.getPaymentMethod())
                 .estimatedFare(verifiedFare)
                 .promoCode(request.getPromoCode())
@@ -133,17 +161,35 @@ public class BookingServiceImpl implements BookingService {
                 .excludedDriverIds(java.util.List.of())
                 .timestamp(Instant.now().toString())
                 .build();
-        bookingEventPublisher.publishRideCreated(event);
-        log.info("✅ RideCreated → Kafka | bookingId={} | fare={}", booking.getId(), verifiedFare);
+    }
 
-        // BƯỚC 6: Cache Redis
-        redisTemplate.opsForValue().set("booking:" + booking.getId(), booking, Duration.ofHours(2));
-
-        // BƯỚC 7: Push vào Timeout Queue (Redis ZSet) để chờ xử lý nếu sau 3 phút không có tài xế nhận
-        long timeoutScore = Instant.now().plus(Duration.ofMinutes(3)).toEpochMilli();
-        redisTemplate.opsForZSet().add("booking:timeout:queue", booking.getId().toString(), timeoutScore);
-
-        return BookingResponse.fromEntity(booking);
+    /**
+     * Xây dựng RideCreatedEvent từ Booking entity — dùng khi thanh toán online xác nhận xong
+     * (BookingLifecycleEventListener sẽ gọi hàm này sau khi nhận payment.completed).
+     */
+    public RideCreatedEvent buildRideCreatedEventFromBooking(Booking booking) {
+        Map<String, Double> pickup = coordinateMap(booking.getPickupLat(), booking.getPickupLng());
+        Map<String, Double> dropoff = coordinateMap(booking.getDropoffLat(), booking.getDropoffLng());
+        return RideCreatedEvent.builder()
+                .eventId(java.util.UUID.randomUUID().toString())
+                .type(RideCreatedEvent.EVENT_TYPE)
+                .rideId(booking.getId().toString())
+                .customerId(booking.getCustomerId())
+                .customerNote(booking.getCustomerNote())
+                .pickupAddress(booking.getPickupLocation())
+                .dropoffAddress(booking.getDropoffLocation())
+                .pickup(pickup)
+                .dropoff(dropoff)
+                .vehicleType(booking.getVehicleType().name())
+                .paymentMethod(booking.getPaymentMethod())
+                .estimatedFare(booking.getEstimatedFare())
+                .promoCode(booking.getPromoCode())
+                .matchingAttempt(1)
+                .searchRadiusKm(3.0)
+                .rematch(false)
+                .excludedDriverIds(java.util.List.of())
+                .timestamp(Instant.now().toString())
+                .build();
     }
 
     // ================================================================
@@ -170,17 +216,6 @@ public class BookingServiceImpl implements BookingService {
         booking = bookingRepository.save(booking);
         log.info("✅ Driver {} accepted booking {}", driverId, bookingId);
 
-        // BƯỚC 5: Gửi Kafka event RideAcceptedEvent (publish cho downstream services nếu cần)
-        com.cab.booking.core.dto.event.outbound.RideAcceptedEvent event = com.cab.booking.core.dto.event.outbound.RideAcceptedEvent.builder()
-                .eventId(UUID.randomUUID().toString())
-                .type("RideAccepted")
-                .rideId(bookingId.toString())
-                .customerId(booking.getCustomerId())
-                .driverId(driverId)
-                .timestamp(Instant.now().toString())
-                .build();
-        bookingEventPublisher.publishRideAccepted(event);
-
         redisTemplate.opsForValue().set("booking:" + bookingId, booking, Duration.ofHours(2));
 
         return BookingResponse.fromEntity(booking);
@@ -206,27 +241,7 @@ public class BookingServiceImpl implements BookingService {
         booking = bookingRepository.save(booking);
         redisTemplate.opsForValue().set("booking:" + bookingId, booking, Duration.ofHours(2));
 
-        RideCreatedEvent event = RideCreatedEvent.builder()
-                .eventId(UUID.randomUUID().toString())
-                .type(RideCreatedEvent.EVENT_TYPE)
-                .rideId(booking.getId().toString())
-                .customerId(booking.getCustomerId())
-                .customerNote(booking.getCustomerNote())
-                .pickup(coordinateMap(booking.getPickupLat(), booking.getPickupLng()))
-                .dropoff(coordinateMap(booking.getDropoffLat(), booking.getDropoffLng()))
-                .vehicleType(booking.getVehicleType())
-                .paymentMethod(booking.getPaymentMethod())
-                .estimatedFare(booking.getEstimatedFare())
-                .promoCode(booking.getPromoCode())
-                .matchingAttempt(1)
-                .searchRadiusKm(3.0)
-                .rematch(true)
-                .excludedDriverIds(java.util.List.of(driverId))
-                .timestamp(Instant.now().toString())
-                .build();
-        bookingEventPublisher.publishRideCreated(event);
-
-        log.info("Driver {} rejected booking {}. Booking moved back to MATCHING. Reason={}",
+        log.info("Driver {} rejected booking {}. Booking moved back to MATCHING; matching-service rematches from ride.rejected. Reason={}",
                 driverId,
                 bookingId,
                 reason);
@@ -236,7 +251,7 @@ public class BookingServiceImpl implements BookingService {
     // ================================================================
     // START RIDE — PICKUP → IN_PROGRESS
     // ================================================================
-    @Override
+    @Deprecated
     @Transactional
     public BookingResponse startRide(UUID bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
@@ -259,9 +274,9 @@ public class BookingServiceImpl implements BookingService {
     }
 
     // ================================================================
-    // COMPLETE RIDE — IN_PROGRESS → COMPLETED → gửi ride.finished
+    // COMPLETE RIDE - IN_PROGRESS -> COMPLETED
     // ================================================================
-    @Override
+    @Deprecated
     @Transactional
     public BookingResponse completeRide(UUID bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
@@ -296,6 +311,15 @@ public class BookingServiceImpl implements BookingService {
             throw new AppException(ErrorCode.VALIDATION_ERROR);
         }
         return request.getEstimatedFare();
+    }
+
+    private VehicleType normalizeRequestedVehicleType(String rawVehicleType) {
+        try {
+            return VehicleTypeNormalizer.normalizeVehicleType(rawVehicleType);
+        } catch (IllegalArgumentException ex) {
+            log.warn("Invalid vehicleType in booking request: {}", rawVehicleType);
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
     }
 
     private Double extractLat(Map<String, Double> coords) {
@@ -356,7 +380,7 @@ public class BookingServiceImpl implements BookingService {
         return BookingResponse.fromEntity(booking);
     }
 
-    @Override
+    @Deprecated
     @Transactional
     public BookingResponse arriveAtPickup(UUID bookingId) {
         Booking booking = bookingRepository.findById(bookingId)

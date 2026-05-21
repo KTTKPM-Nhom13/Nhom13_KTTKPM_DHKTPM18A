@@ -38,7 +38,6 @@ spring:
         spring.json.type.mapping: >
           ride-created:com.cab.booking.core.dto.event.outbound.RideCreatedEvent,
           ride-cancelled:com.cab.booking.core.dto.event.outbound.RideCancelledEvent,
-          ride-accepted:com.cab.booking.core.dto.event.outbound.RideAcceptedEvent,
           booking-timeout:com.cab.booking.core.dto.event.outbound.BookingTimeoutEvent
     consumer:
       group-id: booking-group
@@ -53,17 +52,13 @@ spring:
         spring.json.type.mapping: >
           ride-assigned:com.cab.booking.core.dto.event.inbound.RideAssignedEvent,
           com.cab.matching.core.dto.event.outbound.RideAssignedEvent:com.cab.booking.core.dto.event.inbound.RideAssignedEvent,
-          ride-accepted:com.cab.booking.core.dto.event.inbound.RideAcceptedEvent,
-          ride-rejected:com.cab.booking.core.dto.event.inbound.RideRejectedEvent,
-          ride-accept-requested:com.cab.booking.core.dto.event.inbound.RideAcceptRequestedEvent,
-          ride-reject-requested:com.cab.booking.core.dto.event.inbound.RideRejectRequestedEvent,
-          driver-arrived:com.cab.booking.core.dto.event.inbound.DriverArrivedEvent,
+          ride-accepted:com.cab.booking.core.dto.event.inbound.DriverAcceptedEvent,
+          ride-rejected:com.cab.booking.core.dto.event.inbound.DriverRejectedEvent,
+          ride-arrived:com.cab.booking.core.dto.event.inbound.RideArrivedEvent,
           ride-started:com.cab.booking.core.dto.event.inbound.RideStartedEvent,
           ride-completed:com.cab.booking.core.dto.event.inbound.RideCompletedEvent,
-          ride-finished:com.cab.booking.core.dto.event.inbound.RideFinishedEvent,
           payment-completed:com.cab.booking.core.dto.event.inbound.PaymentCompletedEvent,
-          payment-failed:com.cab.booking.core.dto.event.inbound.PaymentFailedEvent,
-          driver-status:com.cab.booking.core.dto.event.inbound.DriverStatusEvent
+          payment-failed:com.cab.booking.core.dto.event.inbound.PaymentFailedEvent
 
 # Cấu hình Eureka Client
 eureka:

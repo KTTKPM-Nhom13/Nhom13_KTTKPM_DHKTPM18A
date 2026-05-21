@@ -90,6 +90,7 @@ public class OutboxPublisher {
             case "PAYMENT_COMPLETED" -> KafkaConfig.TOPIC_PAYMENT_COMPLETED;
             case "PAYMENT_FAILED" -> KafkaConfig.TOPIC_PAYMENT_FAILED;
             case "PAYMENT_REFUNDED" -> KafkaConfig.TOPIC_PAYMENT_REFUNDED;
+            case "DRIVER_EARNING_SETTLED" -> KafkaConfig.TOPIC_DRIVER_EARNING_SETTLED;
             default -> KafkaConfig.TOPIC_PAYMENT_INITIATED;
         };
     }
