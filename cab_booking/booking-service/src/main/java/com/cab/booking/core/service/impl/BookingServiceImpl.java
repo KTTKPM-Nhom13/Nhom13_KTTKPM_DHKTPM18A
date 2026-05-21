@@ -1,5 +1,6 @@
 package com.cab.booking.core.service.impl;
 
+import com.cab.booking.core.dto.event.outbound.PaymentRequestedEvent;
 import com.cab.booking.core.dto.event.outbound.RideCreatedEvent;
 import com.cab.booking.core.dto.request.BookingRequest;
 import com.cab.booking.core.dto.response.BookingResponse;
@@ -117,6 +118,8 @@ public class BookingServiceImpl implements BookingService {
             // ONLINE (MoMo/VNPay/ZaloPay): dừng ở PENDING_PAYMENT, chờ payment.completed rồi mới matching
             bookingStateMachine.transitionTo(booking, BookingStatus.PENDING_PAYMENT);
             booking = bookingRepository.saveAndFlush(booking);
+            PaymentRequestedEvent event = buildPaymentRequestedEvent(booking);
+            bookingEventPublisher.publishPaymentRequested(event);
             log.info("⏳ Online payment required — bookingId={} | method={} | Đang chờ thanh toán xác nhận.",
                     booking.getId(), request.getPaymentMethod());
         } else {
@@ -128,14 +131,13 @@ public class BookingServiceImpl implements BookingService {
             RideCreatedEvent event = buildRideCreatedEvent(booking, request, customerId, vehicleType, verifiedFare);
             bookingEventPublisher.publishRideCreated(event);
             log.info("✅ RideCreated → Kafka | bookingId={} | fare={}", booking.getId(), verifiedFare);
+
+            long timeoutScore = Instant.now().plus(Duration.ofMinutes(3)).toEpochMilli();
+            redisTemplate.opsForZSet().add("booking:timeout:queue", booking.getId().toString(), timeoutScore);
         }
 
         // BƯỚC 6: Cache Redis
         redisTemplate.opsForValue().set("booking:" + booking.getId(), booking, Duration.ofHours(2));
-
-        // BƯỚC 7: Push vào Timeout Queue (Redis ZSet) — chạy với cả CASH và ONLINE
-        long timeoutScore = Instant.now().plus(Duration.ofMinutes(3)).toEpochMilli();
-        redisTemplate.opsForZSet().add("booking:timeout:queue", booking.getId().toString(), timeoutScore);
 
         return BookingResponse.fromEntity(booking);
     }
@@ -159,6 +161,22 @@ public class BookingServiceImpl implements BookingService {
                 .searchRadiusKm(3.0)
                 .rematch(false)
                 .excludedDriverIds(java.util.List.of())
+                .timestamp(Instant.now().toString())
+                .build();
+    }
+
+    private PaymentRequestedEvent buildPaymentRequestedEvent(Booking booking) {
+        String bookingId = booking.getId().toString();
+        return PaymentRequestedEvent.builder()
+                .eventId(UUID.randomUUID().toString())
+                .eventType(PaymentRequestedEvent.EVENT_TYPE)
+                .bookingId(bookingId)
+                .rideId(bookingId)
+                .customerId(booking.getCustomerId())
+                .amount(booking.getEstimatedFare())
+                .paymentMethod(booking.getPaymentMethod())
+                .paymentPhase(PaymentRequestedEvent.PRE_TRIP_PHASE)
+                .currency("VND")
                 .timestamp(Instant.now().toString())
                 .build();
     }
