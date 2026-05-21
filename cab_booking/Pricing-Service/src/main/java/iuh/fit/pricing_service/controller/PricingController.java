@@ -128,10 +128,11 @@ public class PricingController {
     })
     public ResponseEntity<FareEstimate> confirmEstimate(
             @Parameter(description = "Estimate ID to confirm", required = true)
-            @PathVariable String estimateId) {
+            @PathVariable String estimateId,
+            @RequestHeader(value = "X-Quote-Hash", required = false) String quoteHash) {
 
         log.info("Received confirm estimate request - estimateId: {}", estimateId);
-        FareEstimate confirmed = pricingService.confirmFare(estimateId);
+        FareEstimate confirmed = pricingService.confirmFare(estimateId, quoteHash);
         log.info("Fare confirmed - estimateId: {}, totalFare: {} {}", estimateId, confirmed.getTotalFare(), confirmed.getCurrency());
         return ResponseEntity.ok(confirmed);
     }
