@@ -123,7 +123,7 @@ def run_agent_session(user_message: str, user_info: dict) -> str:
         active_tools = [calculate_fare, create_booking]
 
     model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
+        model_name="gemini-1.5-flash",
         system_instruction=system_instruction,
         tools=active_tools if active_tools else None
     )
