@@ -191,6 +191,7 @@ public class DriverProfileService {
                 .serviceArea(profile.getServiceArea())
                 .availabilityStatus(profile.getAvailabilityStatus().name())
                 .verificationStatus(profile.getVerificationStatus().name())
+                .accountStatus(profile.getAccountStatus().name())
                 .currentLatitude(profile.getCurrentLatitude())
                 .currentLongitude(profile.getCurrentLongitude())
                 .lastOnlineAt(profile.getLastOnlineAt())

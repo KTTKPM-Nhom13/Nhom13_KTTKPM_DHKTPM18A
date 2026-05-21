@@ -27,6 +27,7 @@ public class DriverProfileResponse {
     String serviceArea;
     String availabilityStatus;
     String verificationStatus;
+    String accountStatus;
     BigDecimal currentLatitude;
     BigDecimal currentLongitude;
     LocalDateTime lastOnlineAt;
