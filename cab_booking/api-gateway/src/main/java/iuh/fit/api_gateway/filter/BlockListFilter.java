@@ -26,17 +26,25 @@ public class BlockListFilter implements GlobalFilter, Ordered {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        String path = exchange.getRequest().getPath().value();
+        String method = exchange.getRequest().getMethod().name();
+
         return ReactiveSecurityContextHolder.getContext()
                 .map(SecurityContext::getAuthentication)
                 .flatMap(auth -> {
                     if (auth != null && auth.getPrincipal() instanceof Jwt jwt) {
                         String userId = jwt.getSubject();
                         
+                        // Check if it's an exception path that should be allowed even if blocked
+                        if (isAllowedLifecycleAction(path, method)) {
+                            return chain.filter(exchange);
+                        }
+
                         if (reactiveRedisTemplate != null) {
                             return reactiveRedisTemplate.opsForSet().isMember(BLOCKED_USERS_KEY, userId)
                                     .flatMap(isBlocked -> {
                                         if (Boolean.TRUE.equals(isBlocked)) {
-                                            log.warn("Blocked user attempt: {}", userId);
+                                            log.warn("Blocked user attempt (Path: {}): {}", path, userId);
                                             exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
                                             return exchange.getResponse().setComplete();
                                         }
@@ -47,6 +55,27 @@ public class BlockListFilter implements GlobalFilter, Ordered {
                     return chain.filter(exchange);
                 })
                 .switchIfEmpty(chain.filter(exchange));
+    }
+
+    private boolean isAllowedLifecycleAction(String path, String method) {
+        // Check if the request is related to ride or booking status/lifecycle
+        boolean isRideRelated = path.contains("/rides") || path.contains("/bookings");
+
+        // allow GET requests to see ride info so they can finish their trip
+        if ("GET".equalsIgnoreCase(method) && isRideRelated) {
+            return true;
+        }
+
+        // Allow critical lifecycle POST/PUT actions to finish active trips
+        if (isRideRelated) {
+            return path.endsWith("/complete") || 
+                   path.endsWith("/cancel") || 
+                   path.endsWith("/arrive") || 
+                   path.endsWith("/start") ||
+                   path.contains("/location");
+        }
+
+        return false;
     }
 
     @Override
