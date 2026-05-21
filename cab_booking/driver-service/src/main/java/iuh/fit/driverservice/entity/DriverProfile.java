@@ -63,6 +63,10 @@ public class DriverProfile extends BaseEntity {
     @Column(name = "verification_status", nullable = false, length = 30)
     DriverVerificationStatus verificationStatus = DriverVerificationStatus.PENDING;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_status", nullable = false, length = 30)
+    AccountLifecycleStatus accountStatus = AccountLifecycleStatus.ACTIVE;
+
     @Column(name = "current_latitude", precision = 10, scale = 6)
     BigDecimal currentLatitude;
 

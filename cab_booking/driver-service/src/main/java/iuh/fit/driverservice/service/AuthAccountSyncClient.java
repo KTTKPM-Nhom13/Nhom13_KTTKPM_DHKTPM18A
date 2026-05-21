@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import iuh.fit.driverservice.entity.DriverProfile;
+
 @Component
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -15,6 +17,17 @@ public class AuthAccountSyncClient {
 
     @Value("${integration.auth-service.url:http://auth-service:8081}")
     String authServiceUrl;
+
+    public void syncAccountLifecycle(DriverProfile profile) {
+        restClientBuilder.build()
+                .post()
+                .uri(authServiceUrl + "/internal/auth/users/{userId}/account-lifecycle", profile.getExternalUserId())
+                .body(java.util.Map.of(
+                        "accountStatus", profile.getAccountStatus().name()
+                ))
+                .retrieve()
+                .toBodilessEntity();
+    }
 
     public String registerAuthAccount(java.util.Map<String, Object> payload) {
         try {
