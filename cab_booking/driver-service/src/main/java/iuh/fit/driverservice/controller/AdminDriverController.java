@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import iuh.fit.driverservice.entity.AccountLifecycleStatus;
+
 @RestController
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -105,6 +107,48 @@ public class AdminDriverController {
 
         return ApiResponse.<DriverProfile>builder()
                 .message("Updated driver verification status successfully")
+                .result(savedProfile)
+                .build();
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/api/admin/drivers/{driverId}/block")
+    public ApiResponse<DriverProfile> blockDriver(@PathVariable UUID driverId) {
+        DriverProfile profile = driverProfileRepository.findById(driverId)
+                .orElseThrow(() -> new RuntimeException("Driver profile not found"));
+
+        profile.setAccountStatus(AccountLifecycleStatus.SUSPENDED);
+        DriverProfile savedProfile = driverProfileRepository.save(profile);
+
+        try {
+            authAccountSyncClient.syncAccountLifecycle(savedProfile);
+        } catch (Exception e) {
+            log.error("Failed to sync block to auth-service for driver {}: {}", driverId, e.getMessage());
+        }
+
+        return ApiResponse.<DriverProfile>builder()
+                .message("Driver blocked successfully")
+                .result(savedProfile)
+                .build();
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/api/admin/drivers/{driverId}/unblock")
+    public ApiResponse<DriverProfile> unblockDriver(@PathVariable UUID driverId) {
+        DriverProfile profile = driverProfileRepository.findById(driverId)
+                .orElseThrow(() -> new RuntimeException("Driver profile not found"));
+
+        profile.setAccountStatus(AccountLifecycleStatus.ACTIVE);
+        DriverProfile savedProfile = driverProfileRepository.save(profile);
+
+        try {
+            authAccountSyncClient.syncAccountLifecycle(savedProfile);
+        } catch (Exception e) {
+            log.error("Failed to sync unblock to auth-service for driver {}: {}", driverId, e.getMessage());
+        }
+
+        return ApiResponse.<DriverProfile>builder()
+                .message("Driver unblocked successfully")
                 .result(savedProfile)
                 .build();
     }

@@ -111,6 +111,48 @@ public class AdminUserController {
                 .build();
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/api/admin/users/{userId}/block")
+    public ApiResponse<UserProfile> blockUser(@PathVariable UUID userId) {
+        UserProfile profile = userProfileRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User profile not found"));
+
+        profile.setAccountStatus(AccountLifecycleStatus.SUSPENDED);
+        UserProfile savedProfile = userProfileRepository.save(profile);
+
+        try {
+            authAccountSyncClient.syncAccountLifecycle(savedProfile);
+        } catch (Exception e) {
+            log.error("Failed to sync block to auth-service for user {}: {}", userId, e.getMessage());
+        }
+
+        return ApiResponse.<UserProfile>builder()
+                .message("User blocked successfully")
+                .result(savedProfile)
+                .build();
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/api/admin/users/{userId}/unblock")
+    public ApiResponse<UserProfile> unblockUser(@PathVariable UUID userId) {
+        UserProfile profile = userProfileRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User profile not found"));
+
+        profile.setAccountStatus(AccountLifecycleStatus.ACTIVE);
+        UserProfile savedProfile = userProfileRepository.save(profile);
+
+        try {
+            authAccountSyncClient.syncAccountLifecycle(savedProfile);
+        } catch (Exception e) {
+            log.error("Failed to sync unblock to auth-service for user {}: {}", userId, e.getMessage());
+        }
+
+        return ApiResponse.<UserProfile>builder()
+                .message("User unblocked successfully")
+                .result(savedProfile)
+                .build();
+    }
+
     @PostMapping("/internal/users")
     public ApiResponse<UserProfile> createInternalUser(@RequestBody Map<String, String> body) {
         String externalUserId = body.get("userId");

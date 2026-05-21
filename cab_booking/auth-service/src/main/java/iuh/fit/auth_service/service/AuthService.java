@@ -47,10 +47,17 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import org.springframework.data.redis.core.StringRedisTemplate;
+
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Bean;
+
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
+@Slf4j
 public class AuthService {
     final AuthUserRepository authUserRepository;
     final AuthSessionRepository authSessionRepository;
@@ -60,6 +67,31 @@ public class AuthService {
     final AuthTokenService authTokenService;
     final EmailServiceClient emailServiceClient;
     final DiscoveryClient discoveryClient;
+    final StringRedisTemplate redisTemplate;
+
+    public static final String BLOCKED_USERS_KEY = "blocked_user_ids";
+
+    @Bean
+    public CommandLineRunner initBlockedUsers() {
+        return args -> {
+            try {
+                log.info("Initializing blocked users in Redis...");
+                List<AuthUser> suspendedUsers = authUserRepository.findAll()
+                        .stream()
+                        .filter(u -> u.getAccountStatus() == AccountLifecycleStatus.SUSPENDED)
+                        .toList();
+                
+                // Clear existing and re-populate
+                redisTemplate.delete(BLOCKED_USERS_KEY);
+                for (AuthUser user : suspendedUsers) {
+                    redisTemplate.opsForSet().add(BLOCKED_USERS_KEY, user.getId().toString());
+                }
+                log.info("Initialized {} blocked users in Redis", suspendedUsers.size());
+            } catch (Exception e) {
+                log.error("Failed to initialize blocked users in Redis: {}", e.getMessage());
+            }
+        };
+    }
 
     @Value("${auth.jwt.refresh-token-days:30}")
     long refreshTokenDays;
@@ -214,6 +246,40 @@ public class AuthService {
         AuthUser savedUser = authUserRepository.save(user);
         return createSessionResponse(savedUser, request.getDeviceId(), request.getPlatform(),
                 request.getUserAgent(), request.getAppVersion());
+    }
+
+    @Transactional
+    public void blockUser(UUID userId) {
+        AuthUser operator = getAuthenticatedUser();
+        if (operator.getRole() != UserRole.ADMIN) {
+            throw new AppException(ErrorCode.UNAUTHORIZED_ACCESS);
+        }
+
+        AuthUser user = authUserRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.AUTH_USER_NOT_FOUND));
+
+        user.setAccountStatus(AccountLifecycleStatus.SUSPENDED);
+        authUserRepository.save(user);
+
+        // Update Redis for Gateway
+        redisTemplate.opsForSet().add(BLOCKED_USERS_KEY, userId.toString());
+    }
+
+    @Transactional
+    public void unblockUser(UUID userId) {
+        AuthUser operator = getAuthenticatedUser();
+        if (operator.getRole() != UserRole.ADMIN) {
+            throw new AppException(ErrorCode.UNAUTHORIZED_ACCESS);
+        }
+
+        AuthUser user = authUserRepository.findById(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.AUTH_USER_NOT_FOUND));
+
+        user.setAccountStatus(AccountLifecycleStatus.ACTIVE);
+        authUserRepository.save(user);
+
+        // Update Redis for Gateway
+        redisTemplate.opsForSet().remove(BLOCKED_USERS_KEY, userId.toString());
     }
 
 
@@ -382,6 +448,13 @@ public class AuthService {
         user.setDeletionReason(request.getDeletionReason());
         user.setActive(status == AccountLifecycleStatus.ACTIVE);
         authUserRepository.save(user);
+
+        // Update Redis for Gateway
+        if (status == AccountLifecycleStatus.SUSPENDED) {
+            redisTemplate.opsForSet().add(BLOCKED_USERS_KEY, userId.toString());
+        } else {
+            redisTemplate.opsForSet().remove(BLOCKED_USERS_KEY, userId.toString());
+        }
     }
 
     private AuthTokenResponse createSessionResponse(AuthUser user, String deviceId, String platform,
