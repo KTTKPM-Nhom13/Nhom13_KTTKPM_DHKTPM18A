@@ -19,21 +19,23 @@ public class RideCompletedConsumer {
     @KafkaListener(topics = "ride.completed", groupId = "review-group")
     public void consumeRideCompletedEvent(Map<String, Object> event) {
         log.info("Consumed ride completed event: {}", event);
-
+        
         try {
-            String rideId = (String) event.get("rideId");
-            String customerId = (String) event.get("customerId");
-            String driverId = (String) event.get("driverId");
+            if (event != null) {
+                String rideId = (String) event.get("rideId");
+                String customerId = (String) event.get("customerId");
+                String driverId = (String) event.get("driverId");
 
-            if (rideId != null) {
-                FinishedRide finishedRide = FinishedRide.builder()
-                        .rideId(rideId)
-                        .customerId(customerId)
-                        .driverId(driverId)
-                        .finishedAt(LocalDateTime.now())
-                        .build();
-                finishedRideRepository.save(finishedRide);
-                log.info("Persisted completed ride {} for review eligibility.", rideId);
+                if (rideId != null) {
+                    FinishedRide finishedRide = FinishedRide.builder()
+                            .rideId(rideId)
+                            .customerId(customerId)
+                            .driverId(driverId)
+                            .finishedAt(LocalDateTime.now())
+                            .build();
+                    finishedRideRepository.save(finishedRide);
+                    log.info("Persisted completed ride {} for review eligibility.", rideId);
+                }
             }
         } catch (Exception e) {
             log.error("Error processing ride.completed event: {}", e.getMessage());
