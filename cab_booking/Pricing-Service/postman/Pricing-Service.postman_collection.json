@@ -1238,6 +1238,675 @@
         }
       }
     ]
+  },
+  {
+    "name": "06 - Admin Pricing Config & Surge Management",
+    "auth": {
+      "type": "bearer",
+      "bearer": [
+        {
+          "key": "token",
+          "value": "{{ADMIN_JWT_TOKEN}}",
+          "type": "string"
+        }
+      ]
+    },
+    "item": [
+      {
+        "name": "01 - Get Admin Dashboard",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Dashboard retrieved successfully', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "  pm.expect(json.data).to.exist;",
+                "  pm.expect(json.data.totalPricingConfigs).to.exist;",
+                "  pm.expect(json.data.totalSurgeRules).to.exist;",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "GET",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/dashboard",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "dashboard"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "02 - Create Pricing Config (BIKE)",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Pricing config created', function () {",
+                "  pm.response.to.have.status(201);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "  pm.expect(json.data.vehicleType).to.eql('BIKE');",
+                "  pm.expect(json.data.baseFare).to.eql(10000);",
+                "});",
+                "if (pm.response.code === 201) {",
+                "  const json = pm.response.json();",
+                "  pm.collectionVariables.set('pricing_config_id', json.data.id);",
+                "}"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "POST",
+          "header": [{"key": "Content-Type", "value": "application/json"}],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"vehicleType\": \"BIKE\",\n  \"baseFare\": 10000,\n  \"perKmRate\": 3500,\n  \"perMinuteRate\": 200,\n  \"multiplier\": 1.0,\n  \"active\": true\n}"
+          },
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/pricing-configs",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "pricing-configs"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "03 - Create Pricing Config (CAR4)",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Pricing config created', function () {",
+                "  pm.response.to.have.status(201);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "  pm.expect(json.data.vehicleType).to.eql('CAR4');",
+                "});",
+                "if (pm.response.code === 201) {",
+                "  const json = pm.response.json();",
+                "  pm.collectionVariables.set('car4_config_id', json.data.id);",
+                "}"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "POST",
+          "header": [{"key": "Content-Type", "value": "application/json"}],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"vehicleType\": \"CAR4\",\n  \"baseFare\": 20000,\n  \"perKmRate\": 8500,\n  \"perMinuteRate\": 500,\n  \"multiplier\": 1.0,\n  \"active\": true\n}"
+          },
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/pricing-configs",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "pricing-configs"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "04 - Create Duplicate Pricing Config Should Fail",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Duplicate config rejected', function () {",
+                "  pm.response.to.have.status(409);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.error).to.eql('CONFLICT');",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "POST",
+          "header": [{"key": "Content-Type", "value": "application/json"}],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"vehicleType\": \"BIKE\",\n  \"baseFare\": 15000,\n  \"perKmRate\": 4000,\n  \"perMinuteRate\": 300,\n  \"active\": true\n}"
+          },
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/pricing-configs",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "pricing-configs"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "05 - Get All Pricing Configs",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('All configs retrieved', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "  pm.expect(json.data).to.be.an('array');",
+                "  pm.expect(json.data.length).to.be.at.least(1);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "GET",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/pricing-configs",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "pricing-configs"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "06 - Get Pricing Config By Vehicle Type",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Config by vehicle type retrieved', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "  pm.expect(json.data.vehicleType).to.eql('BIKE');",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "GET",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/pricing-configs/vehicle/BIKE",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "pricing-configs", "vehicle", "BIKE"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "07 - Update Pricing Config",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Pricing config updated', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "  pm.expect(json.data.baseFare).to.eql(12000);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "PUT",
+          "header": [{"key": "Content-Type", "value": "application/json"}],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"vehicleType\": \"BIKE\",\n  \"baseFare\": 12000,\n  \"perKmRate\": 4000,\n  \"perMinuteRate\": 250,\n  \"multiplier\": 1.0,\n  \"active\": true\n}"
+          },
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/pricing-configs/{{pricing_config_id}}",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "pricing-configs", "{{pricing_config_id}}"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "08 - Toggle Pricing Config Status",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Pricing config status toggled', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "PATCH",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/pricing-configs/{{pricing_config_id}}/toggle",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "pricing-configs", "{{pricing_config_id}}", "toggle"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "09 - Create Surge Rule",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Surge rule created', function () {",
+                "  pm.response.to.have.status(201);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "  pm.expect(json.data.zoneId).to.eql(pm.collectionVariables.get('pickup_zone'));",
+                "  pm.expect(Number(json.data.surgeMultiplier)).to.eql(1.5);",
+                "});",
+                "if (pm.response.code === 201) {",
+                "  const json = pm.response.json();",
+                "  pm.collectionVariables.set('surge_rule_id', json.data.id);",
+                "}"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "POST",
+          "header": [{"key": "Content-Type", "value": "application/json"}],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"zoneId\": \"{{pickup_zone}}\",\n  \"zoneName\": \"District 1 Downtown\",\n  \"surgeMultiplier\": 1.5,\n  \"latitude\": 10.8231,\n  \"longitude\": 106.6297,\n  \"radiusKm\": 2.0,\n  \"activeDrivers\": 20,\n  \"pendingRides\": 50,\n  \"source\": \"MANUAL\"\n}"
+          },
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/surge-rules",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "surge-rules"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "10 - Create Another Surge Rule",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Surge rule created', function () {",
+                "  pm.response.to.have.status(201);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "POST",
+          "header": [{"key": "Content-Type", "value": "application/json"}],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"zoneId\": \"Z60207\",\n  \"zoneName\": \"District 3\",\n  \"surgeMultiplier\": 1.2,\n  \"latitude\": 10.7875,\n  \"longitude\": 106.6819,\n  \"radiusKm\": 1.5,\n  \"source\": \"MANUAL\"\n}"
+          },
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/surge-rules",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "surge-rules"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "11 - Create Bulk Surge Rules",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Bulk surge rules created', function () {",
+                "  pm.response.to.have.status(201);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "  pm.expect(json.data).to.be.an('array');",
+                "  pm.expect(json.data.length).to.eql(2);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "POST",
+          "header": [{"key": "Content-Type", "value": "application/json"}],
+          "body": {
+            "mode": "raw",
+            "raw": "[\n  {\n    \"zoneId\": \"Z60208\",\n    \"zoneName\": \"District 5\",\n    \"surgeMultiplier\": 1.3,\n    \"latitude\": 10.7456,\n    \"longitude\": 106.6563,\n    \"source\": \"MANUAL\"\n  },\n  {\n    \"zoneId\": \"Z60209\",\n    \"zoneName\": \"District 10\",\n    \"surgeMultiplier\": 1.1,\n    \"latitude\": 10.7654,\n    \"longitude\": 106.6789,\n    \"source\": \"MANUAL\"\n  }\n]"
+          },
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/surge-rules/bulk",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "surge-rules", "bulk"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "12 - Get All Surge Rules",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('All surge rules retrieved', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "  pm.expect(json.data).to.be.an('array');",
+                "  pm.expect(json.data.length).to.be.at.least(3);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "GET",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/surge-rules",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "surge-rules"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "13 - Get Surge Rule By Zone ID",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Surge rule by zone retrieved', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "  pm.expect(json.data.zoneId).to.eql(pm.collectionVariables.get('pickup_zone'));",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "GET",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/surge-rules/zone/{{pickup_zone}}",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "surge-rules", "zone", "{{pickup_zone}}"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "14 - Update Surge Rule",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Surge rule updated', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "  pm.expect(Number(json.data.surgeMultiplier)).to.eql(1.8);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "PUT",
+          "header": [{"key": "Content-Type", "value": "application/json"}],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"zoneId\": \"{{pickup_zone}}\",\n  \"surgeMultiplier\": 1.8,\n  \"activeDrivers\": 30,\n  \"pendingRides\": 80,\n  \"source\": \"MANUAL\"\n}"
+          },
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/surge-rules/{{surge_rule_id}}",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "surge-rules", "{{surge_rule_id}}"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "15 - Update Bulk Zone Metrics",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Bulk zone metrics updated', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "POST",
+          "header": [{"key": "Content-Type", "value": "application/json"}],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"zoneMetrics\": [\n    {\"zoneId\": \"{{pickup_zone}}\", \"activeDrivers\": 25, \"pendingRides\": 60},\n    {\"zoneId\": \"Z60207\", \"activeDrivers\": 15, \"pendingRides\": 40},\n    {\"zoneId\": \"Z60208\", \"activeDrivers\": 10, \"pendingRides\": 30}\n  ]\n}"
+          },
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/zone-metrics/bulk",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "zone-metrics", "bulk"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "16 - Delete Surge Rule By Zone",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Surge rule deleted by zone', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "DELETE",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/surge-rules/zone/Z60207",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "surge-rules", "zone", "Z60207"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "17 - Delete Surge Rule By ID",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Surge rule deleted by ID', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "DELETE",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/surge-rules/{{surge_rule_id}}",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "surge-rules", "{{surge_rule_id}}"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "18 - Delete Pricing Config",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Pricing config deleted', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "DELETE",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/pricing-configs/{{pricing_config_id}}",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "pricing-configs", "{{pricing_config_id}}"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "19 - Get Dashboard After Changes",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Dashboard reflects changes', function () {",
+                "  pm.response.to.have.status(200);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "  pm.expect(json.data.totalPricingConfigs).to.be.at.least(1);",
+                "  pm.expect(json.data.totalSurgeRules).to.be.at.least(3);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "GET",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/dashboard",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "dashboard"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "20 - Get Non-Existent Pricing Config Returns 404",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Not found handled', function () {",
+                "  pm.response.to.have.status(404);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "GET",
+          "header": [],
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/pricing-configs/nonexistent-id",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "pricing-configs", "nonexistent-id"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "21 - Invalid Surge Multiplier Should Be Rejected",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Invalid surge multiplier validation works', function () {",
+                "  pm.response.to.have.status(400);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "POST",
+          "header": [{"key": "Content-Type", "value": "application/json"}],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"zoneId\": \"Z99999\",\n  \"surgeMultiplier\": 10.0,\n  \"source\": \"MANUAL\"\n}"
+          },
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/surge-rules",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "surge-rules"]
+          }
+        },
+        "response": []
+      }
+    ]
   }
 ],
   "event": [
@@ -1389,6 +2058,21 @@
     {
       "key": "admin_password",
       "value": "12345678",
+      "type": "string"
+    },
+    {
+      "key": "pricing_config_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "car4_config_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "surge_rule_id",
+      "value": "",
       "type": "string"
     }
   ]
