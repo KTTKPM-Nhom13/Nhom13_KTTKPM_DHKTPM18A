@@ -1,5 +1,6 @@
 package iuh.fit.review_service.consumer;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -12,12 +13,15 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class RideFinishedConsumer {
     private final iuh.fit.review_service.repository.FinishedRideRepository finishedRideRepository;
+    private final ObjectMapper objectMapper;
 
     @KafkaListener(topics = "ride.finished", groupId = "review-group")
-    public void consumeRideFinishedEvent(Map<String, Object> event) {
-        log.info("Consumed ride finished event: {}", event);
+    public void consumeRideFinishedEvent(String message) {
+        log.info("Consumed raw ride finished event: {}", message);
         
         try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> event = objectMapper.readValue(message, Map.class);
             String rideId = (String) event.get("rideId");
             String customerId = (String) event.get("customerId");
             String driverId = (String) event.get("driverId");
@@ -37,3 +41,4 @@ public class RideFinishedConsumer {
         }
     }
 }
+
