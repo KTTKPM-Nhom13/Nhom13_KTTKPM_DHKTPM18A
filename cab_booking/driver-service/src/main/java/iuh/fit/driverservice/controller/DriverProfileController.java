@@ -8,6 +8,7 @@ import iuh.fit.driverservice.dto.response.DriverAvailabilityResponse;
 import iuh.fit.driverservice.dto.response.DriverCurrentRideResponse;
 import iuh.fit.driverservice.dto.response.DriverEarningsSummaryResponse;
 import iuh.fit.driverservice.dto.response.DriverProfileResponse;
+import iuh.fit.driverservice.dto.response.DriverRevenueStatsResponse;
 import iuh.fit.driverservice.security.CurrentUserFacade;
 import iuh.fit.driverservice.service.DriverProfileService;
 import iuh.fit.driverservice.service.DriverRideCommandService;
@@ -15,14 +16,10 @@ import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/drivers/me")
@@ -38,6 +35,20 @@ public class DriverProfileController {
         return ApiResponse.<DriverProfileResponse>builder()
                 .message("Fetched driver profile successfully")
                 .result(driverProfileService.getProfile(currentUserFacade.getCurrentUserId()))
+                .build();
+    }
+
+    @GetMapping("/revenue/stats")
+    public ApiResponse<DriverRevenueStatsResponse> getRevenueStats(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
+
+        if (start == null) start = LocalDateTime.now().minusMonths(1);
+        if (end == null) end = LocalDateTime.now();
+
+        return ApiResponse.<DriverRevenueStatsResponse>builder()
+                .message("Fetched driver revenue stats successfully")
+                .result(driverProfileService.getRevenueStats(currentUserFacade.getCurrentUserId(), start, end))
                 .build();
     }
 

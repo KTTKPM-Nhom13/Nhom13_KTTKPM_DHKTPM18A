@@ -12,7 +12,9 @@ import iuh.fit.driverservice.dto.response.DriverProfileResponse;
 import iuh.fit.driverservice.dto.response.DriverStatusCheckResponse;
 import iuh.fit.driverservice.entity.DriverAvailabilityStatus;
 import iuh.fit.driverservice.entity.DriverProfile;
+import iuh.fit.driverservice.dto.response.DriverRevenueStatsResponse;
 import iuh.fit.driverservice.entity.DriverVerificationStatus;
+import iuh.fit.driverservice.repository.DriverEarningRepository;
 import iuh.fit.driverservice.repository.DriverProfileRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +38,7 @@ import java.time.LocalDateTime;
 public class DriverProfileService {
 
     DriverProfileRepository driverProfileRepository;
+    DriverEarningRepository driverEarningRepository;
     DriverStatusService driverStatusService;
 
     @Transactional
@@ -118,6 +124,57 @@ public class DriverProfileService {
                 .currentRideActive(profile.getCurrentRideId() != null)
                 .lastOnlineAt(profile.getLastOnlineAt())
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public DriverRevenueStatsResponse getRevenueStats(String driverId, LocalDateTime start, LocalDateTime end) {
+        DriverProfile profile = driverProfileRepository.findByExternalUserId(driverId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_PROFILE_NOT_FOUND));
+
+        Map<String, Object> stats = driverEarningRepository.getEarningStatsByDriverId(driverId, start, end);
+
+        return DriverRevenueStatsResponse.builder()
+                .driverId(driverId)
+                .driverName(profile.getFullName())
+                .totalGross(getBigDecimal(stats, "totalGross"))
+                .totalDriver(getBigDecimal(stats, "totalDriver"))
+                .totalPlatform(getBigDecimal(stats, "totalPlatform"))
+                .totalRides(getLong(stats, "totalRides"))
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<DriverRevenueStatsResponse> getAllDriversRevenueStats(LocalDateTime start, LocalDateTime end) {
+        List<Map<String, Object>> allStats = driverEarningRepository.getAllDriversEarningStats(start, end);
+
+        Map<String, String> driverNames = driverProfileRepository.findAll().stream()
+                .collect(Collectors.toMap(DriverProfile::getExternalUserId,
+                        p -> p.getFullName() != null ? p.getFullName() : "Unknown",
+                        (a, b) -> a));
+
+        return allStats.stream().map(stats -> DriverRevenueStatsResponse.builder()
+                .driverId((String) stats.get("driverId"))
+                .driverName(driverNames.getOrDefault((String) stats.get("driverId"), "Unknown"))
+                .totalGross(getBigDecimal(stats, "totalGross"))
+                .totalDriver(getBigDecimal(stats, "totalDriver"))
+                .totalPlatform(getBigDecimal(stats, "totalPlatform"))
+                .totalRides(getLong(stats, "totalRides"))
+                .build()
+        ).collect(Collectors.toList());
+    }
+
+    private BigDecimal getBigDecimal(Map<String, Object> map, String key) {
+        Object val = map.get(key);
+        if (val == null) return BigDecimal.ZERO;
+        if (val instanceof BigDecimal) return (BigDecimal) val;
+        return new BigDecimal(val.toString());
+    }
+
+    private Long getLong(Map<String, Object> map, String key) {
+        Object val = map.get(key);
+        if (val == null) return 0L;
+        if (val instanceof Number) return ((Number) val).longValue();
+        return Long.parseLong(val.toString());
     }
 
     @Transactional

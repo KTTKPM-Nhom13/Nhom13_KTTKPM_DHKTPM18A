@@ -6,14 +6,18 @@ import iuh.fit.driverservice.entity.DriverProfile;
 import iuh.fit.driverservice.entity.DriverVerificationStatus;
 import iuh.fit.driverservice.repository.DriverProfileRepository;
 import iuh.fit.driverservice.service.AuthAccountSyncClient;
+import iuh.fit.driverservice.service.DriverProfileService;
+import iuh.fit.driverservice.dto.response.DriverRevenueStatsResponse;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +32,7 @@ import iuh.fit.driverservice.entity.AccountLifecycleStatus;
 public class AdminDriverController {
 
     DriverProfileRepository driverProfileRepository;
+    DriverProfileService driverProfileService;
     AuthAccountSyncClient authAccountSyncClient;
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -36,6 +41,21 @@ public class AdminDriverController {
         return ApiResponse.<List<DriverProfile>>builder()
                 .message("Fetched drivers successfully")
                 .result(driverProfileRepository.findAllByOrderByCreatedAtDesc())
+                .build();
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/api/admin/drivers/revenue/stats")
+    public ApiResponse<List<DriverRevenueStatsResponse>> getAllDriversRevenueStats(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
+
+        if (start == null) start = LocalDateTime.now().minusMonths(1);
+        if (end == null) end = LocalDateTime.now();
+
+        return ApiResponse.<List<DriverRevenueStatsResponse>>builder()
+                .message("Fetched all drivers revenue stats successfully")
+                .result(driverProfileService.getAllDriversRevenueStats(start, end))
                 .build();
     }
 
