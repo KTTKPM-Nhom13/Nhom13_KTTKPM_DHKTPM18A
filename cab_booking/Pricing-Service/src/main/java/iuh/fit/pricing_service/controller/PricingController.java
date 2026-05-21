@@ -7,8 +7,10 @@ import iuh.fit.pricing_service.model.FareEstimateRequest;
 import iuh.fit.pricing_service.model.FareEstimateResponse;
 import iuh.fit.pricing_service.model.PricingTestRequest;
 import iuh.fit.pricing_service.model.PricingTestResponse;
+import iuh.fit.pricing_service.model.RevenueStatisticsResponse;
 import iuh.fit.pricing_service.model.SurgeUpdateRequest;
 import iuh.fit.pricing_service.service.PricingService;
+import iuh.fit.pricing_service.service.RevenueStatisticsService;
 import iuh.fit.pricing_service.service.SurgePricingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -25,6 +27,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -39,6 +42,7 @@ public class PricingController {
 
     private final PricingService pricingService;
     private final SurgePricingService surgePricingService;
+    private final RevenueStatisticsService revenueStatisticsService;
     private final PricingConfigProperties pricingConfig;
 
     @PostMapping("/calculate")
@@ -128,10 +132,11 @@ public class PricingController {
     })
     public ResponseEntity<FareEstimate> confirmEstimate(
             @Parameter(description = "Estimate ID to confirm", required = true)
-            @PathVariable String estimateId) {
+            @PathVariable String estimateId,
+            @RequestHeader(value = "X-Quote-Hash", required = false) String quoteHash) {
 
         log.info("Received confirm estimate request - estimateId: {}", estimateId);
-        FareEstimate confirmed = pricingService.confirmFare(estimateId);
+        FareEstimate confirmed = pricingService.confirmFare(estimateId, quoteHash);
         log.info("Fare confirmed - estimateId: {}, totalFare: {} {}", estimateId, confirmed.getTotalFare(), confirmed.getCurrency());
         return ResponseEntity.ok(confirmed);
     }
@@ -365,7 +370,7 @@ public class PricingController {
             @Parameter(description = "Filter by status (PENDING, CONFIRMED, EXPIRED, CANCELLED)")
             @RequestParam(required = false) String status,
 
-            @Parameter(description = "Filter by vehicle type (ECONOMY, COMFORT, PREMIUM)")
+            @Parameter(description = "Filter by vehicle type (BIKE, CAR4, CAR7)")
             @RequestParam(required = false) String vehicleType,
 
             @Parameter(description = "Filter by pickup zone")
@@ -391,5 +396,137 @@ public class PricingController {
                 "limit", limit,
                 "offset", offset
         ));
+    }
+
+    @GetMapping("/revenue/statistics")
+    @Operation(
+            summary = "Get revenue statistics",
+            description = "Retrieve revenue statistics for a date range with breakdowns by day, zone, and vehicle type"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Revenue statistics retrieved successfully",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = RevenueStatisticsResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid date range")
+    })
+    public ResponseEntity<RevenueStatisticsResponse> getRevenueStatistics(
+            @Parameter(description = "Start date (ISO format, e.g., 2026-05-01T00:00:00)")
+            @RequestParam(required = false) LocalDateTime startDate,
+
+            @Parameter(description = "End date (ISO format, e.g., 2026-05-22T23:59:59)")
+            @RequestParam(required = false) LocalDateTime endDate) {
+
+        log.info("Received revenue statistics request - startDate: {}, endDate: {}", startDate, endDate);
+        RevenueStatisticsResponse response = revenueStatisticsService.getRevenueStatistics(startDate, endDate);
+        log.info("Revenue statistics computed - totalRevenue: {}, totalTrips: {}",
+                response.getTotalRevenue(), response.getTotalTrips());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/revenue/daily/{date}")
+    @Operation(
+            summary = "Get daily revenue",
+            description = "Retrieve revenue statistics for a specific date"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Daily revenue retrieved successfully",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = RevenueStatisticsResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid date format")
+    })
+    public ResponseEntity<RevenueStatisticsResponse> getDailyRevenue(
+            @Parameter(description = "Date in YYYY-MM-DD format", required = true)
+            @PathVariable String date) {
+
+        log.info("Received daily revenue request - date: {}", date);
+        RevenueStatisticsResponse response = revenueStatisticsService.getDailyRevenue(date);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/revenue/weekly")
+    @Operation(
+            summary = "Get weekly revenue",
+            description = "Retrieve revenue statistics for the last 7 days"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Weekly revenue retrieved successfully",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = RevenueStatisticsResponse.class)))
+    })
+    public ResponseEntity<RevenueStatisticsResponse> getWeeklyRevenue() {
+
+        log.info("Received weekly revenue request");
+        RevenueStatisticsResponse response = revenueStatisticsService.getWeeklyRevenue();
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/revenue/monthly")
+    @Operation(
+            summary = "Get monthly revenue",
+            description = "Retrieve revenue statistics for the last 30 days"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Monthly revenue retrieved successfully",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = RevenueStatisticsResponse.class)))
+    })
+    public ResponseEntity<RevenueStatisticsResponse> getMonthlyRevenue() {
+
+        log.info("Received monthly revenue request");
+        RevenueStatisticsResponse response = revenueStatisticsService.getMonthlyRevenue();
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/revenue/zone/{zoneId}")
+    @Operation(
+            summary = "Get revenue by zone",
+            description = "Retrieve revenue statistics for a specific zone"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Zone revenue retrieved successfully",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = RevenueStatisticsResponse.class))),
+            @ApiResponse(responseCode = "404", description = "No data found for zone")
+    })
+    public ResponseEntity<RevenueStatisticsResponse> getZoneRevenue(
+            @Parameter(description = "Zone ID", required = true)
+            @PathVariable String zoneId,
+
+            @Parameter(description = "Start date (optional)")
+            @RequestParam(required = false) LocalDateTime startDate,
+
+            @Parameter(description = "End date (optional)")
+            @RequestParam(required = false) LocalDateTime endDate) {
+
+        log.info("Received zone revenue request - zoneId: {}, startDate: {}, endDate: {}", zoneId, startDate, endDate);
+        RevenueStatisticsResponse response = revenueStatisticsService.getZoneRevenue(zoneId, startDate, endDate);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/revenue/vehicle/{vehicleType}")
+    @Operation(
+            summary = "Get revenue by vehicle type",
+            description = "Retrieve revenue statistics for a specific vehicle type (BIKE, CAR4, CAR7)"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Vehicle type revenue retrieved successfully",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = RevenueStatisticsResponse.class))),
+            @ApiResponse(responseCode = "404", description = "No data found for vehicle type")
+    })
+    public ResponseEntity<RevenueStatisticsResponse> getVehicleTypeRevenue(
+            @Parameter(description = "Vehicle type (BIKE, CAR4, CAR7)", required = true)
+            @PathVariable String vehicleType,
+
+            @Parameter(description = "Start date (optional)")
+            @RequestParam(required = false) LocalDateTime startDate,
+
+            @Parameter(description = "End date (optional)")
+            @RequestParam(required = false) LocalDateTime endDate) {
+
+        log.info("Received vehicle type revenue request - vehicleType: {}, startDate: {}, endDate: {}",
+                vehicleType, startDate, endDate);
+        RevenueStatisticsResponse response = revenueStatisticsService.getVehicleTypeRevenue(vehicleType, startDate, endDate);
+        return ResponseEntity.ok(response);
     }
 }

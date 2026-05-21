@@ -80,10 +80,16 @@ public class FareEstimate {
 
     private String schemaVersion;
 
+    private String quoteId;
+
+    private String quotePayloadHash;
+
+    private String quoteHashAlgorithm;
+
     public enum VehicleType {
-        ECONOMY,
-        COMFORT,
-        PREMIUM
+        BIKE,
+        CAR4,
+        CAR7
     }
 
     public enum EstimateStatus {

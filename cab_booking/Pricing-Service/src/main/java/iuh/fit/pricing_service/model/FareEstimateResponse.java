@@ -60,6 +60,12 @@ public class FareEstimateResponse {
 
     private LocalDateTime expiresAt;
 
+    private String quoteId;
+
+    private String quotePayloadHash;
+
+    private String quoteHashAlgorithm;
+
     private String message;
 
     public static FareEstimateResponse fromFareEstimate(FareEstimate estimate) {
@@ -87,6 +93,9 @@ public class FareEstimateResponse {
                 .weatherSource(estimate.getWeatherSource())
                 .fallbackUsed(estimate.getFallbackUsed())
                 .expiresAt(estimate.getExpiresAt())
+                .quoteId(estimate.getQuoteId())
+                .quotePayloadHash(estimate.getQuotePayloadHash())
+                .quoteHashAlgorithm(estimate.getQuoteHashAlgorithm())
                 .message("Fare estimate generated successfully")
                 .build();
     }

@@ -1,6 +1,7 @@
 package com.cab.booking.core.service.impl;
 
 import com.cab.booking.core.dto.event.outbound.BookingTimeoutEvent;
+import com.cab.booking.core.dto.event.outbound.PaymentRequestedEvent;
 import com.cab.booking.core.dto.event.outbound.RideCreatedEvent;
 import com.cab.booking.core.service.BookingEventPublisher;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,12 @@ import org.springframework.stereotype.Component;
 public class BookingEventPublisherImpl implements BookingEventPublisher {
 
     private final KafkaTemplate<String, Object> kafkaTemplate;
+
+    @Override
+    public void publishPaymentRequested(PaymentRequestedEvent event) {
+        kafkaTemplate.send("payment.requested", event.bookingId(), event);
+        log.info("Published payment.requested | key={}", event.bookingId());
+    }
 
     @Override
     public void publishRideCreated(RideCreatedEvent event) {

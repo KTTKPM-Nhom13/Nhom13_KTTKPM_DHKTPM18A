@@ -2,11 +2,11 @@ package iuh.fit.payment_service.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import iuh.fit.payment_service.config.RedisConfig.IdempotencyRedisService;
-import iuh.fit.payment_service.dto.event.BookingCreatedEvent;
 import iuh.fit.payment_service.dto.event.DriverEarningSettledEvent;
 import iuh.fit.payment_service.dto.event.PaymentCompletedEvent;
 import iuh.fit.payment_service.dto.event.PaymentFailedEvent;
 import iuh.fit.payment_service.dto.event.PaymentInitiatedEvent;
+import iuh.fit.payment_service.dto.event.PaymentRequestedEvent;
 import iuh.fit.payment_service.dto.event.RideCompletedEvent;
 import iuh.fit.payment_service.dto.momo.MoMoIpnResult;
 import iuh.fit.payment_service.dto.request.ChargePaymentRequest;
@@ -67,27 +67,29 @@ public class PaymentSagaService {
     }
 
     @Transactional
-    public void initiatePaymentFromBookingCreated(BookingCreatedEvent event) {
-        String bookingId = event.getBookingId();
+    public void initiatePaymentFromPaymentRequested(PaymentRequestedEvent event) {
+        String bookingId = event.getBookingId() != null && !event.getBookingId().isBlank()
+                ? event.getBookingId()
+                : event.getRideId();
         if (bookingId == null || bookingId.isBlank()) {
-            log.warn("[Saga] booking.created has blank bookingId/rideId, skipping payment initiation");
+            log.warn("[Saga] payment.requested has blank bookingId/rideId, skipping payment initiation");
             return;
         }
 
         if (paymentRepository.findByBookingId(bookingId).isPresent()) {
-            log.info("[Saga] Payment transaction already exists for bookingId={}, skipping duplicate booking.created", bookingId);
+            log.info("[Saga] Payment transaction already exists for bookingId={}, skipping duplicate payment.requested", bookingId);
             return;
         }
 
         PaymentMethod method = resolvePaymentMethod(event.getPaymentMethod());
         if (method == PaymentMethod.CASH) {
-            log.info("[Saga] booking.created uses CASH, skipping pre-payment initiation - bookingId={}", bookingId);
+            log.info("[Saga] payment.requested uses CASH, skipping pre-payment initiation - bookingId={}", bookingId);
             return;
         }
 
         BigDecimal amount = event.getAmount();
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            log.warn("[Saga] booking.created has invalid amount={}, bookingId={}, skipping payment initiation",
+            log.warn("[Saga] payment.requested has invalid amount={}, bookingId={}, skipping payment initiation",
                     amount, bookingId);
             return;
         }
@@ -99,7 +101,7 @@ public class PaymentSagaService {
                 .currency(event.getCurrency() != null && !event.getCurrency().isBlank() ? event.getCurrency() : "VND")
                 .paymentMethod(method)
                 .description("Pre-payment for booking " + bookingId)
-                .idempotencyKey("booking-created-" + bookingId)
+                .idempotencyKey("payment-requested-" + bookingId)
                 .build();
 
         PaymentTransaction transaction = createAndSaveTransaction(request);
@@ -113,7 +115,7 @@ public class PaymentSagaService {
         if (gatewayResponse.isPending()) {
             updateStatusWithGatewayResponse(transaction, PaymentStatus.PENDING, gatewayResponse);
             publishPaymentInitiated(transaction, gatewayResponse);
-            log.info("[Saga] Payment initiated from booking.created - bookingId={}, txnId={}, method={}",
+            log.info("[Saga] Payment initiated from payment.requested - bookingId={}, txnId={}, method={}",
                     bookingId, transaction.getTransactionId(), method);
             return;
         }
@@ -505,6 +507,8 @@ public class PaymentSagaService {
             case "MOMO", "MOMO_WALLET" -> PaymentMethod.MOMO;
             case "ZALOPAY", "ZALO_PAY" -> PaymentMethod.ZALOPAY;
             case "VNPAY", "VNPAY_ATM", "ATM", "BANK_TRANSFER", "BANK", "TRANSFER" -> PaymentMethod.VNPAY;
+            case "CARD", "CREDITCARD", "CREDIT_CARD" -> PaymentMethod.CREDIT_CARD;
+            case "DEBITCARD", "DEBIT_CARD" -> PaymentMethod.DEBIT_CARD;
             case "CASH" -> PaymentMethod.CASH;
             default -> PaymentMethod.valueOf(rawPaymentMethod.trim().toUpperCase());
         };

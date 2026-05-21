@@ -9,39 +9,30 @@ import org.springframework.stereotype.Component;
 @Component
 public class BookingStateMachine {
 
-    /**
-     * Chuyển đổi trạng thái của Booking.
-     * Sử dụng Java 21 Pattern Matching (switch expression) để kiểm tra luồng chuyển trạng thái.
-     *
-     * @param booking    Booking hiện tại
-     * @param nextStatus Trạng thái muốn chuyển sang
-     * @throws AppException Nếu chuyển đổi trạng thái không hợp lệ
-     */
     public void transitionTo(Booking booking, BookingStatus nextStatus) {
         BookingStatus currentStatus = booking.getStatus();
         if (currentStatus == null) {
             currentStatus = BookingStatus.CREATED;
         }
 
-        // Vòng đời: CREATED → PENDING_PAYMENT (online) | MATCHING (cash) → ASSIGNED → ACCEPTED → PICKUP → IN_PROGRESS → COMPLETED → PAID
-        // Ngoài ra, tất cả các trạng thái (trừ PAID) đều có thể chuyển sang CANCELLED
         boolean isValid = switch (currentStatus) {
-            // CREATED: CASH đi thẳng MATCHING, ONLINE đi qua PENDING_PAYMENT
             case CREATED -> nextStatus == BookingStatus.MATCHING
                     || nextStatus == BookingStatus.PENDING_PAYMENT
                     || nextStatus == BookingStatus.ASSIGNED;
-            // PENDING_PAYMENT: thanh toán xong → MATCHING, thanh toán thất bại → CANCELLED
             case PENDING_PAYMENT -> nextStatus == BookingStatus.MATCHING
                     || nextStatus == BookingStatus.CANCELLED;
-            case MATCHING -> nextStatus == BookingStatus.ASSIGNED || nextStatus == BookingStatus.CANCELLED;
+            case MATCHING -> nextStatus == BookingStatus.ASSIGNED
+                    || nextStatus == BookingStatus.CANCELLED;
             case ASSIGNED -> nextStatus == BookingStatus.ACCEPTED
                     || nextStatus == BookingStatus.MATCHING
                     || nextStatus == BookingStatus.CANCELLED;
-            case ACCEPTED -> nextStatus == BookingStatus.PICKUP || nextStatus == BookingStatus.CANCELLED;
-            case PICKUP -> nextStatus == BookingStatus.IN_PROGRESS || nextStatus == BookingStatus.CANCELLED;
-            case IN_PROGRESS -> nextStatus == BookingStatus.COMPLETED || nextStatus == BookingStatus.CANCELLED;
-            case COMPLETED -> nextStatus == BookingStatus.PAID || nextStatus == BookingStatus.CANCELLED;
-            case PAID, CANCELLED -> false;
+            case ACCEPTED -> nextStatus == BookingStatus.PICKUP
+                    || nextStatus == BookingStatus.CANCELLED;
+            case PICKUP -> nextStatus == BookingStatus.IN_PROGRESS
+                    || nextStatus == BookingStatus.CANCELLED;
+            case IN_PROGRESS -> nextStatus == BookingStatus.COMPLETED
+                    || nextStatus == BookingStatus.CANCELLED;
+            case COMPLETED, CANCELLED -> false;
             case null -> false;
         };
 

@@ -24,8 +24,10 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -90,6 +92,10 @@ public class PricingService {
         FareBreakdown fareBreakdown = calculateFare(vehicleType, route.distanceKm(), route.durationMinutes(), surgeMultiplier);
 
         String estimateId = UUID.randomUUID().toString();
+        String quotePayloadHash = buildQuotePayloadHash(
+                estimateId, pickupZone, dropoffZone, vehicleType, route.distanceKm(), route.durationMinutes(),
+                fareBreakdown.totalFare(), pricingConfig.getCalculation().getCurrency()
+        );
         LocalDateTime now = LocalDateTime.now();
         FareEstimate fareEstimate = FareEstimate.builder()
                 .id(estimateId)
@@ -122,6 +128,9 @@ public class PricingService {
                 .createdAt(now)
                 .expiresAt(now.plusMinutes(ESTIMATE_EXPIRY_MINUTES))
                 .schemaVersion("1.0.0")
+                .quoteId(estimateId)
+                .quotePayloadHash(quotePayloadHash)
+                .quoteHashAlgorithm("SHA-256")
                 .build();
 
         fareEstimateRepository.save(fareEstimate);
@@ -132,7 +141,7 @@ public class PricingService {
         return FareEstimateResponse.fromFareEstimate(fareEstimate);
     }
 
-    public FareEstimate confirmFare(String estimateId) {
+    public FareEstimate confirmFare(String estimateId, String presentedQuoteHash) {
         LocalDateTime now = LocalDateTime.now();
         Query query = Query.query(Criteria.where("_id").is(estimateId)
                 .and("status").is(FareEstimate.EstimateStatus.PENDING.name())
@@ -158,9 +167,14 @@ public class PricingService {
             pricingMetrics.recordConfirmFailure("expired");
             throw new PricingException("Fare estimate has expired: " + estimateId, "ESTIMATE_EXPIRED");
         }
+        if (presentedQuoteHash != null && !presentedQuoteHash.isBlank()
+                && !presentedQuoteHash.equalsIgnoreCase(confirmed.getQuotePayloadHash())) {
+            pricingMetrics.recordConfirmFailure("quote_hash_mismatch");
+            throw new PricingException("Quote payload hash mismatch for estimate: " + estimateId, "QUOTE_HASH_MISMATCH");
+        }
 
-        log.info("Fare confirmed for estimate {}: total fare = {} {}",
-                estimateId, confirmed.getTotalFare(), confirmed.getCurrency());
+        log.info("Fare confirmed for estimate {}: total fare = {} {}, quoteId = {}, quotePayloadHash = {}",
+                estimateId, confirmed.getTotalFare(), confirmed.getCurrency(), confirmed.getQuoteId(), confirmed.getQuotePayloadHash());
 
         return confirmed;
     }
@@ -509,7 +523,7 @@ public class PricingService {
 
     private String normalizeVehicleType(String vehicleType) {
         if (vehicleType == null || vehicleType.isBlank()) {
-            return "ECONOMY";
+            return "BIKE";
         }
         return vehicleType.toUpperCase().trim();
     }
@@ -527,6 +541,28 @@ public class PricingService {
                 request.getPickupLng(),
                 request.getDropoffLat(),
                 request.getDropoffLng());
+    }
+
+    private String buildQuotePayloadHash(String quoteId, String pickupZone, String dropoffZone, String vehicleType,
+                                         double distanceKm, int durationMinutes, BigDecimal totalFare, String currency) {
+        String canonical = quoteId + "|" + pickupZone + "|" + dropoffZone + "|" + vehicleType + "|"
+                + String.format("%.6f", distanceKm) + "|" + durationMinutes + "|"
+                + totalFare.setScale(2, RoundingMode.HALF_UP).toPlainString() + "|" + currency;
+        return sha256Hex(canonical);
+    }
+
+    private String sha256Hex(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (Exception e) {
+            throw new PricingException("Failed to hash quote payload", "QUOTE_HASH_ERROR");
+        }
     }
 
     private FareEstimate findEstimateByIdempotencyKey(String idempotencyKey) {

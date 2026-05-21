@@ -9,6 +9,12 @@ spring:
     username: ${AUTH_DB_USER:admin}
     password: ${AUTH_DB_PASSWORD:adminpassword}
     driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:redis}
+      port: ${SPRING_REDIS_PORT:6379}
+      password: ${SPRING_REDIS_PASSWORD:redis123}
+      timeout: 2000ms
   jpa:
     hibernate:
       ddl-auto: update

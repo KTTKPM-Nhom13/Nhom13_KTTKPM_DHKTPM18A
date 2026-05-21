@@ -57,4 +57,9 @@ public class KafkaTopicConfig {
     public NewTopic paymentFailedTopic() {
         return TopicBuilder.name("payment.failed").partitions(3).replicas(1).build();
     }
+
+    @Bean
+    public NewTopic paymentRequestedTopic() {
+        return TopicBuilder.name("payment.requested").partitions(3).replicas(1).build();
+    }
 }
