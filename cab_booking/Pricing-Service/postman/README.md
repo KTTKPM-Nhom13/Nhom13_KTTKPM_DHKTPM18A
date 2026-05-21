@@ -129,7 +129,7 @@ Lấy cấu hình pricing hiện tại của service.
 | Section | Mô tả |
 |---------|--------|
 | `calculation` | Công thức tính giá cơ bản |
-| `vehicle` | Rate theo loại xe (ECONOMY, COMFORT, PREMIUM) |
+| `vehicle` | Rate theo loại xe (BIKE, CAR4, CAR7) |
 | `surge` | Cấu hình surge (min, max, threshold) |
 | `weather` | Cấu hình weather adjustment |
 | `cache` | TTL cho cache route/weather |
@@ -187,7 +187,7 @@ Tạo fare estimate cho chuyến đi.
   "pickupLng": 106.6297,
   "dropoffLat": 10.7626,
   "dropoffLng": 106.6601,
-  "vehicleType": "ECONOMY",
+  "vehicleType": "CAR4",
   "estimatedDurationMinutes": 15
 }
 ```
@@ -200,7 +200,7 @@ Tạo fare estimate cho chuyến đi.
 | `pickupLng` | double | Yes | Kinh độ điểm đón (-180 đến 180) |
 | `dropoffLat` | double | Yes | Vĩ độ điểm trả (-90 đến 90) |
 | `dropoffLng` | double | Yes | Kinh độ điểm trả (-180 đến 180) |
-| `vehicleType` | string | Yes | Loại xe: ECONOMY, COMFORT, PREMIUM |
+| `vehicleType` | string | Yes | Loại xe: BIKE, CAR4, CAR7 |
 | `estimatedDurationMinutes` | int | No | Thời gian ước tính (phút) |
 
 **Headers tùy chọn:**
@@ -228,6 +228,10 @@ Tạo fare estimate cho chuyến đi.
 | `distanceFare` | decimal | Cước tính theo khoảng cách = distanceKm × perKmRate |
 | `timeFare` | decimal | Cước tính theo thời gian = durationMinutes × perMinuteRate |
 | `platformFee` | decimal | Phí nền tảng (cố định) |
+| `zoneFee` | decimal | Phí zone (hiện tại = 0) |
+| `airportFee` | decimal | Phí sân bay (cố định theo config) |
+| `tollFee` | decimal | Phí cầu đường (cố định theo config) |
+| `discountAmount` | decimal | Giảm giá (hiện tại = 0) |
 | `surgeMultiplier` | decimal | Hệ số surge - nhân vào tổng giá |
 | `totalFare` | decimal | Tổng cước phí = (base + distance + time + fees) × surge |
 | `currency` | string | Đơn vị tiền tệ (VND) |
@@ -237,6 +241,10 @@ Tạo fare estimate cho chuyến đi.
 | `weatherSource` | string | Nguồn dữ liệu thời tiết |
 | `fallbackUsed` | boolean | Có dùng fallback không |
 | `expiresAt` | datetime | Thời điểm estimate hết hạn |
+| `quoteId` | string | Quote ID (trùng với estimateId) |
+| `quotePayloadHash` | string | Hash SHA-256 của payload quote để xác minh |
+| `quoteHashAlgorithm` | string | Thuật toán hash (`SHA-256`) |
+| `message` | string | Thông báo thành công |
 
 **Cách tính totalFare:**
 
@@ -386,6 +394,18 @@ totalFare = (baseFare + distanceFare) × surgeMultiplier
 |-------|------|----------|--------|
 | `distanceKm` | double | Yes | Khoảng cách (km) |
 | `demandIndex` | double | Yes | Hệ số demand (tương tự surge) |
+
+**Response Fields:**
+
+| Field | Type | Mô tả |
+|-------|------|--------|
+| `distanceKm` | double | Khoảng cách đã truyền vào |
+| `demandIndex` | double | Hệ số demand đã truyền vào |
+| `baseFare` | decimal | Phí khởi đầu (VND) |
+| `distanceFare` | decimal | Cước tính theo khoảng cách (VND) |
+| `surgeMultiplier` | decimal | Hệ số surge đã áp dụng (clamped 1.0 - 3.0) |
+| `totalFare` | decimal | Tổng cước phí (VND) |
+| `message` | string | Thông báo thành công |
 
 **Công dụng:**
 - Smoke test pricing formula
@@ -567,13 +587,17 @@ Lấy thông tin chi tiết của một estimate đã tạo.
 | `estimateId` | string | UUID duy nhất của estimate |
 | `pickupZone` | string | Zone ID của điểm đón |
 | `dropoffZone` | string | Zone ID của điểm trả |
-| `vehicleType` | string | Loại xe: ECONOMY, COMFORT, PREMIUM |
+| `vehicleType` | string | Loại xe: BIKE, CAR4, CAR7 |
 | `distanceKm` | double | Khoảng cách chuyến đi (km) |
 | `durationMinutes` | int | Thời gian ước tính (phút) |
 | `baseFare` | decimal | Cước phí cơ bản (VND) |
 | `distanceFare` | decimal | Cước tính theo khoảng cách (VND) |
 | `timeFare` | decimal | Cước tính theo thời gian (VND) |
 | `platformFee` | decimal | Phí nền tảng (VND) |
+| `zoneFee` | decimal | Phí zone (VND, hiện tại = 0) |
+| `airportFee` | decimal | Phí sân bay (VND) |
+| `tollFee` | decimal | Phí cầu đường (VND) |
+| `discountAmount` | decimal | Giảm giá (VND, hiện tại = 0) |
 | `surgeMultiplier` | decimal | Hệ số surge (1.0 = bình thường) |
 | `totalFare` | decimal | Tổng cước phí (VND) |
 | `currency` | string | Đơn vị tiền tệ |
@@ -584,6 +608,10 @@ Lấy thông tin chi tiết của một estimate đã tạo.
 | `weatherCondition` | string | Tình trạng thời tiết |
 | `weatherSource` | string | Nguồn dữ liệu thời tiết |
 | `fallbackUsed` | boolean | Có dùng fallback không |
+| `quoteId` | string | Quote ID (trùng estimateId) |
+| `quotePayloadHash` | string | Hash SHA-256 để xác minh quote |
+| `quoteHashAlgorithm` | string | Thuật toán hash (`SHA-256`) |
+| `message` | string | Thông báo thành công |
 
 ### 14 - Cancel Estimate
 
@@ -635,7 +663,7 @@ Liệt kê các estimate với bộ lọc và phân trang.
 | Parameter | Type | Default | Mô tả |
 |-----------|------|---------|--------|
 | `status` | string | - | Lọc theo trạng thái: PENDING, CONFIRMED, EXPIRED, CANCELLED |
-| `vehicleType` | string | - | Lọc theo loại xe: ECONOMY, COMFORT, PREMIUM |
+| `vehicleType` | string | - | Lọc theo loại xe: BIKE, CAR4, CAR7 |
 | `pickupZone` | string | - | Lọc theo zone đón |
 | `limit` | int | 50 | Số lượng kết quả tối đa |
 | `offset` | int | 0 | Vị trí bắt đầu (pagination) |
@@ -649,7 +677,7 @@ Liệt kê các estimate với bộ lọc và phân trang.
 
 ```
 GET /api/pricing/estimates?status=PENDING&limit=10&offset=0
-GET /api/pricing/estimates?vehicleType=ECONOMY&limit=20
+GET /api/pricing/estimates?vehicleType=CAR4&limit=20
 GET /api/pricing/estimates?pickupZone=Z60206
 ```
 

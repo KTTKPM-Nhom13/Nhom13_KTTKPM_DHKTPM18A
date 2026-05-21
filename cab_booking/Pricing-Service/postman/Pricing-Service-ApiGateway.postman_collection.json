@@ -459,6 +459,14 @@
                   "  pm.expect(json.pricingConfigVersion).to.exist;",
                   "  pm.expect(json.distanceSource).to.be.oneOf(['MAPBOX', 'MAPBOX_CACHE', 'HAVERSINE_FALLBACK']);",
                   "  pm.expect(json.weatherSource).to.be.oneOf(['OPEN_METEO', 'OPEN_METEO_CACHE', 'FALLBACK_UNAVAILABLE']);",
+                  "  pm.expect(json.zoneFee).to.exist;",
+                  "  pm.expect(json.airportFee).to.exist;",
+                  "  pm.expect(json.tollFee).to.exist;",
+                  "  pm.expect(json.discountAmount).to.exist;",
+                  "  pm.expect(json.quoteId).to.exist;",
+                  "  pm.expect(json.quotePayloadHash).to.exist;",
+                  "  pm.expect(json.quoteHashAlgorithm).to.eql('SHA-256');",
+                  "  pm.expect(json.message).to.eql('Fare estimate generated successfully');",
                   "});",
                   "const estimate = pm.response.json();",
                   "pm.collectionVariables.set('estimate_id', estimate.estimateId);",
@@ -507,6 +515,11 @@
                   "  const json = pm.response.json();",
                   "  pm.expect(json.estimateId).to.be.a('string');",
                   "  pm.expect(json.currency).to.eql('VND');",
+                  "  pm.expect(json.zoneFee).to.exist;",
+                  "  pm.expect(json.airportFee).to.exist;",
+                  "  pm.expect(json.tollFee).to.exist;",
+                  "  pm.expect(json.quoteId).to.exist;",
+                  "  pm.expect(json.quotePayloadHash).to.exist;",
                   "  pm.expect(json.distanceSource).to.be.oneOf(['MAPBOX', 'MAPBOX_CACHE', 'HAVERSINE_FALLBACK']);",
                   "  pm.expect(json.weatherSource).to.be.oneOf(['OPEN_METEO', 'OPEN_METEO_CACHE', 'FALLBACK_UNAVAILABLE']);",
                   "});"
@@ -555,6 +568,11 @@
                   "  pm.expect(json.status).to.eql('CONFIRMED');",
                   "  pm.expect(json.currency).to.eql('VND');",
                   "  pm.expect(Number(json.totalFare)).to.eql(Number(pm.collectionVariables.get('estimated_fare')));",
+                  "  pm.expect(json.zoneFee).to.exist;",
+                  "  pm.expect(json.airportFee).to.exist;",
+                  "  pm.expect(json.tollFee).to.exist;",
+                  "  pm.expect(json.discountAmount).to.exist;",
+                  "  pm.expect(json.quotePayloadHash).to.exist;",
                   "});"
                 ]
               }
@@ -660,7 +678,12 @@
                   "  pm.response.to.have.status(200);",
                   "  const json = pm.response.json();",
                   "  pm.expect(Number(json.distanceKm)).to.eql(Number(pm.collectionVariables.get('simple_distance_km')));",
+                  "  pm.expect(Number(json.demandIndex)).to.eql(Number(pm.collectionVariables.get('simple_demand_index')));",
+                  "  pm.expect(json.baseFare).to.exist;",
+                  "  pm.expect(json.distanceFare).to.exist;",
+                  "  pm.expect(json.surgeMultiplier).to.exist;",
                   "  pm.expect(Number(json.totalFare)).to.be.above(0);",
+                  "  pm.expect(json.message).to.eql('Pricing calculated successfully');",
                   "});"
                 ]
               }
@@ -978,6 +1001,11 @@
                 "  const json = pm.response.json();",
                 "  pm.expect(json.estimateId).to.eql(pm.collectionVariables.get('estimate_id'));",
                 "  pm.expect(json.totalFare).to.exist;",
+                "  pm.expect(json.zoneFee).to.exist;",
+                "  pm.expect(json.airportFee).to.exist;",
+                "  pm.expect(json.tollFee).to.exist;",
+                "  pm.expect(json.quotePayloadHash).to.exist;",
+                "  pm.expect(json.message).to.eql('Fare estimate generated successfully');",
                 "});"
               ]
             }
@@ -1275,7 +1303,7 @@
     },
     {
       "key": "vehicle_type",
-      "value": "ECONOMY",
+      "value": "CAR4",
       "type": "string"
     },
     {

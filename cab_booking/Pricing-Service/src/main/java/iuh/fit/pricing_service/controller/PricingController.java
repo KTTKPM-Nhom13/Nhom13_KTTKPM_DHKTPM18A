@@ -366,7 +366,7 @@ public class PricingController {
             @Parameter(description = "Filter by status (PENDING, CONFIRMED, EXPIRED, CANCELLED)")
             @RequestParam(required = false) String status,
 
-            @Parameter(description = "Filter by vehicle type (ECONOMY, COMFORT, PREMIUM)")
+            @Parameter(description = "Filter by vehicle type (BIKE, CAR4, CAR7)")
             @RequestParam(required = false) String vehicleType,
 
             @Parameter(description = "Filter by pickup zone")

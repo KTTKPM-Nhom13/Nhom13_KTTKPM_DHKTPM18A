@@ -131,21 +131,21 @@ pricing:
     currency: VND
     config-version: v1
   vehicle:
-    economy:
+    bike:
+      multiplier: 1.0
+      base-fare: 8000
+      per-km: 3500
+      per-minute: 400
+    car4:
       multiplier: 1.0
       base-fare: 12000
       per-km: 8500
       per-minute: 1200
-    comfort:
+    car7:
       multiplier: 1.5
-      base-fare: 18000
+      base-fare: 20000
       per-km: 12000
-      per-minute: 1600
-    premium:
-      multiplier: 2.0
-      base-fare: 30000
-      per-km: 18000
-      per-minute: 2500
+      per-minute: 1800
   surge:
     default-multiplier: 1.0
     min-multiplier: 1.0
