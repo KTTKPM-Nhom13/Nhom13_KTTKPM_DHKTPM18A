@@ -218,6 +218,41 @@ Expected Redis after complete:
 driver:status:{driverUserId} = AVAILABLE
 ```
 
+## 7-8. Payment Flows
+
+Cash flow:
+
+```text
+Booking Service
+-> ride.created
+-> ride.completed
+-> Payment Service records CASH payment
+-> payment.completed
+-> driver.earning.settled
+```
+
+Online prepaid flow:
+
+```text
+Booking Service
+-> PENDING_PAYMENT
+-> payment.requested
+-> Payment Service creates transaction/payUrl
+-> customer completes payment
+-> payment.completed
+-> Booking Service MATCHING
+-> ride.created
+-> ride.completed
+-> Payment Service settles driver earning without charging again
+-> driver.earning.settled
+```
+
+Postman note for VNPay/MoMo/ZaloPay:
+
+- After create booking, run the payment lookup step and capture `payUrl`/gateway data.
+- Complete the payment through the gateway sandbox or callback flow.
+- Only after `payment.completed` should you run driver assignment/accept/ride lifecycle steps.
+
 ## Debug nhanh
 
 Kafka UI:
@@ -237,6 +272,10 @@ ride.arrived
 ride.started
 ride.completed
 ride.cancelled
+payment.requested
+payment.completed
+payment.failed
+driver.earning.settled
 driver.status.changed
 driver.location.updated
 ```

@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "cab-boundary-main-flows",
     "name": "CAB Boundary Main Flows",
-    "description": "Main E2E flows for the refactored boundaries: Booking publishes booking.created with vehicleType, Matching filters by vehicleType and publishes driver.assigned, Driver Service only publishes driver.accepted/driver.rejected, Ride Service owns trip lifecycle and publishes ride.arrived/ride.started/ride.completed. Run folders top to bottom. For Kafka async steps, run poll requests after a short wait.",
+    "description": "Main E2E flows for the refactored boundaries: Booking publishes ride.created for matching, and online prepaid bookings publish payment.requested first. Payment Service consumes payment.requested for PRE_TRIP online payment and ride.completed for POST_TRIP cash/settlement. Driver Service only publishes driver.accepted/driver.rejected, Ride Service owns trip lifecycle and publishes ride.arrived/ride.started/ride.completed. Run folders top to bottom. For Kafka async steps, run poll requests after a short wait.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -413,7 +413,7 @@
               }
             },
             "url": "{{bookingServiceUrl}}/api/v1/bookings",
-            "description": "Expected async: Booking MATCHING -> booking.created(vehicleType) -> Matching reads Redis status/GEO/vehicleType -> driver.assigned canonical + ride.assigned legacy -> Booking ASSIGNED."
+            "description": "Expected async: Booking MATCHING -> ride.created(vehicleType) -> Matching reads Redis status/GEO/vehicleType -> driver.assigned canonical + ride.assigned legacy -> Booking ASSIGNED."
           }
         },
         {
@@ -667,7 +667,7 @@
             "method": "POST",
             "header": [],
             "url": "{{driverServiceUrl}}/api/drivers/me/rides/{{rejectBookingId}}/reject",
-            "description": "Driver Service publishes driver.rejected. Booking consumes it and moves ASSIGNED -> MATCHING. Matching Service consumes driver.rejected, excludes the rejected driver, and rematches from its cached booking.created snapshot."
+            "description": "Driver Service publishes driver.rejected. Booking consumes it and moves ASSIGNED -> MATCHING. Matching Service consumes driver.rejected, excludes the rejected driver, and rematches from its cached ride.created snapshot."
           }
         },
         {
@@ -845,7 +845,7 @@
             "method": "GET",
             "header": [],
             "url": "{{bookingServiceUrl}}/api/v1/bookings/customer/{{customerUserId}}?page=0&size=5",
-            "description": "Expected completed booking appears in history with status COMPLETED, then PAID after payment.completed if payment flow is run."
+            "description": "Expected completed booking appears in history with status COMPLETED. Payment/settlement state is verified through Payment Service, not BookingStatus."
           }
         }
       ]
@@ -1398,7 +1398,7 @@
             "method": "GET",
             "header": [],
             "url": "{{bookingServiceUrl}}/api/v1/bookings/customer/{{customerUserId}}?page=0&size=10",
-            "description": "Expected completed booking appears in customer history. CASH may become PAID after payment.completed is consumed; VNPay stays COMPLETED until VNPay callback completes payment."
+            "description": "Expected completed booking appears in customer history with status COMPLETED. CASH payment success is verified separately through Payment Service after ride.completed."
           },
           "event": [
             {
@@ -1414,7 +1414,7 @@
                   "pm.test('7.15 booking appears in history', () => pm.expect(booking, 'booking in history').to.exist);",
                   "if (booking) {",
                   "  pm.test('7.15 booking payment method is CASH', () => pm.expect(booking.paymentMethod).to.eql('CASH'));",
-                  "  pm.test('7.15 booking final status is valid', () => pm.expect(['COMPLETED','PAID']).to.include(booking.status));",
+                  "  pm.test('7.15 booking final status is COMPLETED', () => pm.expect(booking.status).to.eql('COMPLETED'));",
                   "}"
                 ]
               }
@@ -1744,7 +1744,7 @@
               }
             },
             "url": "{{bookingServiceUrl}}/api/v1/bookings",
-            "description": "Creates a VNPAY booking for the full E2E payment flow. Wait 2-5 seconds after this request so Matching can assign the driver asynchronously."
+            "description": "Creates a VNPAY prepaid booking. Expected async: Booking CREATED -> PENDING_PAYMENT, then publishes payment.requested. Payment Service consumes payment.requested and creates the VNPay transaction. Matching must not start until payment.completed is published."
           },
           "event": [
             {
@@ -1758,15 +1758,53 @@
                   "pm.collectionVariables.set('e2eVnpayAssignedDriverId', result.assignedDriverId || result.driverId || '');",
                   "pm.test('VNPAY booking created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
                   "pm.test('VNPAY booking id captured', () => pm.expect(pm.collectionVariables.get('e2eVnpayBookingId')).to.not.be.empty);",
-                  "pm.test('booking initially MATCHING/CREATED', () => pm.expect(['MATCHING','CREATED']).to.include(result.status));",
-                  "pm.test('8.8 assigned driver is current logged-in driver', () => { const assignedDriverId = pm.collectionVariables.get('e2eVnpayAssignedDriverId'); if (assignedDriverId) pm.expect(assignedDriverId).to.eql(pm.collectionVariables.get('driverUserId')); });"
+                  "pm.test('booking initially waits for online payment', () => pm.expect(['PENDING_PAYMENT','CREATED']).to.include(result.status));",
+                  "pm.test('8.8 no driver assigned before online payment success', () => pm.expect(pm.collectionVariables.get('e2eVnpayAssignedDriverId')).to.be.oneOf(['', null, undefined]));"
                 ]
               }
             }
           ]
         },
         {
-          "name": "8.9 Poll Driver Current Ride After Assignment",
+          "name": "8.9 Verify VNPAY Pre-Trip Payment Transaction",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": "{{paymentServiceUrl}}/api/payments/booking/{{e2eVnpayBookingId}}",
+            "description": "Run 2-5 seconds after 8.8. Expected: Payment Service consumed payment.requested and created a PRE_TRIP VNPAY transaction. If status is PENDING, open the captured payUrl in a browser/sandbox and complete payment before running the driver assignment steps. After valid VNPay return/IPN, Payment Service publishes payment.completed, Booking moves PENDING_PAYMENT -> MATCHING, then publishes ride.created."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || body.data || body;",
+                  "pm.collectionVariables.set('e2eVnpayPaymentTxnId', result.transactionId || pm.collectionVariables.get('e2eVnpayPaymentTxnId') || '');",
+                  "pm.collectionVariables.set('e2eVnpayPayUrl', result.payUrl || pm.collectionVariables.get('e2eVnpayPayUrl') || '');",
+                  "pm.test('8.9 payment lookup ok', () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test('8.9 payment transaction id captured', () => pm.expect(pm.collectionVariables.get('e2eVnpayPaymentTxnId')).to.not.be.empty);",
+                  "pm.test('8.9 payment method is VNPAY', () => pm.expect(result.paymentMethod).to.eql('VNPAY'));",
+                  "pm.test('8.9 pre-trip payment is pending or already success', () => pm.expect([\"PENDING\",\"SUCCESS\"]).to.include(result.status));",
+                  "pm.test('8.9 payUrl captured when pending', () => { if (result.status === 'PENDING') pm.expect(pm.collectionVariables.get('e2eVnpayPayUrl')).to.not.be.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "8.10 Poll Driver Current Ride After Payment Success",
           "request": {
             "auth": {
               "type": "bearer",
@@ -1781,7 +1819,7 @@
             "method": "GET",
             "header": [],
             "url": "{{driverServiceUrl}}/api/drivers/me/current-ride",
-            "description": "Expected immediately after Matching assignment: current ride points at the E2E booking for the same driver token used by this collection. If booking.assignedDriverId differs from driverUserId, Matching selected another online driver from Redis; set other drivers offline/clear stale Redis statuses or use that assigned driver token. Assignment TTL is 30 seconds."
+            "description": "Run only after VNPay payment is completed and Booking has consumed payment.completed. Expected: payment.completed -> Booking MATCHING -> ride.created -> Matching assignment. Current ride should point at the E2E booking for the same driver token used by this collection. If booking.assignedDriverId differs from driverUserId, Matching selected another online driver from Redis; set other drivers offline/clear stale Redis statuses or use that assigned driver token. Assignment TTL is 30 seconds."
           },
           "event": [
             {
@@ -1789,14 +1827,15 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('8.9 current ride poll returns ok/not-found while async', () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));",
-                  "pm.test('8.9 booking was assigned to this logged-in driver', () => { const assignedDriverId = pm.collectionVariables.get('e2eVnpayAssignedDriverId'); if (assignedDriverId) pm.expect(assignedDriverId).to.eql(pm.collectionVariables.get('driverUserId')); });",
+                  "pm.test('8.10 current ride poll returns ok/not-found while async', () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));",
+                  "pm.test('8.10 booking was assigned to this logged-in driver', () => { const assignedDriverId = pm.collectionVariables.get('e2eVnpayAssignedDriverId'); if (assignedDriverId) pm.expect(assignedDriverId).to.eql(pm.collectionVariables.get('driverUserId')); });",
                   "if (pm.response.code === 200) {",
                   "  const body = pm.response.json();",
                   "  const result = body.result || body.data || body;",
                   "  const rideId = result.rideId || result.bookingId || result.id || '';",
-                  "  pm.test('8.9 driver has assigned ride before timeout', () => pm.expect(rideId, 'rideId from driver current-ride').to.not.be.empty);",
-                  "  pm.test('8.9 current ride matches booking', () => pm.expect(rideId).to.eql(pm.collectionVariables.get('e2eVnpayBookingId')));",
+                  "  pm.collectionVariables.set('e2eVnpayAssignedDriverId', result.assignedDriverId || result.driverId || pm.collectionVariables.get('driverUserId') || '');",
+                  "  pm.test('8.10 driver has assigned ride before timeout', () => pm.expect(rideId, 'rideId from driver current-ride').to.not.be.empty);",
+                  "  pm.test('8.10 current ride matches booking', () => pm.expect(rideId).to.eql(pm.collectionVariables.get('e2eVnpayBookingId')));",
                   "}"
                 ]
               }
@@ -1956,7 +1995,7 @@
           ]
         },
         {
-          "name": "8.14 Verify VNPAY Payment Transaction",
+          "name": "8.14 Verify VNPAY Payment Transaction After Ride Completed",
           "request": {
             "auth": {
               "type": "bearer",
@@ -1971,7 +2010,7 @@
             "method": "GET",
             "header": [],
             "url": "{{paymentServiceUrl}}/api/payments/booking/{{e2eVnpayBookingId}}",
-            "description": "Expected: VNPay transaction exists and has payUrl while pending. After a manual valid VNPay return/IPN, status may become SUCCESS."
+            "description": "Expected after the prepaid VNPay flow: transaction already exists from payment.requested and should be SUCCESS before/after ride.completed. ride.completed should not charge the customer again; it only lets Payment Service settle driver earning."
           },
           "event": [
             {
@@ -1986,8 +2025,8 @@
                   "pm.test('VNPAY payment lookup ok', () => pm.expect(pm.response.code).to.eql(200));",
                   "pm.test('VNPAY payment transaction id captured', () => pm.expect(pm.collectionVariables.get('e2eVnpayPaymentTxnId')).to.not.be.empty);",
                   "pm.test('VNPAY payment method', () => pm.expect(result.paymentMethod).to.eql('VNPAY'));",
-                  "pm.test('VNPAY payment status is pending or completed', () => pm.expect([\"PENDING\",\"SUCCESS\"]).to.include(result.status));",
-                  "pm.test('VNPAY payUrl captured when payment is pending', () => { if (result.status === 'PENDING') pm.expect(pm.collectionVariables.get('e2eVnpayPayUrl')).to.not.be.empty; });"
+                  "pm.test('VNPAY payment success before settlement', () => pm.expect(result.status).to.eql('SUCCESS'));",
+                  "pm.test('VNPAY payUrl was captured during pre-trip step when gateway returned one', () => pm.expect(pm.collectionVariables.get('e2eVnpayPayUrl')).to.be.a('string'));"
                 ]
               }
             }
@@ -2009,7 +2048,7 @@
             "method": "GET",
             "header": [],
             "url": "{{bookingServiceUrl}}/api/v1/bookings/customer/{{customerUserId}}?page=0&size=10",
-            "description": "Expected completed booking appears in customer history. CASH may become PAID after payment.completed is consumed; VNPay stays COMPLETED until VNPay callback completes payment."
+            "description": "Expected completed booking appears in customer history with status COMPLETED. VNPay payment success and driver settlement are owned by Payment Service."
           },
           "event": [
             {
@@ -2025,7 +2064,7 @@
                   "pm.test('8.15 booking appears in history', () => pm.expect(booking, 'booking in history').to.exist);",
                   "if (booking) {",
                   "  pm.test('8.15 booking payment method is VNPAY', () => pm.expect(booking.paymentMethod).to.eql('VNPAY'));",
-                  "  pm.test('8.15 booking final status is valid', () => pm.expect(['COMPLETED','PAID']).to.include(booking.status));",
+                  "  pm.test('8.15 booking final status is COMPLETED', () => pm.expect(booking.status).to.eql('COMPLETED'));",
                   "}"
                 ]
               }

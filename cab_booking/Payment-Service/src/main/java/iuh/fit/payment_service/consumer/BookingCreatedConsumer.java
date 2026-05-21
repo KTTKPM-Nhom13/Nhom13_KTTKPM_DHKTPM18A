@@ -1,7 +1,7 @@
 package iuh.fit.payment_service.consumer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import iuh.fit.payment_service.dto.event.BookingCreatedEvent;
+import iuh.fit.payment_service.dto.event.PaymentRequestedEvent;
 import iuh.fit.payment_service.service.PaymentSagaService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,11 +23,11 @@ public class BookingCreatedConsumer {
     private final ObjectMapper objectMapper;
 
     @KafkaListener(
-            topics = "ride.created",
-            groupId = "payment-booking-created-consumer-group",
+            topics = "payment.requested",
+            groupId = "payment-service-group",
             containerFactory = "kafkaListenerContainerFactory"
     )
-    public void consumeBookingCreated(
+    public void consumePaymentRequested(
             @Payload Map<String, Object> payload,
             @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
             @Header(KafkaHeaders.OFFSET) long offset,
@@ -35,13 +35,13 @@ public class BookingCreatedConsumer {
             Acknowledgment acknowledgment
     ) {
         try {
-            BookingCreatedEvent event = objectMapper.convertValue(payload, BookingCreatedEvent.class);
-            log.info("[Consumer] Received ride.created - key={}, partition={}, offset={}, bookingId={}, paymentMethod={}, amount={}",
+            PaymentRequestedEvent event = objectMapper.convertValue(payload, PaymentRequestedEvent.class);
+            log.info("[Consumer] Received payment.requested - key={}, partition={}, offset={}, bookingId={}, paymentMethod={}, amount={}",
                     key, partition, offset, event.getBookingId(), event.getPaymentMethod(), event.getAmount());
-            paymentSagaService.initiatePaymentFromBookingCreated(event);
+            paymentSagaService.initiatePaymentFromPaymentRequested(event);
             acknowledgment.acknowledge();
         } catch (Exception e) {
-            log.error("[Consumer] Error processing ride.created - key={}, partition={}, offset={}",
+            log.error("[Consumer] Error processing payment.requested - key={}, partition={}, offset={}",
                     key, partition, offset, e);
             acknowledgment.acknowledge();
         }

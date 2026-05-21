@@ -17,10 +17,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 
 @Component
@@ -32,6 +35,7 @@ public class BookingLifecycleEventListener {
     private final BookingService bookingService;
     private final BookingStateMachine bookingStateMachine;
     private final com.cab.booking.core.service.BookingEventPublisher bookingEventPublisher;
+    private final RedisTemplate<String, Object> redisTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @KafkaListener(topics = "ride.assigned", groupId = "booking-service-group")
@@ -140,21 +144,18 @@ public class BookingLifecycleEventListener {
                 com.cab.booking.core.dto.event.outbound.RideCreatedEvent rideCreatedEvent = impl.buildRideCreatedEventFromBooking(booking);
                 bookingEventPublisher.publishRideCreated(rideCreatedEvent);
             }
+            long timeoutScore = Instant.now().plus(Duration.ofMinutes(3)).toEpochMilli();
+            redisTemplate.opsForZSet().add("booking:timeout:queue", booking.getId().toString(), timeoutScore);
             return;
         }
 
-        if (booking.getStatus() == BookingStatus.PAID) {
-            log.info("Booking {} is already PAID, ignoring duplicate payment.completed", booking.getId());
-            return;
-        }
-        if (booking.getStatus() != BookingStatus.COMPLETED) {
-            log.warn("Booking {} is in status {}, skipping payment.completed", booking.getId(), booking.getStatus());
+        if (booking.getStatus() == BookingStatus.COMPLETED) {
+            log.info("Booking {} is already COMPLETED; payment.completed is financial-only and does not change booking status",
+                    booking.getId());
             return;
         }
 
-        bookingStateMachine.transitionTo(booking, BookingStatus.PAID);
-        bookingRepository.save(booking);
-        log.info("Booking {} moved to PAID", booking.getId());
+        log.warn("Booking {} is in status {}, skipping payment.completed", booking.getId(), booking.getStatus());
     }
 
     @KafkaListener(
@@ -284,7 +285,6 @@ public class BookingLifecycleEventListener {
             case PICKUP -> 5;
             case IN_PROGRESS -> 6;
             case COMPLETED -> 7;
-            case PAID -> 8;
             case CANCELLED -> 99;
         };
     }

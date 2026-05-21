@@ -34,6 +34,7 @@ public class KafkaConfig {
     public static final String TOPIC_RIDE_COMPLETED = "ride.completed";
     public static final String TOPIC_PAYMENT_COMPLETED = "payment.completed";
     public static final String TOPIC_PAYMENT_FAILED = "payment.failed";
+    public static final String TOPIC_PAYMENT_REQUESTED = "payment.requested";
     public static final String TOPIC_PAYMENT_INITIATED = "payment.initiated";
     public static final String TOPIC_PAYMENT_REFUNDED = "payment.refunded";
     public static final String TOPIC_DRIVER_EARNING_SETTLED = "driver.earning.settled";
@@ -130,6 +131,14 @@ public class KafkaConfig {
     @Bean
     public NewTopic paymentFailedTopic() {
         return TopicBuilder.name(TOPIC_PAYMENT_FAILED)
+                .partitions(3)
+                .replicas(1)
+                .build();
+    }
+
+    @Bean
+    public NewTopic paymentRequestedTopic() {
+        return TopicBuilder.name(TOPIC_PAYMENT_REQUESTED)
                 .partitions(3)
                 .replicas(1)
                 .build();

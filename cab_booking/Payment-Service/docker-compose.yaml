@@ -35,9 +35,12 @@ services:
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
       - EUREKA_CLIENT_ENABLED=true
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=${EUREKA_DEFAULT_ZONE:-http://eureka-server:8761/eureka/}
-      - PAYMENT_DB_JDBC_URL=jdbc:postgresql://${PAYMENT_DB_HOST:-payment-postgres}:5432/${PAYMENT_DB_NAME:-payment_db}
+      - PAYMENT_DB_JDBC_URL=${PAYMENT_DB_JDBC_URL:-jdbc:postgresql://payment-postgres:5432/payment_db}
       - PAYMENT_DB_USER=${PAYMENT_DB_USER:-postgres}
       - PAYMENT_DB_PASSWORD=${PAYMENT_DB_PASSWORD:-payment123}
+      - SPRING_DATASOURCE_URL=${PAYMENT_DB_JDBC_URL:-jdbc:postgresql://payment-postgres:5432/payment_db}
+      - SPRING_DATASOURCE_USERNAME=${PAYMENT_DB_USER:-postgres}
+      - SPRING_DATASOURCE_PASSWORD=${PAYMENT_DB_PASSWORD:-payment123}
       - SPRING_DATA_REDIS_HOST=${REDIS_HOST:-redis}
       - SPRING_DATA_REDIS_PORT=${REDIS_PORT:-6379}
       - SPRING_DATA_REDIS_PASSWORD=${REDIS_PASSWORD:-redis123}

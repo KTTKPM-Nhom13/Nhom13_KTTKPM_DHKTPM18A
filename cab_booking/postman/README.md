@@ -7,6 +7,11 @@ File chinh de import:
 - `CAB_BOUNDARY_MAIN_FLOWS.postman_collection.json` de test boundary refactor moi: Driver ghi status, Ride ghi GPS, Matching doc Redis, Booking update lifecycle.
 - `CAB_BOUNDARY_MAIN_FLOWS_TEST_GUIDE.md` la checklist huong dan chay collection boundary moi.
 
+Payment flow hien tai:
+
+- Online prepaid: Booking publish `payment.requested`, Payment Service tao transaction/payUrl, gateway thanh cong thi publish `payment.completed`, Booking moi publish `ride.created`.
+- Cash: Booking publish `ride.created` ngay; Payment Service xu ly CASH sau `ride.completed`.
+
 Collection hien tai da duoc tach lai thanh 2 luong dang ky dung theo code:
 
 - `1. Customer Registration Flow`
