@@ -523,7 +523,7 @@ public class PricingService {
 
     private String normalizeVehicleType(String vehicleType) {
         if (vehicleType == null || vehicleType.isBlank()) {
-            return "ECONOMY";
+            return "BIKE";
         }
         return vehicleType.toUpperCase().trim();
     }
