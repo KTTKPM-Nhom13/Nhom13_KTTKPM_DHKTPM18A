@@ -1511,7 +1511,7 @@
         "response": []
       },
       {
-        "name": "09 - Create Surge Rule",
+        "name": "09 - Create Surge Rule (with explicit zoneId)",
         "event": [
           {
             "listen": "test",
@@ -1539,6 +1539,187 @@
           "body": {
             "mode": "raw",
             "raw": "{\n  \"zoneId\": \"{{pickup_zone}}\",\n  \"zoneName\": \"District 1 Downtown\",\n  \"surgeMultiplier\": 1.5,\n  \"latitude\": 10.8231,\n  \"longitude\": 106.6297,\n  \"radiusKm\": 2.0,\n  \"activeDrivers\": 20,\n  \"pendingRides\": 50,\n  \"source\": \"MANUAL\"\n}"
+          },
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/surge-rules",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "surge-rules"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "09b - Create Surge Rule (AUTO-GENERATE zoneId from coordinates)",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Surge rule auto-generated zoneId', function () {",
+                "  pm.response.to.have.status(201);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "  pm.expect(json.data.zoneId).to.be.a('string');",
+                "  pm.expect(json.data.zoneId).to.match(/^Z\\d+$/);",
+                "  pm.expect(Number(json.data.surgeMultiplier)).to.eql(1.3);",
+                "});",
+                "if (pm.response.code === 201) {",
+                "  const json = pm.response.json();",
+                "  pm.collectionVariables.set('autogen_surge_rule_id', json.data.id);",
+                "  pm.collectionVariables.set('autogen_zone_id', json.data.zoneId);",
+                "}"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "POST",
+          "header": [{"key": "Content-Type", "value": "application/json"}],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"zoneName\": \"Tan Binh Airport Area\",\n  \"surgeMultiplier\": 1.3,\n  \"latitude\": 10.8183,\n  \"longitude\": 106.6520,\n  \"radiusKm\": 3.0,\n  \"source\": \"MANUAL\"\n}"
+          },
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/surge-rules",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "surge-rules"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "09c - Upsert: Create Surge Rule for Zone That Already Exists (should UPDATE, not 409)",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Upsert: existing zone updated, not 409 conflict', function () {",
+                "  pm.response.to.have.status(201);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "  pm.expect(json.data.zoneId).to.eql(pm.collectionVariables.get('autogen_zone_id'));",
+                "  pm.expect(Number(json.data.surgeMultiplier)).to.eql(2.0);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "POST",
+          "header": [{"key": "Content-Type", "value": "application/json"}],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"zoneId\": \"{{autogen_zone_id}}\",\n  \"zoneName\": \"Tan Binh Airport Area - Updated\",\n  \"surgeMultiplier\": 2.0,\n  \"latitude\": 10.8183,\n  \"longitude\": 106.6520,\n  \"radiusKm\": 3.0,\n  \"source\": \"MANUAL\"\n}"
+          },
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/surge-rules",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "surge-rules"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "09d - Missing Coordinates Should Return 400",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Missing coordinates and zoneId returns 400', function () {",
+                "  pm.response.to.have.status(400);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "POST",
+          "header": [{"key": "Content-Type", "value": "application/json"}],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"zoneName\": \"Orphan Zone\",\n  \"surgeMultiplier\": 1.5,\n  \"source\": \"MANUAL\"\n}"
+          },
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/surge-rules",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "surge-rules"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "09e - Create Surge Rule: Tan Son Nhat International Airport",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Airport surge rule created', function () {",
+                "  pm.response.to.have.status(201);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "  pm.expect(json.data.zoneId).to.eql('Z601206');",
+                "  pm.expect(json.data.zoneName).to.eql('Tan Son Nhat International Airport');",
+                "  pm.expect(Number(json.data.surgeMultiplier)).to.eql(1.5);",
+                "  pm.expect(Number(json.data.latitude)).to.eql(10.8169828);",
+                "  pm.expect(Number(json.data.longitude)).to.eql(106.6565808);",
+                "  pm.expect(Number(json.data.radiusKm)).to.eql(3.0);",
+                "});",
+                "if (pm.response.code === 201) {",
+                "  const json = pm.response.json();",
+                "  pm.collectionVariables.set('airport_surge_rule_id', json.data.id);",
+                "  pm.collectionVariables.set('airport_zone_id', json.data.zoneId);",
+                "}"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "POST",
+          "header": [{"key": "Content-Type", "value": "application/json"}],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"zoneId\": \"Z601206\",\n  \"zoneName\": \"Tan Son Nhat International Airport\",\n  \"surgeMultiplier\": 1.5,\n  \"latitude\": 10.8169828,\n  \"longitude\": 106.6565808,\n  \"radiusKm\": 3.0,\n  \"activeDrivers\": 15,\n  \"pendingRides\": 45,\n  \"source\": \"MANUAL\"\n}"
+          },
+          "url": {
+            "raw": "{{BASE_URL}}/api/admin/surge-rules",
+            "host": ["{{BASE_URL}}"],
+            "path": ["api", "admin", "surge-rules"]
+          }
+        },
+        "response": []
+      },
+      {
+        "name": "09f - Upsert: Update Airport Surge Rule (existing zone - should UPDATE)",
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "type": "text/javascript",
+              "exec": [
+                "pm.test('Airport surge rule updated', function () {",
+                "  pm.response.to.have.status(201);",
+                "  const json = pm.response.json();",
+                "  pm.expect(json.success).to.eql(true);",
+                "  pm.expect(json.data.zoneId).to.eql('Z601206');",
+                "  pm.expect(Number(json.data.surgeMultiplier)).to.eql(2.0);",
+                "});"
+              ]
+            }
+          }
+        ],
+        "request": {
+          "method": "POST",
+          "header": [{"key": "Content-Type", "value": "application/json"}],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"zoneId\": \"Z601206\",\n  \"zoneName\": \"Tan Son Nhat International Airport\",\n  \"surgeMultiplier\": 2.0,\n  \"latitude\": 10.8169828,\n  \"longitude\": 106.6565808,\n  \"radiusKm\": 3.0,\n  \"activeDrivers\": 20,\n  \"pendingRides\": 60,\n  \"source\": \"MANUAL\"\n}"
           },
           "url": {
             "raw": "{{BASE_URL}}/api/admin/surge-rules",
@@ -1908,7 +2089,7 @@
       }
     ]
   }
-],
+  ],
   "event": [
     {
       "listen": "prerequest",
@@ -2072,6 +2253,26 @@
     },
     {
       "key": "surge_rule_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "autogen_surge_rule_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "autogen_zone_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "airport_surge_rule_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "airport_zone_id",
       "value": "",
       "type": "string"
     }
