@@ -31,6 +31,9 @@ import java.util.UUID;
 @Slf4j
 public class BookingLifecycleEventListener {
 
+    private static final Duration PROCESSED_EVENT_TTL = Duration.ofHours(6);
+    private static final String PROCESSED_EVENT_PREFIX = "booking:processed-event:";
+
     private final BookingRepository bookingRepository;
     private final BookingService bookingService;
     private final BookingStateMachine bookingStateMachine;
@@ -45,9 +48,13 @@ public class BookingLifecycleEventListener {
     }
 
     @KafkaListener(topics = "ride.accepted", groupId = "booking-service-group")
+    @Transactional
     public void handleRideAccepted(DriverAcceptedEvent event) {
         log.info("[ride.accepted] rideId={} | driverId={}", event.aggregateId(), event.getDriverId());
         try {
+            if (isDuplicateEvent("ride.accepted", event.getEventId())) {
+                return;
+            }
             UUID rideId = UUID.fromString(event.aggregateId());
             Booking booking = bookingRepository.findById(rideId).orElse(null);
             if (booking == null) {
@@ -69,12 +76,16 @@ public class BookingLifecycleEventListener {
     }
 
     @KafkaListener(topics = "ride.rejected", groupId = "booking-service-group")
+    @Transactional
     public void handleRideRejected(DriverRejectedEvent event) {
         log.info("[ride.rejected] rideId={} | driverId={} | reason={}",
                 event.aggregateId(),
                 event.getDriverId(),
                 event.getReason());
         try {
+            if (isDuplicateEvent("ride.rejected", event.getEventId())) {
+                return;
+            }
             UUID rideId = UUID.fromString(event.aggregateId());
             Booking booking = bookingRepository.findById(rideId).orElse(null);
             if (booking == null) {
@@ -92,20 +103,32 @@ public class BookingLifecycleEventListener {
     }
 
     @KafkaListener(topics = "ride.arrived", groupId = "booking-service-group")
+    @Transactional
     public void handleRideArrived(RideArrivedEvent event) {
         log.info("[ride.arrived] rideId={}", event.aggregateId());
+        if (isDuplicateEvent("ride.arrived", event.eventId())) {
+            return;
+        }
         transitionIfCurrent(event.aggregateId(), BookingStatus.ACCEPTED, BookingStatus.PICKUP, "ride.arrived");
     }
 
     @KafkaListener(topics = "ride.started", groupId = "booking-service-group")
+    @Transactional
     public void handleRideStarted(RideStartedEvent event) {
         log.info("[ride.started] rideId={}", event.aggregateId());
+        if (isDuplicateEvent("ride.started", event.eventId())) {
+            return;
+        }
         transitionIfCurrent(event.aggregateId(), BookingStatus.PICKUP, BookingStatus.IN_PROGRESS, "ride.started");
     }
 
     @KafkaListener(topics = "ride.completed", groupId = "booking-service-group")
+    @Transactional
     public void handleRideCompleted(RideCompletedEvent event) {
         log.info("[ride.completed] rideId={}", event.aggregateId());
+        if (isDuplicateEvent("ride.completed", event.getEventId())) {
+            return;
+        }
         transitionIfCurrent(event.aggregateId(), BookingStatus.IN_PROGRESS, BookingStatus.COMPLETED, "ride.completed");
     }
 
@@ -114,9 +137,13 @@ public class BookingLifecycleEventListener {
             groupId = "booking-service-group",
             containerFactory = "paymentKafkaListenerContainerFactory"
     )
+    @Transactional
     public void handlePaymentCompleted(String payload) {
         PaymentCompletedEvent event = readPaymentEvent(payload, PaymentCompletedEvent.class, "payment.completed");
         if (event == null) {
+            return;
+        }
+        if (isDuplicateEvent("payment.completed", event.getEventId())) {
             return;
         }
         log.info("[payment.completed] rideId={} | bookingId={} | eventId={} | amount={}",
@@ -163,9 +190,13 @@ public class BookingLifecycleEventListener {
             groupId = "booking-service-group",
             containerFactory = "paymentKafkaListenerContainerFactory"
     )
+    @Transactional
     public void handlePaymentFailed(String payload) {
         PaymentFailedEvent event = readPaymentEvent(payload, PaymentFailedEvent.class, "payment.failed");
         if (event == null) {
+            return;
+        }
+        if (isDuplicateEvent("payment.failed", event.getEventId())) {
             return;
         }
         UUID rideId = resolveRideId(event.getRideId(), event.getBookingId(), "payment.failed");
@@ -190,6 +221,9 @@ public class BookingLifecycleEventListener {
 
     private void handleAssignmentEvent(RideAssignedEvent event) {
         log.info("[ride.assigned] rideId={} | driverId={}", event.aggregateId(), event.getDriverId());
+        if (isDuplicateEvent("ride.assigned", event.getEventId())) {
+            return;
+        }
 
         UUID rideId;
         try {
@@ -287,5 +321,18 @@ public class BookingLifecycleEventListener {
             case COMPLETED -> 7;
             case CANCELLED -> 99;
         };
+    }
+
+    private boolean isDuplicateEvent(String topic, String eventId) {
+        if (eventId == null || eventId.isBlank()) {
+            return false;
+        }
+        String key = PROCESSED_EVENT_PREFIX + topic + ":" + eventId;
+        Boolean firstSeen = redisTemplate.opsForValue().setIfAbsent(key, "true", PROCESSED_EVENT_TTL);
+        if (Boolean.FALSE.equals(firstSeen)) {
+            log.info("Duplicate {} event skipped | eventId={}", topic, eventId);
+            return true;
+        }
+        return false;
     }
 }

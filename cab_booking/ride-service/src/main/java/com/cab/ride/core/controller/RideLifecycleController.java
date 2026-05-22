@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
-@RequestMapping({"/api/rides", "/api/v1/rides"})
+@RequestMapping("/api/v1/rides")
 @RequiredArgsConstructor
 public class RideLifecycleController {
 

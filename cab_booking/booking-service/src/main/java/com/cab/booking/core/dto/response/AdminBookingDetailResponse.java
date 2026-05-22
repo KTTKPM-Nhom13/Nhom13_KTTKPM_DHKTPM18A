@@ -16,35 +16,37 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class BookingResponse {
-
-    private UUID id;
+public class AdminBookingDetailResponse {
+    private UUID bookingId;
     private String customerId;
-    private String assignedDriverId;
+    private String driverId;
+    private BookingStatus status;
     private String pickupLocation;
     private String dropoffLocation;
     private String customerNote;
-
     private Map<String, Double> pickupCoordinates;
     private Map<String, Double> dropoffCoordinates;
-
     private String vehicleType;
     private String paymentMethod;
     private BigDecimal estimatedFare;
     private String promoCode;
     private String estimateId;
     private String quoteId;
-    private String quoteHashAlgorithm;
-
-    private BookingStatus status;
+    private LocalDateTime quoteExpiresAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private AdminUserInfoResponse customerInfo;
+    private AdminUserInfoResponse driverInfo;
 
-    public static BookingResponse fromEntity(Booking booking) {
-        return BookingResponse.builder()
-                .id(booking.getId())
+    public static AdminBookingDetailResponse fromEntity(
+            Booking booking,
+            AdminUserInfoResponse customerInfo,
+            AdminUserInfoResponse driverInfo) {
+        return AdminBookingDetailResponse.builder()
+                .bookingId(booking.getId())
                 .customerId(booking.getCustomerId())
-                .assignedDriverId(booking.getAssignedDriverId())
+                .driverId(booking.getAssignedDriverId())
+                .status(booking.getStatus())
                 .pickupLocation(booking.getPickupLocation())
                 .dropoffLocation(booking.getDropoffLocation())
                 .customerNote(booking.getCustomerNote())
@@ -60,10 +62,11 @@ public class BookingResponse {
                 .promoCode(booking.getPromoCode())
                 .estimateId(booking.getEstimateId())
                 .quoteId(booking.getQuoteId())
-                .quoteHashAlgorithm(booking.getQuoteHashAlgorithm())
-                .status(booking.getStatus())
+                .quoteExpiresAt(booking.getQuoteExpiresAt())
                 .createdAt(booking.getCreatedAt())
                 .updatedAt(booking.getUpdatedAt())
+                .customerInfo(customerInfo)
+                .driverInfo(driverInfo)
                 .build();
     }
 }
