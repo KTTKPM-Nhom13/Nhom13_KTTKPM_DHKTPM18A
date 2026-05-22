@@ -305,6 +305,15 @@ public class SurgePricingService {
         }
     }
 
+    public void removeFromActiveZones(String zoneId) {
+        try {
+            redisTemplate.opsForSet().remove(ACTIVE_ZONES_KEY, zoneId);
+            log.debug("Removed zone {} from active zones set", zoneId);
+        } catch (Exception e) {
+            log.warn("Failed to remove zone {} from active zones set: {}", zoneId, e.getMessage());
+        }
+    }
+
     private BigDecimal clampSurge(BigDecimal multiplier) {
         if (multiplier == null) {
             return pricingConfig.getSurge().getDefaultMultiplier();

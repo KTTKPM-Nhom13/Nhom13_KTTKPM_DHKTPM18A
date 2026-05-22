@@ -170,6 +170,11 @@ pricing:
     expiry-scheduler-fixed-delay-ms: 60000
   eta:
     fallback-duration-minutes: 15
+  zone-metrics:
+    sync-fixed-delay-ms: 30000
+    driver-service-timeout-ms: 5000
+    booking-service-timeout-ms: 5000
+    default-radius-km: 2.0
 
 mapbox:
   api-key: ${MAPBOX_API_KEY:dummy_mapbox_key}
@@ -177,9 +182,30 @@ mapbox:
 feign:
   client:
     config:
+      default:
+        connectTimeout: 2000
+        readTimeout: 3000
       mapboxClient:
         connectTimeout: 2000
         readTimeout: 3000
       openMeteoClient:
         connectTimeout: 2000
         readTimeout: 3000
+      driverServiceClient:
+        connectTimeout: 2000
+        readTimeout: 5000
+      bookingServiceClient:
+        connectTimeout: 2000
+        readTimeout: 5000
+  circuitbreaker:
+    instances:
+      driverService:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+      bookingService:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
