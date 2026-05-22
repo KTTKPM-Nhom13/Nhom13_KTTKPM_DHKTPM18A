@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -121,13 +122,27 @@ public class BookingController {
                 bookingService.cancelRide(id, reason));
     }
 
+    @PreAuthorize("hasRole('DRIVER')")
     @GetMapping("/driver/{driverId}")
     public ApiResponse<org.springframework.data.domain.Page<BookingResponse>> getDriverHistory(
             @PathVariable String driverId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal Jwt jwt) {
+        requireSameUser(jwt, driverId);
         return ApiResponse.success("Fetched driver booking history successfully",
                 bookingService.getDriverHistory(driverId, page, size));
+    }
+
+    @PreAuthorize("hasRole('CUSTOMER')")
+    @GetMapping("/me")
+    public ApiResponse<org.springframework.data.domain.Page<BookingResponse>> getMyBookings(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @AuthenticationPrincipal Jwt jwt) {
+        String userId = requireUserId(jwt);
+        return ApiResponse.success("Fetched bookings successfully",
+                bookingService.getCustomerHistory(userId, page, size));
     }
 
     @GetMapping("/nearby")
@@ -143,5 +158,12 @@ public class BookingController {
         if (jwt == null || jwt.getSubject() == null || !jwt.getSubject().equals(customerId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only access your own bookings");
         }
+    }
+
+    private String requireUserId(Jwt jwt) {
+        if (jwt == null || jwt.getSubject() == null || jwt.getSubject().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+        return jwt.getSubject();
     }
 }

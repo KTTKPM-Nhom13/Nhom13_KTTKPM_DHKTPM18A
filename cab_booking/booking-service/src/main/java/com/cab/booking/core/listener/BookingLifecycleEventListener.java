@@ -4,8 +4,7 @@ import com.cab.booking.core.dto.event.inbound.DriverAcceptedEvent;
 import com.cab.booking.core.dto.event.inbound.DriverRejectedEvent;
 import com.cab.booking.core.dto.event.inbound.PaymentCompletedEvent;
 import com.cab.booking.core.dto.event.inbound.PaymentFailedEvent;
-import com.cab.booking.core.dto.event.inbound.RideArrivedEvent;
-import com.cab.booking.core.dto.event.inbound.RideAssignedEvent;
+import com.cab.booking.core.dto.event.inbound.RideArrivedEvent;import com.cab.booking.core.dto.event.inbound.RideCancelledEvent;import com.cab.booking.core.dto.event.inbound.RideAssignedEvent;
 import com.cab.booking.core.dto.event.inbound.RideCompletedEvent;
 import com.cab.booking.core.dto.event.inbound.RideStartedEvent;
 import com.cab.booking.core.entity.Booking;
@@ -101,6 +100,33 @@ public class BookingLifecycleEventListener {
             log.error("Error processing ride.rejected for rideId={}: {}", event.aggregateId(), ex.getMessage());
         }
     }
+
+    @KafkaListener(topics = "ride.cancelled", groupId = "booking-service-group")
+        @Transactional
+        public void handleRideCancelled(String message) {
+            log.info("[ride.cancelled] message={}", message);
+            try {
+                RideCancelledEvent event = objectMapper.readValue(message, RideCancelledEvent.class);
+
+                if (isDuplicateEvent("ride.cancelled", event.getEventId())) {
+                    return;
+                }
+
+                UUID bookingId = UUID.fromString(event.getBookingId() != null ? event.getBookingId() : event.getRideId());
+                Booking booking = bookingRepository.findById(bookingId).orElse(null);
+                if (booking == null) return;
+
+                if (booking.getStatus() == BookingStatus.CANCELLED || hasReachedOrPassed(booking.getStatus(), BookingStatus.ACCEPTED)) {
+                    log.info("Booking {} already {}, ignoring ride.cancelled", bookingId, booking.getStatus());
+                    return;
+                }
+
+                log.info("Process ride.cancelled from system | bookingId={} | reason={}", bookingId, event.getReason());
+                bookingService.cancelRide(bookingId, "System Canceled: " + event.getReason());
+            } catch (Exception ex) {
+                log.error("Error processing ride.cancelled: {}", ex.getMessage());
+            }
+        }
 
     @KafkaListener(topics = "ride.arrived", groupId = "booking-service-group")
     @Transactional

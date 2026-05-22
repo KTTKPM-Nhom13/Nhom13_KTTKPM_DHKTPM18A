@@ -31,8 +31,8 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{gatewayUrl}}/auth/token",
-							"host": ["{{gatewayUrl}}"],
+							"raw": "{{apiGatewayUrl}}/auth/token",
+							"host": ["{{apiGatewayUrl}}"],
 							"path": ["auth", "token"]
 						},
 						"description": "Lấy token debug từ auth-service (qua Gateway) để gán vào Collection Authorization."
@@ -50,8 +50,8 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/actuator/health",
-							"host": ["{{baseUrl}}"],
+							"raw": "{{apiGatewayUrl}}/actuator/health",
+							"host": ["{{apiGatewayUrl}}"],
 							"path": ["actuator", "health"]
 						}
 					},
@@ -63,8 +63,8 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/bookings/demo/success",
-							"host": ["{{baseUrl}}"],
+							"raw": "{{apiGatewayUrl}}/api/v1/bookings/demo/success",
+							"host": ["{{apiGatewayUrl}}"],
 							"path": ["api", "v1", "bookings", "demo", "success"]
 						}
 					},
@@ -76,8 +76,8 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/bookings/demo/not-found",
-							"host": ["{{baseUrl}}"],
+							"raw": "{{apiGatewayUrl}}/api/v1/bookings/demo/not-found",
+							"host": ["{{apiGatewayUrl}}"],
 							"path": ["api", "v1", "bookings", "demo", "not-found"]
 						}
 					},
@@ -89,8 +89,8 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/bookings/demo/conflict",
-							"host": ["{{baseUrl}}"],
+							"raw": "{{apiGatewayUrl}}/api/v1/bookings/demo/conflict",
+							"host": ["{{apiGatewayUrl}}"],
 							"path": ["api", "v1", "bookings", "demo", "conflict"]
 						}
 					},
@@ -134,8 +134,8 @@
 							"raw": "{\n    \"pickupLocation\": \"12 Nguyễn Văn Bảo, Phường 4, Gò Vấp, TP.HCM\",\n    \"dropoffLocation\": \"Sân bay Tân Sơn Nhất\",\n    \"customerNote\": \"Mang theo hành lý cồng kềnh\",\n    \"pickupCoordinates\": { \"lat\": 10.8221, \"lng\": 106.6885 },\n    \"dropoffCoordinates\": { \"lat\": 10.8188, \"lng\": 106.6619 },\n    \"vehicleType\": \"SEDAN\",\n    \"paymentMethod\": \"CASH\",\n    \"estimatedFare\": 75000.00,\n    \"idempotencyKey\": \"{{$guid}}\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/bookings",
-							"host": ["{{baseUrl}}"],
+							"raw": "{{apiGatewayUrl}}/api/v1/bookings",
+							"host": ["{{apiGatewayUrl}}"],
 							"path": ["api", "v1", "bookings"]
 						}
 					},
@@ -147,8 +147,8 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/bookings/nearby?lat=10.8221&lng=106.6885&radius=5.0",
-							"host": ["{{baseUrl}}"],
+							"raw": "{{apiGatewayUrl}}/api/v1/bookings/nearby?lat=10.8221&lng=106.6885&radius=5.0",
+							"host": ["{{apiGatewayUrl}}"],
 							"path": ["api", "v1", "bookings", "nearby"],
 							"query": [
 								{ "key": "lat", "value": "10.8221" },
@@ -181,8 +181,8 @@
 						"method": "POST",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/assign?driverId={{driverId}}",
-							"host": ["{{baseUrl}}"],
+							"raw": "{{apiGatewayUrl}}/api/v1/bookings/{{bookingId}}/assign?driverId={{driverId}}",
+							"host": ["{{apiGatewayUrl}}"],
 							"path": ["api", "v1", "bookings", "{{bookingId}}", "assign"],
 							"query": [
 								{ "key": "driverId", "value": "{{driverId}}" }
@@ -198,9 +198,9 @@
 						"method": "POST",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/arrive",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "bookings", "{{bookingId}}", "arrive"]
+							"raw": "{{apiGatewayUrl}}/api/v1/rides/{{rideId}}/arrive",
+							"host": ["{{apiGatewayUrl}}"],
+							"path": ["api", "v1", "rides", "{{rideId}}", "arrive"]
 						},
 						"description": "Tài xế đã tới điểm đón khách."
 					},
@@ -227,9 +227,9 @@
 						"method": "POST",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/start",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "bookings", "{{bookingId}}", "start"]
+							"raw": "{{apiGatewayUrl}}/api/v1/rides/{{rideId}}/start",
+							"host": ["{{apiGatewayUrl}}"],
+							"path": ["api", "v1", "rides", "{{rideId}}", "start"]
 						},
 						"description": "Bắt đầu di chuyển chuyến đi."
 					},
@@ -256,9 +256,9 @@
 						"method": "POST",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/complete",
-							"host": ["{{baseUrl}}"],
-							"path": ["api", "v1", "bookings", "{{bookingId}}", "complete"]
+							"raw": "{{apiGatewayUrl}}/api/v1/rides/{{rideId}}/complete",
+							"host": ["{{apiGatewayUrl}}"],
+							"path": ["api", "v1", "rides", "{{rideId}}", "complete"]
 						},
 						"description": "Tài xế trả khách, kết thúc hành trình."
 					},
@@ -279,8 +279,8 @@
 							"raw": "{\n    \"rating\": 5,\n    \"comment\": \"Tài xế thân thiện, lái xe an toàn!\"\n}"
 						},
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/review",
-							"host": ["{{baseUrl}}"],
+							"raw": "{{apiGatewayUrl}}/api/v1/bookings/{{bookingId}}/review",
+							"host": ["{{apiGatewayUrl}}"],
 							"path": ["api", "v1", "bookings", "{{bookingId}}", "review"]
 						},
 						"description": "Đánh giá chuyến đi sau khi hoàn thành."
@@ -298,8 +298,8 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/bookings/customer/{{customerId}}/active",
-							"host": ["{{baseUrl}}"],
+							"raw": "{{apiGatewayUrl}}/api/v1/bookings/customer/{{customerId}}/active",
+							"host": ["{{apiGatewayUrl}}"],
 							"path": ["api", "v1", "bookings", "customer", "{{customerId}}", "active"]
 						},
 						"description": "Lấy thông tin chuyến đi hiện tại của khách hàng (đang chờ xe, đang đi, v.v.)"
@@ -312,8 +312,8 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/bookings/customer/{{customerId}}?page=0&size=10",
-							"host": ["{{baseUrl}}"],
+							"raw": "{{apiGatewayUrl}}/api/v1/bookings/customer/{{customerId}}?page=0&size=10",
+							"host": ["{{apiGatewayUrl}}"],
 							"path": ["api", "v1", "bookings", "customer", "{{customerId}}"],
 							"query": [
 								{ "key": "page", "value": "0" },
@@ -330,8 +330,8 @@
 						"method": "POST",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/bookings/{{bookingId}}/cancel?reason=Thay đổi ý định",
-							"host": ["{{baseUrl}}"],
+							"raw": "{{apiGatewayUrl}}/api/v1/bookings/{{bookingId}}/cancel?reason=Thay đổi ý định",
+							"host": ["{{apiGatewayUrl}}"],
 							"path": ["api", "v1", "bookings", "{{bookingId}}", "cancel"],
 							"query": [
 								{ "key": "reason", "value": "Thay đổi ý định" }
@@ -352,8 +352,8 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/api/v1/bookings/driver/{{driverId}}?page=0&size=10",
-							"host": ["{{baseUrl}}"],
+							"raw": "{{apiGatewayUrl}}/api/v1/bookings/driver/{{driverId}}?page=0&size=10",
+							"host": ["{{apiGatewayUrl}}"],
 							"path": ["api", "v1", "bookings", "driver", "{{driverId}}"],
 							"query": [
 								{ "key": "page", "value": "0" },

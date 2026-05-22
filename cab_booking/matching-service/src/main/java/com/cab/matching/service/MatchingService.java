@@ -21,6 +21,7 @@ import org.springframework.data.redis.domain.geo.GeoReference;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -58,6 +59,7 @@ public class MatchingService {
     private static final long RETRY_DELAY_SECONDS = 5L;
     private static final int MAX_MATCHING_ATTEMPTS = 3;
     private static final String TOPIC_RIDE_ASSIGNED = "ride.assigned";
+    private static final String TOPIC_RIDE_CANCELLED = "ride.cancelled";
     private static final String TOPIC_MATCHING_RETRY_REQUESTED = "matching.retry.requested";
     private static final String TOPIC_MATCHING_FAILED = "matching.failed";
 
@@ -292,7 +294,7 @@ public class MatchingService {
         if (rejectedDriverId != null && !rejectedDriverId.isBlank()) {
             releaseDriverLockIfOwned(rejectedDriverId, rideId);
             redisTemplate.opsForSet().add(rejectedDriversKey(rideId), rejectedDriverId);
-            redisTemplate.expire(rejectedDriversKey(rideId), MATCHING_STATE_TTL_HOURS, TimeUnit.HOURS);
+            redisTemplate.expire(rejectedDriversKey(rideId), 15, TimeUnit.MINUTES);
             log.info("Released driver lock after ride.rejected | rideId={} | driverId={}", rideId, rejectedDriverId);
         }
         redisTemplate.delete(MATCHING_ASSIGNED_PREFIX + rideId);
@@ -310,9 +312,9 @@ public class MatchingService {
     private void scheduleRetryIfPossible(RideCreatedEvent event) {
         int currentAttempt = event.attemptOrDefault();
         if (currentAttempt >= MAX_MATCHING_ATTEMPTS || isBookingCancelled(event.rideId())) {
-            log.warn("No retry for rideId={} | attempt={} | cancelled={}",
-                    event.rideId(), currentAttempt, isBookingCancelled(event.rideId()));
+            log.warn("Matching failed after {} attempts or cancelled | rideId={}", currentAttempt, event.rideId());
             markFailed(event.rideId(), "NO_DRIVER_AVAILABLE");
+            publishRideCancelled(event, currentAttempt, "NO_DRIVER_AVAILABLE_AFTER_RETRY");
             publishMatchingFailed(event, currentAttempt, "NO_DRIVER_AVAILABLE");
             return;
         }
@@ -411,6 +413,21 @@ public class MatchingService {
         failedEvent.put("timestamp", Instant.now().toString());
         kafkaTemplate.send(TOPIC_MATCHING_FAILED, event.rideId(), failedEvent);
         log.warn("Published matching.failed | rideId={} | attempt={} | reason={}", event.rideId(), attempt, reason);
+    }
+
+    private void publishRideCancelled(RideCreatedEvent event, int attempt, String reason) {
+        Map<String, Object> cancelledEvent = new HashMap<>();
+        cancelledEvent.put("eventId", UUID.randomUUID().toString());
+        cancelledEvent.put("eventType", "RIDE_CANCELLED");
+        cancelledEvent.put("rideId", event.rideId());
+        cancelledEvent.put("bookingId", event.rideId());
+        cancelledEvent.put("customerId", event.customerId());
+        cancelledEvent.put("reason", reason + " (attempts: " + attempt + ")");
+        cancelledEvent.put("timestamp", Instant.now().toString());
+
+        kafkaTemplate.send(TOPIC_RIDE_CANCELLED, event.rideId(), cancelledEvent);
+        log.info("Published ride.cancelled from matching-service | rideId={} | reason={}", 
+                event.rideId(), reason);
     }
 
     private void releaseAssignedDriverLock(String rideId, String driverIdFromEvent) {
@@ -520,7 +537,7 @@ public class MatchingService {
                 coordinateMap(parseDoubleObject(raw.get("dropoffLat")), parseDoubleObject(raw.get("dropoffLng"))),
                 stringValue(raw.get("vehicleType"), null),
                 stringValue(raw.get("paymentMethod"), null),
-                null,
+                parseBigDecimal(raw.get("estimatedFare")),
                 stringValue(raw.get("promoCode"), null),
                 nextAttempt,
                 nextRadiusKm,
@@ -611,6 +628,14 @@ public class MatchingService {
     private double parseDouble(Object value, double fallback) {
         Double parsed = parseDoubleObject(value);
         return parsed == null ? fallback : parsed;
+    }
+
+    private BigDecimal parseBigDecimal(Object value) {
+        try {
+            return value == null ? null : new BigDecimal(value.toString());
+        } catch (NumberFormatException | ArithmeticException ex) {
+            return null;
+        }
     }
 
     private Double parseDoubleObject(Object value) {

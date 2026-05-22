@@ -1,0 +1,738 @@
+{
+  "info": {
+    "_postman_id": "cab-booking-e2e-gateway",
+    "name": "CAB Booking E2E - Through Gateway",
+    "description": "End-to-end booking flow through API Gateway (port 8080). Covers CASH and ONLINE payment flows. All requests go through {{apiGatewayUrl}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "apiGatewayUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.environment.get('run_id')) {",
+          "    pm.environment.set('run_id', Date.now().toString());",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Auth - Get Tokens",
+      "item": [
+        {
+          "name": "0.1 Register Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "const result = json.result || {};",
+                  "const user = result.user || {};",
+                  "pm.test('Customer registered', function () {",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(result.accessToken).to.be.a('string');",
+                  "    pm.expect(user.role).to.eql('CUSTOMER');",
+                  "});",
+                  "pm.environment.set('customer_token', result.accessToken);",
+                  "pm.environment.set('customerId', user.userId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"E2E Customer\",\n  \"email\": \"customer_{{$timestamp}}@test.com\",\n  \"password\": \"Test@123456\",\n  \"phoneNumber\": \"+84910000001\",\n  \"role\": \"CUSTOMER\",\n  \"deviceId\": \"dev-{{$timestamp}}\",\n  \"platform\": \"android\",\n  \"userAgent\": \"Postman E2E\",\n  \"appVersion\": \"1.0.0\"\n}"
+            },
+            "url": {
+              "raw": "{{apiGatewayUrl}}/auth/register",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "0.2 Register Driver",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "const result = json.result || {};",
+                  "const user = result.user || {};",
+                  "pm.test('Driver registered', function () {",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(result.accessToken).to.be.a('string');",
+                  "    pm.expect(user.role).to.eql('DRIVER');",
+                  "});",
+                  "pm.environment.set('driver_token', result.accessToken);",
+                  "pm.environment.set('driverId', user.userId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"E2E Driver\",\n  \"email\": \"driver_{{$timestamp}}@test.com\",\n  \"password\": \"Test@123456\",\n  \"phoneNumber\": \"+84910000002\",\n  \"role\": \"DRIVER\",\n  \"deviceId\": \"dev-driver-{{$timestamp}}\",\n  \"platform\": \"android\",\n  \"userAgent\": \"Postman E2E\",\n  \"appVersion\": \"1.0.0\"\n}"
+            },
+            "url": {
+              "raw": "{{apiGatewayUrl}}/auth/register",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "0.3 Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "const result = json.result || {};",
+                  "pm.environment.set('admin_token', result.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@cab.com\",\n  \"password\": \"Admin@123456\"\n}"
+            },
+            "url": {
+              "raw": "{{apiGatewayUrl}}/auth/admin/login",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["auth", "admin", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. CASH Flow",
+      "description": "Full CASH payment booking lifecycle through API Gateway.\n\nFlow: CREATE → MATCHING (Kafka) → ride.created → ride.assigned → Driver Accept → ride.accepted → Arrive → ride.arrived → Start → ride.started → Complete → ride.completed → COMPLETED",
+      "item": [
+        {
+          "name": "1.1 Customer Create Booking (CASH)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "const result = json.result || {};",
+                  "pm.test('Booking created with CASH payment', function () {",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(result.id).to.be.a('string');",
+                  "    pm.expect(result.paymentMethod).to.eql('CASH');",
+                  "    pm.expect(result.status).to.be.oneOf(['CREATED', 'MATCHING']);",
+                  "});",
+                  "pm.environment.set('bookingId', result.id);",
+                  "console.log('bookingId:', result.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{customer_token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLocation\": \"12 Nguyen Van Bao, Go Vap, HCMC\",\n  \"dropoffLocation\": \"Tan Son Nhat Airport\",\n  \"customerNote\": \"E2E CASH flow test\",\n  \"pickupCoordinates\": { \"lat\": 10.8221, \"lng\": 106.6885 },\n  \"dropoffCoordinates\": { \"lat\": 10.8188, \"lng\": 106.6619 },\n  \"vehicleType\": \"SEDAN\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": 75000.00,\n  \"idempotencyKey\": \"{{$guid}}\"\n}"
+            },
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/bookings",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "bookings"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1.2 Wait for matching (manual)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/bookings/nearby?lat=10.8221&lng=106.6885&radius=5.0",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "bookings", "nearby"],
+              "query": [
+                { "key": "lat", "value": "10.8221" },
+                { "key": "lng", "value": "106.6885" },
+                { "key": "radius", "value": "5.0" }
+              ]
+            },
+            "description": "Poll nearby bookings. After matching-service assigns a driver, booking becomes ASSIGNED."
+          },
+          "response": []
+        },
+        {
+          "name": "1.3 Get Booking by ID (Customer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Booking retrieved', function () {",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.result.id).to.eql(pm.environment.get('bookingId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{customer_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/bookings/{{bookingId}}",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1.4 Get My Bookings (Customer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Page returned', function () {",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.result.content).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{customer_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/bookings/me?page=0&size=10",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "bookings", "me"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1.5 Get Ride by ID (Driver)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Ride retrieved', function () {",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.result.bookingId).to.be.a('string');",
+                  "});",
+                  "pm.environment.set('rideId', json.result.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{driver_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/rides/{{bookingId}}",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "rides", "{{bookingId}}"]
+            },
+            "description": "Driver fetches ride details after assignment."
+          },
+          "response": []
+        },
+        {
+          "name": "1.6 Driver Arrive at Pickup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Ride status is PICKUP or ASSIGNED', function () {",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.result.status).to.be.oneOf(['PICKUP', 'ASSIGNED', 'ACCEPTED']);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{driver_token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/rides/{{rideId}}/arrive",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "rides", "{{rideId}}", "arrive"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1.7 Driver Start Ride",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Ride started', function () {",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.result.status).to.eql('IN_PROGRESS');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{driver_token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/rides/{{rideId}}/start",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "rides", "{{rideId}}", "start"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1.8 Driver Complete Ride",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Ride completed', function () {",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.result.status).to.eql('COMPLETED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{driver_token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"finalFare\": 75000.00,\n  \"paymentMethod\": \"CASH\"\n}"
+            },
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/rides/{{rideId}}/complete",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "rides", "{{rideId}}", "complete"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. ONLINE Flow",
+      "description": "Online payment booking lifecycle through API Gateway.\n\nFlow: CREATE (MOMO/VNPAY/CARD) → PENDING_PAYMENT → Kafka payment.requested → payment.completed → MATCHING → ride.created → ride.assigned → ... → COMPLETED",
+      "item": [
+        {
+          "name": "2.1 Customer Create Booking (ONLINE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "const result = json.result || {};",
+                  "pm.test('Booking created with ONLINE payment', function () {",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(result.id).to.be.a('string');",
+                  "    pm.expect(result.paymentMethod).to.be.oneOf(['MOMO', 'VNPAY', 'CARD']);",
+                  "    pm.expect(result.status).to.eql('PENDING_PAYMENT');",
+                  "});",
+                  "pm.environment.set('bookingId_online', result.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{customer_token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLocation\": \"Ben Thanh Market, District 1, HCMC\",\n  \"dropoffLocation\": \"Landmark 81, Binh Thanh, HCMC\",\n  \"customerNote\": \"E2E ONLINE flow test\",\n  \"pickupCoordinates\": { \"lat\": 10.7769, \"lng\": 106.7009 },\n  \"dropoffCoordinates\": { \"lat\": 10.7949, \"lng\": 106.7218 },\n  \"vehicleType\": \"ECONOMY\",\n  \"paymentMethod\": \"MOMO\",\n  \"estimatedFare\": 45000.00,\n  \"idempotencyKey\": \"{{$guid}}\"\n}"
+            },
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/bookings",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "bookings"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2.2 Check booking is PENDING_PAYMENT",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{customer_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/bookings/{{bookingId_online}}",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId_online}}"]
+            },
+            "description": "Verify booking status is PENDING_PAYMENT. Payment Service will process Kafka payment.requested, then emit payment.completed to transition to MATCHING."
+          },
+          "response": []
+        },
+        {
+          "name": "2.3 (Simulate) Payment completed → booking MATCHING",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/bookings/{{bookingId_online}}",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId_online}}"]
+            },
+            "description": "After payment.completed Kafka event, booking should transition to MATCHING. Poll this endpoint to verify."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Role Smoke - CUSTOMER",
+      "description": "Verify CUSTOMER role access through Gateway.",
+      "item": [
+        {
+          "name": "3.1 CUSTOMER: POST /api/v1/bookings ✅",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customer_token}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLocation\": \"Test\",\n  \"dropoffLocation\": \"Test\",\n  \"vehicleType\": \"SEDAN\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": 50000,\n  \"idempotencyKey\": \"{{$guid}}\"\n}"
+            },
+            "url": { "raw": "{{apiGatewayUrl}}/api/v1/bookings", "host": ["{{apiGatewayUrl}}"], "path": ["api", "v1", "bookings"] }
+          }
+        },
+        {
+          "name": "3.2 CUSTOMER: GET /api/v1/bookings/me ✅",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customer_token}}", "type": "string" }] },
+            "method": "GET",
+            "url": { "raw": "{{apiGatewayUrl}}/api/v1/bookings/me", "host": ["{{apiGatewayUrl}}"], "path": ["api", "v1", "bookings", "me"] }
+          }
+        },
+        {
+          "name": "3.3 CUSTOMER: GET /api/v1/bookings/{id} ✅",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customer_token}}", "type": "string" }] },
+            "method": "GET",
+            "url": { "raw": "{{apiGatewayUrl}}/api/v1/bookings/{{bookingId}}", "host": ["{{apiGatewayUrl}}"], "path": ["api", "v1", "bookings", "{{bookingId}}"] }
+          }
+        },
+        {
+          "name": "3.4 CUSTOMER: POST /api/v1/bookings/{id}/cancel ✅",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customer_token}}", "type": "string" }] },
+            "method": "POST",
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/bookings/{{bookingId}}/cancel?reason=Test+cancel",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId}}", "cancel"],
+              "query": [{ "key": "reason", "value": "Test cancel" }]
+            }
+          }
+        },
+        {
+          "name": "3.5 CUSTOMER: POST /api/v1/rides/{id}/arrive ❌ (expect 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('CUSTOMER cannot call ride arrive (expect 401/403)', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([401, 403]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customer_token}}", "type": "string" }] },
+            "method": "POST",
+            "url": { "raw": "{{apiGatewayUrl}}/api/v1/rides/00000000-0000-0000-0000-000000000000/arrive", "host": ["{{apiGatewayUrl}}"], "path": ["api", "v1", "rides", "00000000-0000-0000-0000-000000000000", "arrive"] }
+          }
+        },
+        {
+          "name": "3.6 CUSTOMER: GET /api/admin/bookings ❌ (expect 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('CUSTOMER cannot access admin bookings (expect 401/403)', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([401, 403]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{customer_token}}", "type": "string" }] },
+            "method": "GET",
+            "url": { "raw": "{{apiGatewayUrl}}/api/admin/bookings", "host": ["{{apiGatewayUrl}}"], "path": ["api", "admin", "bookings"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Role Smoke - DRIVER",
+      "description": "Verify DRIVER role access through Gateway.",
+      "item": [
+        {
+          "name": "4.1 DRIVER: GET /api/v1/rides/{id} ✅",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{driver_token}}", "type": "string" }] },
+            "method": "GET",
+            "url": { "raw": "{{apiGatewayUrl}}/api/v1/rides/{{rideId}}", "host": ["{{apiGatewayUrl}}"], "path": ["api", "v1", "rides", "{{rideId}}"] }
+          }
+        },
+        {
+          "name": "4.2 DRIVER: POST /api/v1/rides/{id}/arrive ✅",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{driver_token}}", "type": "string" }] },
+            "method": "POST",
+            "url": { "raw": "{{apiGatewayUrl}}/api/v1/rides/{{rideId}}/arrive", "host": ["{{apiGatewayUrl}}"], "path": ["api", "v1", "rides", "{{rideId}}", "arrive"] }
+          }
+        },
+        {
+          "name": "4.3 DRIVER: POST /api/v1/rides/{id}/start ✅",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{driver_token}}", "type": "string" }] },
+            "method": "POST",
+            "url": { "raw": "{{apiGatewayUrl}}/api/v1/rides/{{rideId}}/start", "host": ["{{apiGatewayUrl}}"], "path": ["api", "v1", "rides", "{{rideId}}", "start"] }
+          }
+        },
+        {
+          "name": "4.4 DRIVER: POST /api/v1/rides/{id}/complete ✅",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{driver_token}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"finalFare\": 50000\n}" },
+            "url": { "raw": "{{apiGatewayUrl}}/api/v1/rides/{{rideId}}/complete", "host": ["{{apiGatewayUrl}}"], "path": ["api", "v1", "rides", "{{rideId}}", "complete"] }
+          }
+        },
+        {
+          "name": "4.5 DRIVER: GET /api/v1/bookings/me ❌ (expect 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('DRIVER cannot access /bookings/me (expect 401/403)', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([401, 403]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{driver_token}}", "type": "string" }] },
+            "method": "GET",
+            "url": { "raw": "{{apiGatewayUrl}}/api/v1/bookings/me", "host": ["{{apiGatewayUrl}}"], "path": ["api", "v1", "bookings", "me"] }
+          }
+        },
+        {
+          "name": "4.6 DRIVER: GET /api/admin/bookings ❌ (expect 403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('DRIVER cannot access admin bookings (expect 401/403)', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([401, 403]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{driver_token}}", "type": "string" }] },
+            "method": "GET",
+            "url": { "raw": "{{apiGatewayUrl}}/api/admin/bookings", "host": ["{{apiGatewayUrl}}"], "path": ["api", "admin", "bookings"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Role Smoke - ADMIN",
+      "description": "Verify ADMIN role access through Gateway.",
+      "item": [
+        {
+          "name": "5.1 ADMIN: GET /api/admin/bookings ✅",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Admin can list bookings', function () {",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.result).to.have.property('content');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{admin_token}}", "type": "string" }] },
+            "method": "GET",
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/admin/bookings?page=0&size=10",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "admin", "bookings"],
+              "query": [{ "key": "page", "value": "0" }, { "key": "size", "value": "10" }]
+            }
+          }
+        },
+        {
+          "name": "5.2 ADMIN: GET /api/admin/bookings/{id} ✅",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{admin_token}}", "type": "string" }] },
+            "method": "GET",
+            "url": { "raw": "{{apiGatewayUrl}}/api/admin/bookings/{{bookingId}}", "host": ["{{apiGatewayUrl}}"], "path": ["api", "admin", "bookings", "{{bookingId}}"] }
+          }
+        },
+        {
+          "name": "5.3 ADMIN: POST /api/admin/bookings/{id}/retry-matching ✅",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{admin_token}}", "type": "string" }] },
+            "method": "POST",
+            "url": { "raw": "{{apiGatewayUrl}}/api/admin/bookings/{{bookingId}}/retry-matching", "host": ["{{apiGatewayUrl}}"], "path": ["api", "admin", "bookings", "{{bookingId}}", "retry-matching"] }
+          }
+        },
+        {
+          "name": "5.4 ADMIN: POST /api/admin/bookings/{id}/cancel ✅",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{admin_token}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Admin test cancel\"\n}" },
+            "url": { "raw": "{{apiGatewayUrl}}/api/admin/bookings/{{bookingId}}/cancel", "host": ["{{apiGatewayUrl}}"], "path": ["api", "admin", "bookings", "{{bookingId}}", "cancel"] }
+          }
+        },
+        {
+          "name": "5.5 ADMIN: GET /api/admin/bookings/{id}/timeline ✅",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{admin_token}}", "type": "string" }] },
+            "method": "GET",
+            "url": { "raw": "{{apiGatewayUrl}}/api/admin/bookings/{{bookingId}}/timeline", "host": ["{{apiGatewayUrl}}"], "path": ["api", "admin", "bookings", "{{bookingId}}", "timeline"] }
+          }
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{customer_token}}", "type": "string" }]
+  }
+}
