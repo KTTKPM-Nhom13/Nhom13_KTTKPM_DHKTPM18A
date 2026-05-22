@@ -1,7 +1,9 @@
 package iuh.fit.driverservice.controller;
 
 import iuh.fit.common.dto.response.ApiResponse;
+import iuh.fit.driverservice.dto.request.CompleteCurrentRideRequest;
 import iuh.fit.driverservice.dto.request.HandleDriverAssignmentRequest;
+import iuh.fit.driverservice.dto.request.UpdateCurrentRideStatusRequest;
 import iuh.fit.driverservice.dto.request.UpdateDriverAvailabilityRequest;
 import iuh.fit.driverservice.dto.request.UpsertDriverProfileRequest;
 import iuh.fit.driverservice.dto.response.DriverAvailabilityResponse;
@@ -96,6 +98,27 @@ public class DriverProfileController {
         return ApiResponse.<DriverEarningsSummaryResponse>builder()
                 .message("Fetched driver earnings summary successfully")
                 .result(driverProfileService.getEarningsSummary(currentUserFacade.getCurrentUserId()))
+                .build();
+    }
+
+    @PatchMapping("/rides/current")
+    public ApiResponse<DriverCurrentRideResponse> updateCurrentRideStatus(
+            @Valid @RequestBody UpdateCurrentRideStatusRequest request) {
+        return ApiResponse.<DriverCurrentRideResponse>builder()
+                .message("Ride status updated successfully")
+                .result(driverRideCommandService.updateCurrentRideStatus(
+                        currentUserFacade.getCurrentUserId(), request))
+                .build();
+    }
+
+    @PostMapping("/rides/current/complete")
+    public ApiResponse<DriverCurrentRideResponse> completeCurrentRide(
+            @RequestBody(required = false) CompleteCurrentRideRequest request) {
+        return ApiResponse.<DriverCurrentRideResponse>builder()
+                .message("Ride completed successfully")
+                .result(driverRideCommandService.completeCurrentRide(
+                        currentUserFacade.getCurrentUserId(),
+                        request != null ? request : new CompleteCurrentRideRequest()))
                 .build();
     }
 }
