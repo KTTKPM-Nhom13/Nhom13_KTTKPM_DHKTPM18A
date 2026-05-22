@@ -333,6 +333,16 @@ public class RideService {
         });
     }
 
+    /**
+     * Find ride by ID for query endpoints.
+     * Returns the entity so callers can perform authorization checks.
+     */
+    public Ride getRideById(String rideId) {
+        UUID uuid = parseUuid(rideId);
+        return rideRepository.findById(uuid)
+                .orElseThrow(() -> rideNotFound(rideId));
+    }
+
     private UUID parseUuid(String rideId) {
         try {
             return UUID.fromString(rideId);

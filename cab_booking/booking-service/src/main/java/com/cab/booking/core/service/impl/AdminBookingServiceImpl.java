@@ -43,6 +43,16 @@ import java.util.UUID;
 public class AdminBookingServiceImpl implements AdminBookingService {
     private static final String TIMEOUT_QUEUE_KEY = "booking:timeout:queue";
 
+    // Matching-service Redis key prefixes (shared Redis instance)
+    private static final String MATCHING_ASSIGNED_PREFIX = "matching:assigned:";
+    private static final String MATCHING_DRIVER_PREFIX = "matching:driver:";
+    private static final String MATCHING_LOCK_PREFIX = "matching:lock:";
+    private static final String MATCHING_REQUEST_PREFIX = "matching:request:";
+    private static final String MATCHING_FAILED_PREFIX = "matching:failed:";
+    private static final String MATCHING_ATTEMPT_PREFIX = "matching:attempt:";
+    private static final String RIDE_REJECTED_DRIVERS_KEY_PATTERN = "ride:%s:rejected-drivers";
+    private static final String BOOKING_CANCELLED_PREFIX = "booking:cancelled:";
+
     private final BookingRepository bookingRepository;
     private final AdminBookingAuditRepository auditRepository;
     private final BookingEventPublisher bookingEventPublisher;
@@ -124,6 +134,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
             bookingStateMachine.transitionTo(booking, BookingStatus.MATCHING);
         }
         Booking saved = bookingRepository.saveAndFlush(booking);
+        clearMatchingRedisState(saved.getId().toString());
         publishRideCreated(saved);
         long timeoutScore = Instant.now().plus(Duration.ofMinutes(3)).toEpochMilli();
         redisTemplate.opsForZSet().add(TIMEOUT_QUEUE_KEY, saved.getId().toString(), timeoutScore);
@@ -264,5 +275,26 @@ public class AdminBookingServiceImpl implements AdminBookingService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    /**
+     * Clear matching-service Redis state for a ride before admin retry.
+     * Without this, {@code hasAssigned(rideId)} in matching-service would return true
+     * and skip the new matching attempt entirely.
+     */
+    private void clearMatchingRedisState(String rideId) {
+        try {
+            redisTemplate.delete(MATCHING_ASSIGNED_PREFIX + rideId);
+            redisTemplate.delete(MATCHING_DRIVER_PREFIX + rideId);
+            redisTemplate.delete(MATCHING_LOCK_PREFIX + rideId);
+            redisTemplate.delete(MATCHING_REQUEST_PREFIX + rideId);
+            redisTemplate.delete(MATCHING_FAILED_PREFIX + rideId);
+            redisTemplate.delete(MATCHING_ATTEMPT_PREFIX + rideId);
+            redisTemplate.delete(String.format(RIDE_REJECTED_DRIVERS_KEY_PATTERN, rideId));
+            redisTemplate.delete(BOOKING_CANCELLED_PREFIX + rideId);
+            log.info("Cleared matching Redis state before admin retry | rideId={}", rideId);
+        } catch (RuntimeException ex) {
+            log.warn("Failed to clear some matching Redis keys | rideId={} | reason={}", rideId, ex.getMessage());
+        }
     }
 }
