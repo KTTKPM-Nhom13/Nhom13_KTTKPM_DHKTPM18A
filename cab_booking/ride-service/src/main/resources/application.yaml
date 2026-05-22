@@ -87,6 +87,9 @@ management:
     web:
       exposure:
         include: health,info,prometheus,metrics
+  health:
+    circuitbreakers:
+      enabled: true
   tracing:
     sampling:
       probability: 1.0

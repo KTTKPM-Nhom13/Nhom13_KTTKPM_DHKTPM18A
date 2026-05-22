@@ -55,3 +55,41 @@ eureka:
       defaultZone: ${EUREKA_DEFAULT_ZONE:${EUREKA_SERVER_URL:http://localhost:8761/eureka/}}
     register-with-eureka: true
     fetch-registry: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      aiScoringService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 2
+        automatic-transition-from-open-to-half-open-enabled: true
+  retry:
+    instances:
+      aiScoringService:
+        max-attempts: 2
+        wait-duration: 200ms
+        retry-exceptions:
+          - feign.RetryableException
+          - java.io.IOException
+  timelimiter:
+    instances:
+      aiScoringService:
+        timeout-duration: 2s
+  bulkhead:
+    instances:
+      aiScoringService:
+        max-concurrent-calls: 10
+        max-wait-duration: 50ms
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  health:
+    circuitbreakers:
+      enabled: true

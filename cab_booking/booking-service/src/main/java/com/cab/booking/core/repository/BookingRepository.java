@@ -2,6 +2,7 @@ package com.cab.booking.core.repository;
 
 import com.cab.booking.core.entity.Booking;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -10,12 +11,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface BookingRepository extends JpaRepository<Booking, UUID> {
+public interface BookingRepository extends JpaRepository<Booking, UUID>, JpaSpecificationExecutor<Booking> {
 
     @Query("SELECT COUNT(b) > 0 FROM Booking b WHERE b.idempotencyKey = :key")
     boolean existsByIdempotencyKey(@Param("key") String idempotencyKey);
 
     Optional<Booking> findByIdempotencyKey(String idempotencyKey);
+
+    Optional<Booking> findByQuoteId(String quoteId);
 
     org.springframework.data.domain.Page<Booking> findByCustomerIdOrderByCreatedAtDesc(String customerId, org.springframework.data.domain.Pageable pageable);
 

@@ -1,5 +1,7 @@
 package com.cab.booking.core.service.impl;
 
+import com.cab.booking.common.BookingException;
+import com.cab.booking.core.client.PricingClient;
 import com.cab.booking.core.dto.event.outbound.PaymentRequestedEvent;
 import com.cab.booking.core.dto.event.outbound.RideCreatedEvent;
 import com.cab.booking.core.dto.request.BookingRequest;
@@ -44,17 +46,21 @@ public class BookingServiceImpl implements BookingService {
     private final BookingStateMachine bookingStateMachine;
     private final RedisTemplate<String, Object> redisTemplate;
     private final BookingEventPublisher bookingEventPublisher;
+    private final PricingClient pricingClient;
 
     // ================================================================
     // LUỒNG TẠO CHUYẾN ĐI
     // ================================================================
     @Override
     @Transactional
-    public BookingResponse createRide(String customerId, BookingRequest request) {
+    public BookingResponse createRide(String customerId, String accessToken, BookingRequest request) {
+        String idempotencyRedisKey = null;
+        boolean idempotencyLockAcquired = false;
 
         // BƯỚC 1: Idempotency check
         if (request.getIdempotencyKey() != null && !request.getIdempotencyKey().isBlank()) {
             String key = request.getIdempotencyKey();
+            idempotencyRedisKey = IDEMPOTENCY_KEY_PREFIX + key;
 
             // 1.1 Kiểm tra xem DB đã có booking với key này chưa
             Optional<Booking> existingOpt = bookingRepository.findByIdempotencyKey(key);
@@ -64,7 +70,8 @@ public class BookingServiceImpl implements BookingService {
             }
 
             // 1.2 Dùng Redis SETNX (Set if not exists) để lock tạm thời request đầu tiên
-            Boolean lockAcquired = redisTemplate.opsForValue().setIfAbsent(IDEMPOTENCY_KEY_PREFIX + key, "PROCESSING", IDEMPOTENCY_TTL);
+            Boolean lockAcquired = redisTemplate.opsForValue().setIfAbsent(idempotencyRedisKey, "PROCESSING", IDEMPOTENCY_TTL);
+            idempotencyLockAcquired = Boolean.TRUE.equals(lockAcquired);
             if (Boolean.FALSE.equals(lockAcquired)) {
                 log.info("♻️ Một request khác đang xử lý key {}, chờ một chút và lấy lại từ DB...", key);
                 try {
@@ -74,12 +81,19 @@ public class BookingServiceImpl implements BookingService {
                 }
                 return bookingRepository.findByIdempotencyKey(key)
                         .map(BookingResponse::fromEntity)
-                        .orElseThrow(() -> new IllegalStateException("Hệ thống đang bận xử lý request này. Vui lòng thử lại sau!"));
+                        .orElseThrow(() -> new BookingException(com.cab.booking.common.ErrorCode.IDEMPOTENCY_REQUEST_PROCESSING));
             }
         }
 
         // BƯỚC 2: Verify fare
-        BigDecimal verifiedFare = verifyAndExtractFare(request);
+        PricingClient.PricingConfirmResponse confirmedQuote;
+        try {
+            confirmedQuote = confirmQuoteBeforeBooking(customerId, request, accessToken);
+        } catch (RuntimeException ex) {
+            releaseIdempotencyLockAfterFailure(idempotencyRedisKey, idempotencyLockAcquired, ex);
+            throw ex;
+        }
+        BigDecimal verifiedFare = confirmedQuote.getTotalFare();
         VehicleType vehicleType = normalizeRequestedVehicleType(request.getVehicleType());
 
         // BƯỚC 3: Build entity
@@ -97,6 +111,13 @@ public class BookingServiceImpl implements BookingService {
                 .estimatedFare(verifiedFare)
                 .promoCode(request.getPromoCode())
                 .quoteToken(request.getQuoteToken())
+                .estimateId(request.getEstimateId())
+                .quoteId(confirmedQuote.getQuoteId() != null ? confirmedQuote.getQuoteId() : request.getQuoteId())
+                .quotePayloadHash(request.getQuotePayloadHash())
+                .quoteHashAlgorithm(confirmedQuote.getQuoteHashAlgorithm() != null
+                        ? confirmedQuote.getQuoteHashAlgorithm()
+                        : request.getQuoteHashAlgorithm())
+                .quoteExpiresAt(confirmedQuote.getExpiresAt() != null ? confirmedQuote.getExpiresAt() : request.getQuoteExpiresAt())
                 .idempotencyKey(request.getIdempotencyKey())
                 .status(BookingStatus.CREATED)
                 .build();
@@ -318,17 +339,79 @@ public class BookingServiceImpl implements BookingService {
     }
 
     // ================================================================
-    // HELPER — Verify fare & extract coordinates
+    // HELPER — Confirm quote & extract coordinates
     // ================================================================
-    private BigDecimal verifyAndExtractFare(BookingRequest request) {
-        // TODO: verify quoteToken từ Pricing Service
-        if (request.getQuoteToken() != null && !request.getQuoteToken().isBlank()) {
-            log.debug("🔐 Verify quoteToken: {}", request.getQuoteToken());
+    private PricingClient.PricingConfirmResponse confirmQuoteBeforeBooking(
+            String customerId,
+            BookingRequest request,
+            String accessToken) {
+        if (isBlank(request.getEstimateId()) || isBlank(request.getQuotePayloadHash())) {
+            throw new BookingException(
+                    com.cab.booking.common.ErrorCode.QUOTE_CONFIRMATION_FAILED,
+                    "Thieu estimateId hoac quotePayloadHash. Vui long lay bao gia moi.");
         }
-        if (request.getEstimatedFare() == null) {
-            throw new AppException(ErrorCode.VALIDATION_ERROR);
+
+        PricingClient.PricingConfirmResponse confirmedQuote = pricingClient.confirmEstimate(
+                request.getEstimateId(),
+                request.getQuotePayloadHash(),
+                accessToken);
+
+        if (confirmedQuote == null || confirmedQuote.getTotalFare() == null) {
+            throw new BookingException(
+                    com.cab.booking.common.ErrorCode.QUOTE_CONFIRMATION_FAILED,
+                    "Pricing Service khong tra ve gia da xac nhan.");
         }
-        return request.getEstimatedFare();
+
+        if (!isBlank(confirmedQuote.getQuotePayloadHash())
+                && !request.getQuotePayloadHash().equalsIgnoreCase(confirmedQuote.getQuotePayloadHash())) {
+            log.warn("Security quote mismatch after Pricing confirm - estimateId={}, quoteId={}, userId={}",
+                    request.getEstimateId(),
+                    confirmedQuote.getQuoteId() != null ? confirmedQuote.getQuoteId() : request.getQuoteId(),
+                    customerId);
+            throw new BookingException(com.cab.booking.common.ErrorCode.QUOTE_HASH_MISMATCH);
+        }
+
+        if (request.getEstimatedFare() != null
+                && request.getEstimatedFare().compareTo(confirmedQuote.getTotalFare()) != 0) {
+            log.warn("Booking estimatedFare differs from confirmed Pricing fare - estimateId={}, quoteId={}, userId={}, requestFare={}, confirmedFare={}",
+                    request.getEstimateId(),
+                    confirmedQuote.getQuoteId() != null ? confirmedQuote.getQuoteId() : request.getQuoteId(),
+                    customerId,
+                    request.getEstimatedFare(),
+                    confirmedQuote.getTotalFare());
+        }
+
+        log.info("Pricing quote confirmed - estimateId={}, quoteId={}, userId={}, fare={} {}",
+                request.getEstimateId(),
+                confirmedQuote.getQuoteId() != null ? confirmedQuote.getQuoteId() : request.getQuoteId(),
+                customerId,
+                confirmedQuote.getTotalFare(),
+                confirmedQuote.getCurrency());
+        return confirmedQuote;
+    }
+
+    private void releaseIdempotencyLockAfterFailure(
+            String idempotencyRedisKey,
+            boolean idempotencyLockAcquired,
+            RuntimeException cause) {
+        if (!idempotencyLockAcquired || idempotencyRedisKey == null) {
+            return;
+        }
+
+        try {
+            redisTemplate.delete(idempotencyRedisKey);
+            log.info("Released idempotency lock after booking failure - key={}, cause={}",
+                    idempotencyRedisKey,
+                    cause.getClass().getSimpleName());
+        } catch (RuntimeException redisEx) {
+            log.warn("Could not release idempotency lock after booking failure - key={}",
+                    idempotencyRedisKey,
+                    redisEx);
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private VehicleType normalizeRequestedVehicleType(String rawVehicleType) {

@@ -73,15 +73,68 @@ eureka:
     instance-id: ${spring.application.name}:${random.value}
 
 resilience4j:
+  circuitbreaker:
+    instances:
+      pricingService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          - com.cab.booking.common.BookingException
+      userService:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
   retry:
     instances:
       driverService:
         max-attempts: 3
         wait-duration: 3s
+      pricingService:
+        max-attempts: 3
+        wait-duration: 300ms
+        retry-exceptions:
+          - com.cab.booking.core.client.PricingClient$PricingInfrastructureException
+          - org.springframework.web.client.ResourceAccessException
+        ignore-exceptions:
+          - com.cab.booking.common.BookingException
+      userService:
+        max-attempts: 2
+        wait-duration: 200ms
+        retry-exceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - org.springframework.web.client.HttpServerErrorException
+  timelimiter:
+    instances:
+      pricingService:
+        timeout-duration: 2s
+      userService:
+        timeout-duration: 1s
+  bulkhead:
+    instances:
+      pricingService:
+        max-concurrent-calls: 20
+        max-wait-duration: 100ms
+      userService:
+        max-concurrent-calls: 30
+        max-wait-duration: 100ms
 
 # Cấu hình bảo mật — đọc bởi iuh.fit.common.config.SecurityConfig
 # JWT được decode bằng RSA public key (từ certs/ hoặc biến môi trường JWT_PRIVATE_KEY)
 app:
+  services:
+    pricing:
+      base-url: ${PRICING_SERVICE_URL:http://localhost:8084}
+    user:
+      base-url: ${USER_SERVICE_URL:http://localhost:8082}
   security:
     # Các endpoint không cần xác thực JWT (phân cách bằng dấu phẩy)
     public-endpoints: >-
@@ -102,6 +155,9 @@ management:
     web:
       exposure:
         include: health,info,prometheus,metrics
+  health:
+    circuitbreakers:
+      enabled: true
   tracing:
     sampling:
       probability: 1.0 # 1.0 = Bắt 100% traces (Tốt cho dev, lúc lên Production nên giảm xuống 0.1)

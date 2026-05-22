@@ -41,7 +41,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{bookingServiceUrl}}/api/v1/bookings/ping",
+            "url": "{{apiGatewayUrl}}/api/v1/bookings/ping",
             "description": "Quick check that booking-service is reachable."
           }
         },
@@ -53,7 +53,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{rideServiceUrl}}/api/v1/rides/ping",
+            "url": "{{apiGatewayUrl}}/api/v1/rides/ping",
             "description": "Quick check that ride-service is reachable."
           }
         },
@@ -65,7 +65,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{gatewayUrl}}/gateway/health",
+            "url": "{{apiGatewayUrl}}/gateway/health",
             "description": "Run auth first, then driver profile with vehicleType BIKE/CAR4/CAR7, driver online + GPS. Matching is Kafka async, so after create booking wait 2-5 seconds then poll Booking Active. Redis CLI checks: GET driver:status:{driverUserId}, GET driver:vehicleType:{driverUserId}, GEOPOS driver:locations {driverUserId}."
           }
         }
@@ -111,7 +111,7 @@
                 }
               }
             },
-            "url": "{{gatewayUrl}}/api/auth/register"
+            "url": "{{apiGatewayUrl}}/api/auth/register"
           }
         },
         {
@@ -151,7 +151,7 @@
                 }
               }
             },
-            "url": "{{gatewayUrl}}/api/auth/login"
+            "url": "{{apiGatewayUrl}}/api/auth/login"
           }
         },
         {
@@ -191,7 +191,7 @@
                 }
               }
             },
-            "url": "{{gatewayUrl}}/api/auth/register"
+            "url": "{{apiGatewayUrl}}/api/auth/register"
           }
         },
         {
@@ -231,7 +231,7 @@
                 }
               }
             },
-            "url": "{{gatewayUrl}}/api/auth/login"
+            "url": "{{apiGatewayUrl}}/api/auth/login"
           }
         }
       ]
@@ -268,7 +268,7 @@
                 }
               }
             },
-            "url": "{{driverServiceUrl}}/api/drivers/me/profile",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/profile",
             "description": "Driver Service owns driver profile. vehicleType must be one of BIKE, CAR4, CAR7."
           }
         },
@@ -301,7 +301,7 @@
                 }
               }
             },
-            "url": "{{driverServiceUrl}}/api/drivers/me/availability",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/availability",
             "description": "Expected side effect: Driver Service writes driver:status:{{driverUserId}} = AVAILABLE. Matching also requires driver vehicle metadata: driver:vehicleType:{{driverUserId}} = {{vehicleType}}."
           }
         },
@@ -327,7 +327,7 @@
                 }
               }
             },
-            "url": "{{rideServiceUrl}}/api/v1/rides/location",
+            "url": "{{apiGatewayUrl}}/api/v1/rides/location",
             "description": "Ride Service owns driver:locations. Expected Redis: GEOPOS driver:locations {{driverUserId}}."
           }
         },
@@ -360,7 +360,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{driverServiceUrl}}/api/drivers/me/current-ride"
+            "url": "{{apiGatewayUrl}}/api/drivers/me/current-ride"
           }
         }
       ]
@@ -368,6 +368,62 @@
     {
       "name": "3. Accept Flow",
       "item": [
+        {
+          "name": "3.0 Estimate Fare For Accept",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || body.data || body;",
+                  "pm.collectionVariables.set('estimateId', result.estimateId || result.id || '');",
+                  "pm.collectionVariables.set('quoteId', result.quoteId || result.estimateId || result.id || '');",
+                  "pm.collectionVariables.set('quotePayloadHash', result.quotePayloadHash || '');",
+                  "pm.collectionVariables.set('quoteHashAlgorithm', result.quoteHashAlgorithm || 'SHA-256');",
+                  "pm.collectionVariables.set('quoteExpiresAt', result.expiresAt || '');",
+                  "pm.collectionVariables.set('estimatedFare', result.totalFare || '');",
+                  "pm.collectionVariables.set('quoteCurrency', result.currency || 'VND');",
+                  "pm.test('estimate created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "pm.test('estimateId captured', () => pm.expect(pm.collectionVariables.get('estimateId')).to.not.be.empty);",
+                  "pm.test('quotePayloadHash captured', () => pm.expect(pm.collectionVariables.get('quotePayloadHash')).to.not.be.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLat\": 10.7769,\n  \"pickupLng\": 106.7009,\n  \"dropoffLat\": 10.7798,\n  \"dropoffLng\": 106.699,\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"estimatedDurationMinutes\": 15\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{apiGatewayUrl}}/api/pricing/estimate",
+            "description": "Lay quote moi tu Pricing-Service. Test script luu estimateId, quoteId, quotePayloadHash, quoteHashAlgorithm, expiresAt va totalFare vao collection variables de request tao booking dung ngay sau do."
+          },
+          "response": []
+        },
         {
           "name": "3.1 Create Booking For Accept",
           "event": [
@@ -405,14 +461,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Saigon Notre Dame Cathedral\",\n  \"customerNote\": \"Accept boundary flow\",\n  \"pickupCoordinates\": { \"lat\": 10.7769, \"lng\": 106.7009 },\n  \"dropoffCoordinates\": { \"lat\": 10.7798, \"lng\": 106.6990 },\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"promoCode\": \"BOUNDARY\",\n  \"quoteToken\": \"{{quoteToken}}\",\n  \"idempotencyKey\": \"{{acceptIdempotencyKey}}\"\n}",
+              "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Saigon Notre Dame Cathedral\",\n  \"customerNote\": \"Accept boundary flow\",\n  \"pickupCoordinates\": {\n    \"lat\": 10.7769,\n    \"lng\": 106.7009\n  },\n  \"dropoffCoordinates\": {\n    \"lat\": 10.7798,\n    \"lng\": 106.699\n  },\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"promoCode\": \"BOUNDARY\",\n  \"quoteToken\": \"{{quoteToken}}\",\n  \"estimateId\": \"{{estimateId}}\",\n  \"quoteId\": \"{{quoteId}}\",\n  \"quotePayloadHash\": \"{{quotePayloadHash}}\",\n  \"quoteHashAlgorithm\": \"{{quoteHashAlgorithm}}\",\n  \"quoteExpiresAt\": \"{{quoteExpiresAt}}\",\n  \"idempotencyKey\": \"{{acceptIdempotencyKey}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "url": "{{bookingServiceUrl}}/api/v1/bookings",
+            "url": "{{apiGatewayUrl}}/api/v1/bookings",
             "description": "Expected async: Booking MATCHING -> ride.created(vehicleType) -> Matching reads Redis status/GEO/vehicleType -> driver.assigned canonical + ride.assigned legacy -> Booking ASSIGNED."
           }
         },
@@ -445,7 +501,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{driverServiceUrl}}/api/drivers/me/current-ride",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/current-ride",
             "description": "Run after waiting a few seconds. If Driver Service is not consuming assignment events directly, this can still be empty; Booking Active is the source of truth for ASSIGNED."
           }
         },
@@ -464,7 +520,7 @@
             },
             "method": "POST",
             "header": [],
-            "url": "{{driverServiceUrl}}/api/drivers/me/rides/{{acceptBookingId}}/accept",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/rides/{{acceptBookingId}}/accept",
             "description": "Driver Service publishes driver.accepted; Booking consumes and updates ASSIGNED -> ACCEPTED. Driver writes driver:status BUSY."
           }
         },
@@ -483,7 +539,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{bookingServiceUrl}}/api/v1/bookings/customer/{{customerUserId}}/active",
+            "url": "{{apiGatewayUrl}}/api/v1/bookings/customer/{{customerUserId}}/active",
             "description": "Expected status ACCEPTED after Kafka processing."
           }
         }
@@ -507,7 +563,7 @@
             },
             "method": "POST",
             "header": [],
-            "url": "{{bookingServiceUrl}}/api/v1/bookings/{{acceptBookingId}}/cancel?reason=Customer%20cancel%20boundary%20test",
+            "url": "{{apiGatewayUrl}}/api/v1/bookings/{{acceptBookingId}}/cancel?reason=Customer%20cancel%20boundary%20test",
             "description": "Booking marks the booking CANCELLED. Driver Service no longer owns ride lifecycle cleanup, so the next request releases the driver's local accepted ride for this demo driver."
           }
         },
@@ -526,7 +582,7 @@
             },
             "method": "POST",
             "header": [],
-            "url": "{{driverServiceUrl}}/api/drivers/me/rides/{{acceptBookingId}}/reject",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/rides/{{acceptBookingId}}/reject",
             "description": "Demo cleanup for reusing one driver in the collection: clears driver-service currentRide after customer cancellation. Booking and Matching should ignore this late driver.rejected because the booking is already CANCELLED."
           }
         },
@@ -545,7 +601,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{driverServiceUrl}}/api/drivers/me/current-ride",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/current-ride",
             "description": "Expected no current ride / null rideId; Redis driver:status should be AVAILABLE."
           }
         },
@@ -578,7 +634,7 @@
                 }
               }
             },
-            "url": "{{driverServiceUrl}}/api/drivers/me/availability"
+            "url": "{{apiGatewayUrl}}/api/drivers/me/availability"
           }
         }
       ]
@@ -586,6 +642,62 @@
     {
       "name": "5. Reject Rematch Flow",
       "item": [
+        {
+          "name": "5.0 Estimate Fare For Reject",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || body.data || body;",
+                  "pm.collectionVariables.set('estimateId', result.estimateId || result.id || '');",
+                  "pm.collectionVariables.set('quoteId', result.quoteId || result.estimateId || result.id || '');",
+                  "pm.collectionVariables.set('quotePayloadHash', result.quotePayloadHash || '');",
+                  "pm.collectionVariables.set('quoteHashAlgorithm', result.quoteHashAlgorithm || 'SHA-256');",
+                  "pm.collectionVariables.set('quoteExpiresAt', result.expiresAt || '');",
+                  "pm.collectionVariables.set('estimatedFare', result.totalFare || '');",
+                  "pm.collectionVariables.set('quoteCurrency', result.currency || 'VND');",
+                  "pm.test('estimate created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "pm.test('estimateId captured', () => pm.expect(pm.collectionVariables.get('estimateId')).to.not.be.empty);",
+                  "pm.test('quotePayloadHash captured', () => pm.expect(pm.collectionVariables.get('quotePayloadHash')).to.not.be.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLat\": 10.7769,\n  \"pickupLng\": 106.7009,\n  \"dropoffLat\": 10.7798,\n  \"dropoffLng\": 106.699,\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"estimatedDurationMinutes\": 15\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{apiGatewayUrl}}/api/pricing/estimate",
+            "description": "Lay quote moi tu Pricing-Service. Test script luu estimateId, quoteId, quotePayloadHash, quoteHashAlgorithm, expiresAt va totalFare vao collection variables de request tao booking dung ngay sau do."
+          },
+          "response": []
+        },
         {
           "name": "5.1 Create Booking For Reject",
           "event": [
@@ -622,14 +734,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Saigon Central Post Office\",\n  \"customerNote\": \"Reject rematch boundary flow\",\n  \"pickupCoordinates\": { \"lat\": 10.7769, \"lng\": 106.7009 },\n  \"dropoffCoordinates\": { \"lat\": 10.7798, \"lng\": 106.6990 },\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"promoCode\": \"REJECT\",\n  \"quoteToken\": \"{{quoteToken}}\",\n  \"idempotencyKey\": \"{{rejectIdempotencyKey}}\"\n}",
+              "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Saigon Central Post Office\",\n  \"customerNote\": \"Reject rematch boundary flow\",\n  \"pickupCoordinates\": {\n    \"lat\": 10.7769,\n    \"lng\": 106.7009\n  },\n  \"dropoffCoordinates\": {\n    \"lat\": 10.7798,\n    \"lng\": 106.699\n  },\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"promoCode\": \"REJECT\",\n  \"quoteToken\": \"{{quoteToken}}\",\n  \"estimateId\": \"{{estimateId}}\",\n  \"quoteId\": \"{{quoteId}}\",\n  \"quotePayloadHash\": \"{{quotePayloadHash}}\",\n  \"quoteHashAlgorithm\": \"{{quoteHashAlgorithm}}\",\n  \"quoteExpiresAt\": \"{{quoteExpiresAt}}\",\n  \"idempotencyKey\": \"{{rejectIdempotencyKey}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "url": "{{bookingServiceUrl}}/api/v1/bookings"
+            "url": "{{apiGatewayUrl}}/api/v1/bookings"
           }
         },
         {
@@ -647,7 +759,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{driverServiceUrl}}/api/drivers/me/current-ride",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/current-ride",
             "description": "Run after a short wait. Expected rideId == {{rejectBookingId}} if this driver was assigned."
           }
         },
@@ -666,7 +778,7 @@
             },
             "method": "POST",
             "header": [],
-            "url": "{{driverServiceUrl}}/api/drivers/me/rides/{{rejectBookingId}}/reject",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/rides/{{rejectBookingId}}/reject",
             "description": "Driver Service publishes driver.rejected. Booking consumes it and moves ASSIGNED -> MATCHING. Matching Service consumes driver.rejected, excludes the rejected driver, and rematches from its cached ride.created snapshot."
           }
         },
@@ -685,7 +797,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{bookingServiceUrl}}/api/v1/bookings/customer/{{customerUserId}}/active",
+            "url": "{{apiGatewayUrl}}/api/v1/bookings/customer/{{customerUserId}}/active",
             "description": "Expected status MATCHING if no other driver is available, or ASSIGNED if another driver was found."
           }
         }
@@ -694,6 +806,62 @@
     {
       "name": "6. Complete Flow",
       "item": [
+        {
+          "name": "6.0 Estimate Fare For Complete",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || body.data || body;",
+                  "pm.collectionVariables.set('estimateId', result.estimateId || result.id || '');",
+                  "pm.collectionVariables.set('quoteId', result.quoteId || result.estimateId || result.id || '');",
+                  "pm.collectionVariables.set('quotePayloadHash', result.quotePayloadHash || '');",
+                  "pm.collectionVariables.set('quoteHashAlgorithm', result.quoteHashAlgorithm || 'SHA-256');",
+                  "pm.collectionVariables.set('quoteExpiresAt', result.expiresAt || '');",
+                  "pm.collectionVariables.set('estimatedFare', result.totalFare || '');",
+                  "pm.collectionVariables.set('quoteCurrency', result.currency || 'VND');",
+                  "pm.test('estimate created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "pm.test('estimateId captured', () => pm.expect(pm.collectionVariables.get('estimateId')).to.not.be.empty);",
+                  "pm.test('quotePayloadHash captured', () => pm.expect(pm.collectionVariables.get('quotePayloadHash')).to.not.be.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLat\": 10.7769,\n  \"pickupLng\": 106.7009,\n  \"dropoffLat\": 10.7721,\n  \"dropoffLng\": 106.6983,\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"estimatedDurationMinutes\": 15\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{apiGatewayUrl}}/api/pricing/estimate",
+            "description": "Lay quote moi tu Pricing-Service. Test script luu estimateId, quoteId, quotePayloadHash, quoteHashAlgorithm, expiresAt va totalFare vao collection variables de request tao booking dung ngay sau do."
+          },
+          "response": []
+        },
         {
           "name": "6.1 Create Booking For Complete",
           "event": [
@@ -730,14 +898,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Ben Thanh Market\",\n  \"customerNote\": \"Complete boundary flow\",\n  \"pickupCoordinates\": { \"lat\": 10.7769, \"lng\": 106.7009 },\n  \"dropoffCoordinates\": { \"lat\": 10.7721, \"lng\": 106.6983 },\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"promoCode\": \"COMPLETE\",\n  \"quoteToken\": \"{{quoteToken}}\",\n  \"idempotencyKey\": \"{{completeIdempotencyKey}}\"\n}",
+              "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Ben Thanh Market\",\n  \"customerNote\": \"Complete boundary flow\",\n  \"pickupCoordinates\": {\n    \"lat\": 10.7769,\n    \"lng\": 106.7009\n  },\n  \"dropoffCoordinates\": {\n    \"lat\": 10.7721,\n    \"lng\": 106.6983\n  },\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"promoCode\": \"COMPLETE\",\n  \"quoteToken\": \"{{quoteToken}}\",\n  \"estimateId\": \"{{estimateId}}\",\n  \"quoteId\": \"{{quoteId}}\",\n  \"quotePayloadHash\": \"{{quotePayloadHash}}\",\n  \"quoteHashAlgorithm\": \"{{quoteHashAlgorithm}}\",\n  \"quoteExpiresAt\": \"{{quoteExpiresAt}}\",\n  \"idempotencyKey\": \"{{completeIdempotencyKey}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "url": "{{bookingServiceUrl}}/api/v1/bookings"
+            "url": "{{apiGatewayUrl}}/api/v1/bookings"
           }
         },
         {
@@ -755,7 +923,7 @@
             },
             "method": "POST",
             "header": [],
-            "url": "{{driverServiceUrl}}/api/drivers/me/rides/{{completeBookingId}}/accept"
+            "url": "{{apiGatewayUrl}}/api/drivers/me/rides/{{completeBookingId}}/accept"
           }
         },
         {
@@ -773,7 +941,7 @@
             },
             "method": "POST",
             "header": [],
-            "url": "{{rideServiceUrl}}/api/rides/{{completeBookingId}}/arrive",
+            "url": "{{apiGatewayUrl}}/api/v1/rides/{{completeBookingId}}/arrive",
             "description": "Ride Service validates the JWT driver is assigned to this ride, updates ACCEPTED -> PICKUP, and publishes ride.arrived."
           }
         },
@@ -792,7 +960,7 @@
             },
             "method": "POST",
             "header": [],
-            "url": "{{rideServiceUrl}}/api/rides/{{completeBookingId}}/start",
+            "url": "{{apiGatewayUrl}}/api/v1/rides/{{completeBookingId}}/start",
             "description": "Ride Service validates the JWT driver is assigned to this ride, updates PICKUP -> IN_PROGRESS, and publishes ride.started."
           }
         },
@@ -825,7 +993,7 @@
                 }
               }
             },
-            "url": "{{rideServiceUrl}}/api/rides/{{completeBookingId}}/complete",
+            "url": "{{apiGatewayUrl}}/api/v1/rides/{{completeBookingId}}/complete",
             "description": "Ride Service validates the JWT driver is assigned to this ride, updates IN_PROGRESS -> COMPLETED, and publishes ride.completed. Booking consumes ride.completed and updates COMPLETED."
           }
         },
@@ -844,7 +1012,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{bookingServiceUrl}}/api/v1/bookings/customer/{{customerUserId}}?page=0&size=5",
+            "url": "{{apiGatewayUrl}}/api/v1/bookings/customer/{{customerUserId}}?page=0&size=5",
             "description": "Expected completed booking appears in history with status COMPLETED. Payment/settlement state is verified through Payment Service, not BookingStatus."
           }
         }
@@ -890,7 +1058,7 @@
                 }
               }
             },
-            "url": "{{gatewayUrl}}/api/auth/register"
+            "url": "{{apiGatewayUrl}}/api/auth/register"
           }
         },
         {
@@ -930,7 +1098,7 @@
                 }
               }
             },
-            "url": "{{gatewayUrl}}/api/auth/login"
+            "url": "{{apiGatewayUrl}}/api/auth/login"
           }
         },
         {
@@ -970,7 +1138,7 @@
                 }
               }
             },
-            "url": "{{gatewayUrl}}/api/auth/register"
+            "url": "{{apiGatewayUrl}}/api/auth/register"
           }
         },
         {
@@ -1010,7 +1178,7 @@
                 }
               }
             },
-            "url": "{{gatewayUrl}}/api/auth/login"
+            "url": "{{apiGatewayUrl}}/api/auth/login"
           }
         },
         {
@@ -1042,7 +1210,7 @@
                 }
               }
             },
-            "url": "{{driverServiceUrl}}/api/drivers/me/profile",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/profile",
             "description": "Ensures the driver has profile/KYC data and vehicleType before going online."
           }
         },
@@ -1075,7 +1243,7 @@
                 }
               }
             },
-            "url": "{{driverServiceUrl}}/api/drivers/me/availability",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/availability",
             "description": "Ensures Matching can pick this driver for the E2E booking."
           }
         },
@@ -1101,9 +1269,65 @@
                 }
               }
             },
-            "url": "{{rideServiceUrl}}/api/v1/rides/location",
+            "url": "{{apiGatewayUrl}}/api/v1/rides/location",
             "description": "Ensures Matching sees driver location near the pickup point."
           }
+        },
+        {
+          "name": "7.7 Estimate Fare For CASH Booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || body.data || body;",
+                  "pm.collectionVariables.set('estimateId', result.estimateId || result.id || '');",
+                  "pm.collectionVariables.set('quoteId', result.quoteId || result.estimateId || result.id || '');",
+                  "pm.collectionVariables.set('quotePayloadHash', result.quotePayloadHash || '');",
+                  "pm.collectionVariables.set('quoteHashAlgorithm', result.quoteHashAlgorithm || 'SHA-256');",
+                  "pm.collectionVariables.set('quoteExpiresAt', result.expiresAt || '');",
+                  "pm.collectionVariables.set('estimatedFare', result.totalFare || '');",
+                  "pm.collectionVariables.set('quoteCurrency', result.currency || 'VND');",
+                  "pm.test('estimate created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "pm.test('estimateId captured', () => pm.expect(pm.collectionVariables.get('estimateId')).to.not.be.empty);",
+                  "pm.test('quotePayloadHash captured', () => pm.expect(pm.collectionVariables.get('quotePayloadHash')).to.not.be.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLat\": 10.7769,\n  \"pickupLng\": 106.7009,\n  \"dropoffLat\": 10.7721,\n  \"dropoffLng\": 106.6983,\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"estimatedDurationMinutes\": 15\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{apiGatewayUrl}}/api/pricing/estimate",
+            "description": "Lay quote moi tu Pricing-Service. Test script luu estimateId, quoteId, quotePayloadHash, quoteHashAlgorithm, expiresAt va totalFare vao collection variables de request tao booking dung ngay sau do."
+          },
+          "response": []
         },
         {
           "name": "7.8 Create Booking (CASH)",
@@ -1127,14 +1351,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Ben Thanh Market\",\n  \"customerNote\": \"E2E Cash payment flow\",\n  \"pickupCoordinates\": { \"lat\": 10.7769, \"lng\": 106.7009 },\n  \"dropoffCoordinates\": { \"lat\": 10.7721, \"lng\": 106.6983 },\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"promoCode\": \"E2E_CASH\",\n  \"quoteToken\": \"{{quoteToken}}\",\n  \"idempotencyKey\": \"{{e2eCashIdempotencyKey}}\"\n}",
+              "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Ben Thanh Market\",\n  \"customerNote\": \"E2E Cash payment flow\",\n  \"pickupCoordinates\": {\n    \"lat\": 10.7769,\n    \"lng\": 106.7009\n  },\n  \"dropoffCoordinates\": {\n    \"lat\": 10.7721,\n    \"lng\": 106.6983\n  },\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"promoCode\": \"E2E_CASH\",\n  \"quoteToken\": \"{{quoteToken}}\",\n  \"estimateId\": \"{{estimateId}}\",\n  \"quoteId\": \"{{quoteId}}\",\n  \"quotePayloadHash\": \"{{quotePayloadHash}}\",\n  \"quoteHashAlgorithm\": \"{{quoteHashAlgorithm}}\",\n  \"quoteExpiresAt\": \"{{quoteExpiresAt}}\",\n  \"idempotencyKey\": \"{{e2eCashIdempotencyKey}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "url": "{{bookingServiceUrl}}/api/v1/bookings",
+            "url": "{{apiGatewayUrl}}/api/v1/bookings",
             "description": "Creates a CASH booking for the full E2E payment flow. Wait 2-5 seconds after this request so Matching can assign the driver asynchronously."
           },
           "event": [
@@ -1171,7 +1395,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{driverServiceUrl}}/api/drivers/me/current-ride",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/current-ride",
             "description": "Expected immediately after Matching assignment: current ride points at the E2E booking for the same driver token used by this collection. If booking.assignedDriverId differs from driverUserId, Matching selected another online driver from Redis; set other drivers offline/clear stale Redis statuses or use that assigned driver token. Assignment TTL is 30 seconds."
           },
           "event": [
@@ -1223,7 +1447,7 @@
                 }
               }
             },
-            "url": "{{driverServiceUrl}}/api/drivers/me/rides/assignment",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/rides/assignment",
             "description": "Driver Service accepts the assigned job through the assignment command and publishes ride.accepted. Ride Service consumes ride.accepted and owns the ASSIGNED -> ACCEPTED ride-state transition before arrive/start/complete. Booking also consumes the event. Wait 1-3 seconds before ride lifecycle requests."
           },
           "event": [
@@ -1255,7 +1479,7 @@
             },
             "method": "POST",
             "header": [],
-            "url": "{{rideServiceUrl}}/api/rides/{{e2eCashBookingId}}/arrive",
+            "url": "{{apiGatewayUrl}}/api/v1/rides/{{e2eCashBookingId}}/arrive",
             "description": "Ride Service validates assigned driver, updates ACCEPTED -> PICKUP, and publishes ride.arrived."
           },
           "event": [
@@ -1285,7 +1509,7 @@
             },
             "method": "POST",
             "header": [],
-            "url": "{{rideServiceUrl}}/api/rides/{{e2eCashBookingId}}/start",
+            "url": "{{apiGatewayUrl}}/api/v1/rides/{{e2eCashBookingId}}/start",
             "description": "Ride Service validates assigned driver, updates PICKUP -> IN_PROGRESS, and publishes ride.started."
           },
           "event": [
@@ -1329,7 +1553,7 @@
                 }
               }
             },
-            "url": "{{rideServiceUrl}}/api/rides/{{e2eCashBookingId}}/complete",
+            "url": "{{apiGatewayUrl}}/api/v1/rides/{{e2eCashBookingId}}/complete",
             "description": "Ride Service validates assigned driver, updates IN_PROGRESS -> COMPLETED, and publishes ride.completed. Wait 2-5 seconds afterward for Booking and Payment consumers."
           },
           "event": [
@@ -1361,7 +1585,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{paymentServiceUrl}}/api/payments/booking/{{e2eCashBookingId}}",
+            "url": "{{apiGatewayUrl}}/api/payments/booking/{{e2eCashBookingId}}",
             "description": "Expected after ride.completed: payment-service records CASH payment and publishes payment.completed."
           },
           "event": [
@@ -1397,7 +1621,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{bookingServiceUrl}}/api/v1/bookings/customer/{{customerUserId}}?page=0&size=10",
+            "url": "{{apiGatewayUrl}}/api/v1/bookings/customer/{{customerUserId}}?page=0&size=10",
             "description": "Expected completed booking appears in customer history with status COMPLETED. CASH payment success is verified separately through Payment Service after ride.completed."
           },
           "event": [
@@ -1436,7 +1660,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{driverServiceUrl}}/api/drivers/me/current-ride",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/current-ride",
             "description": "Expected after ride.completed consumer: no active current ride for the driver. If Kafka is still processing, wait and retry."
           },
           "event": [
@@ -1499,7 +1723,7 @@
                 }
               }
             },
-            "url": "{{gatewayUrl}}/api/auth/register"
+            "url": "{{apiGatewayUrl}}/api/auth/register"
           }
         },
         {
@@ -1539,7 +1763,7 @@
                 }
               }
             },
-            "url": "{{gatewayUrl}}/api/auth/login"
+            "url": "{{apiGatewayUrl}}/api/auth/login"
           }
         },
         {
@@ -1579,7 +1803,7 @@
                 }
               }
             },
-            "url": "{{gatewayUrl}}/api/auth/register"
+            "url": "{{apiGatewayUrl}}/api/auth/register"
           }
         },
         {
@@ -1619,7 +1843,7 @@
                 }
               }
             },
-            "url": "{{gatewayUrl}}/api/auth/login"
+            "url": "{{apiGatewayUrl}}/api/auth/login"
           }
         },
         {
@@ -1651,7 +1875,7 @@
                 }
               }
             },
-            "url": "{{driverServiceUrl}}/api/drivers/me/profile",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/profile",
             "description": "Ensures the driver has profile/KYC data and vehicleType before going online."
           }
         },
@@ -1684,7 +1908,7 @@
                 }
               }
             },
-            "url": "{{driverServiceUrl}}/api/drivers/me/availability",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/availability",
             "description": "Ensures Matching can pick this driver for the E2E booking."
           }
         },
@@ -1710,9 +1934,65 @@
                 }
               }
             },
-            "url": "{{rideServiceUrl}}/api/v1/rides/location",
+            "url": "{{apiGatewayUrl}}/api/v1/rides/location",
             "description": "Ensures Matching sees driver location near the pickup point."
           }
+        },
+        {
+          "name": "8.7 Estimate Fare For VNPAY Booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || body.data || body;",
+                  "pm.collectionVariables.set('estimateId', result.estimateId || result.id || '');",
+                  "pm.collectionVariables.set('quoteId', result.quoteId || result.estimateId || result.id || '');",
+                  "pm.collectionVariables.set('quotePayloadHash', result.quotePayloadHash || '');",
+                  "pm.collectionVariables.set('quoteHashAlgorithm', result.quoteHashAlgorithm || 'SHA-256');",
+                  "pm.collectionVariables.set('quoteExpiresAt', result.expiresAt || '');",
+                  "pm.collectionVariables.set('estimatedFare', result.totalFare || '');",
+                  "pm.collectionVariables.set('quoteCurrency', result.currency || 'VND');",
+                  "pm.test('estimate created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "pm.test('estimateId captured', () => pm.expect(pm.collectionVariables.get('estimateId')).to.not.be.empty);",
+                  "pm.test('quotePayloadHash captured', () => pm.expect(pm.collectionVariables.get('quotePayloadHash')).to.not.be.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customerAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLat\": 10.7769,\n  \"pickupLng\": 106.7009,\n  \"dropoffLat\": 10.7765,\n  \"dropoffLng\": 106.7039,\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"estimatedDurationMinutes\": 15\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{apiGatewayUrl}}/api/pricing/estimate",
+            "description": "Lay quote moi tu Pricing-Service. Test script luu estimateId, quoteId, quotePayloadHash, quoteHashAlgorithm, expiresAt va totalFare vao collection variables de request tao booking dung ngay sau do."
+          },
+          "response": []
         },
         {
           "name": "8.8 Create Booking (VNPAY)",
@@ -1736,14 +2016,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Saigon Opera House\",\n  \"customerNote\": \"E2E VNPay payment flow\",\n  \"pickupCoordinates\": { \"lat\": 10.7769, \"lng\": 106.7009 },\n  \"dropoffCoordinates\": { \"lat\": 10.7765, \"lng\": 106.7039 },\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"paymentMethod\": \"VNPAY\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"promoCode\": \"E2E_VNPAY\",\n  \"quoteToken\": \"{{quoteToken}}\",\n  \"idempotencyKey\": \"{{e2eVnpayIdempotencyKey}}\"\n}",
+              "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Saigon Opera House\",\n  \"customerNote\": \"E2E VNPay payment flow\",\n  \"pickupCoordinates\": {\n    \"lat\": 10.7769,\n    \"lng\": 106.7009\n  },\n  \"dropoffCoordinates\": {\n    \"lat\": 10.7765,\n    \"lng\": 106.7039\n  },\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"paymentMethod\": \"VNPAY\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"promoCode\": \"E2E_VNPAY\",\n  \"quoteToken\": \"{{quoteToken}}\",\n  \"estimateId\": \"{{estimateId}}\",\n  \"quoteId\": \"{{quoteId}}\",\n  \"quotePayloadHash\": \"{{quotePayloadHash}}\",\n  \"quoteHashAlgorithm\": \"{{quoteHashAlgorithm}}\",\n  \"quoteExpiresAt\": \"{{quoteExpiresAt}}\",\n  \"idempotencyKey\": \"{{e2eVnpayIdempotencyKey}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "url": "{{bookingServiceUrl}}/api/v1/bookings",
+            "url": "{{apiGatewayUrl}}/api/v1/bookings",
             "description": "Creates a VNPAY prepaid booking. Expected async: Booking CREATED -> PENDING_PAYMENT, then publishes payment.requested. Payment Service consumes payment.requested and creates the VNPay transaction. Matching must not start until payment.completed is published."
           },
           "event": [
@@ -1780,7 +2060,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{paymentServiceUrl}}/api/payments/booking/{{e2eVnpayBookingId}}",
+            "url": "{{apiGatewayUrl}}/api/payments/booking/{{e2eVnpayBookingId}}",
             "description": "Run 2-5 seconds after 8.8. Expected: Payment Service consumed payment.requested and created a PRE_TRIP VNPAY transaction. If status is PENDING, open the captured payUrl in a browser/sandbox and complete payment before running the driver assignment steps. After valid VNPay return/IPN, Payment Service publishes payment.completed, Booking moves PENDING_PAYMENT -> MATCHING, then publishes ride.created."
           },
           "event": [
@@ -1818,7 +2098,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{driverServiceUrl}}/api/drivers/me/current-ride",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/current-ride",
             "description": "Run only after VNPay payment is completed and Booking has consumed payment.completed. Expected: payment.completed -> Booking MATCHING -> ride.created -> Matching assignment. Current ride should point at the E2E booking for the same driver token used by this collection. If booking.assignedDriverId differs from driverUserId, Matching selected another online driver from Redis; set other drivers offline/clear stale Redis statuses or use that assigned driver token. Assignment TTL is 30 seconds."
           },
           "event": [
@@ -1871,7 +2151,7 @@
                 }
               }
             },
-            "url": "{{driverServiceUrl}}/api/drivers/me/rides/assignment",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/rides/assignment",
             "description": "Driver Service accepts the assigned job through the assignment command and publishes ride.accepted. Ride Service consumes ride.accepted and owns the ASSIGNED -> ACCEPTED ride-state transition before arrive/start/complete. Booking also consumes the event. Wait 1-3 seconds before ride lifecycle requests."
           },
           "event": [
@@ -1903,7 +2183,7 @@
             },
             "method": "POST",
             "header": [],
-            "url": "{{rideServiceUrl}}/api/rides/{{e2eVnpayBookingId}}/arrive",
+            "url": "{{apiGatewayUrl}}/api/v1/rides/{{e2eVnpayBookingId}}/arrive",
             "description": "Ride Service validates assigned driver, updates ACCEPTED -> PICKUP, and publishes ride.arrived."
           },
           "event": [
@@ -1933,7 +2213,7 @@
             },
             "method": "POST",
             "header": [],
-            "url": "{{rideServiceUrl}}/api/rides/{{e2eVnpayBookingId}}/start",
+            "url": "{{apiGatewayUrl}}/api/v1/rides/{{e2eVnpayBookingId}}/start",
             "description": "Ride Service validates assigned driver, updates PICKUP -> IN_PROGRESS, and publishes ride.started."
           },
           "event": [
@@ -1977,7 +2257,7 @@
                 }
               }
             },
-            "url": "{{rideServiceUrl}}/api/rides/{{e2eVnpayBookingId}}/complete",
+            "url": "{{apiGatewayUrl}}/api/v1/rides/{{e2eVnpayBookingId}}/complete",
             "description": "Ride Service validates assigned driver, updates IN_PROGRESS -> COMPLETED, and publishes ride.completed. Wait 2-5 seconds afterward for Booking and Payment consumers."
           },
           "event": [
@@ -2009,7 +2289,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{paymentServiceUrl}}/api/payments/booking/{{e2eVnpayBookingId}}",
+            "url": "{{apiGatewayUrl}}/api/payments/booking/{{e2eVnpayBookingId}}",
             "description": "Expected after the prepaid VNPay flow: transaction already exists from payment.requested and should be SUCCESS before/after ride.completed. ride.completed should not charge the customer again; it only lets Payment Service settle driver earning."
           },
           "event": [
@@ -2047,7 +2327,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{bookingServiceUrl}}/api/v1/bookings/customer/{{customerUserId}}?page=0&size=10",
+            "url": "{{apiGatewayUrl}}/api/v1/bookings/customer/{{customerUserId}}?page=0&size=10",
             "description": "Expected completed booking appears in customer history with status COMPLETED. VNPay payment success and driver settlement are owned by Payment Service."
           },
           "event": [
@@ -2086,7 +2366,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{driverServiceUrl}}/api/drivers/me/current-ride",
+            "url": "{{apiGatewayUrl}}/api/drivers/me/current-ride",
             "description": "Expected after ride.completed consumer: no active current ride for the driver. If Kafka is still processing, wait and retry."
           },
           "event": [
@@ -2112,23 +2392,8 @@
   ],
   "variable": [
     {
-      "key": "gatewayUrl",
+      "key": "apiGatewayUrl",
       "value": "http://localhost:8080",
-      "type": "string"
-    },
-    {
-      "key": "bookingServiceUrl",
-      "value": "http://localhost:8084",
-      "type": "string"
-    },
-    {
-      "key": "driverServiceUrl",
-      "value": "http://localhost:8083",
-      "type": "string"
-    },
-    {
-      "key": "rideServiceUrl",
-      "value": "http://localhost:8085",
       "type": "string"
     },
     {
@@ -2227,11 +2492,6 @@
       "type": "string"
     },
     {
-      "key": "paymentServiceUrl",
-      "value": "http://localhost:8088",
-      "type": "string"
-    },
-    {
       "key": "e2eCashBookingId",
       "value": "",
       "type": "string"
@@ -2273,6 +2533,36 @@
     },
     {
       "key": "e2eVnpayAssignedDriverId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "estimateId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "quoteId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "quotePayloadHash",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "quoteHashAlgorithm",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "quoteExpiresAt",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "quoteCurrency",
       "value": "",
       "type": "string"
     }

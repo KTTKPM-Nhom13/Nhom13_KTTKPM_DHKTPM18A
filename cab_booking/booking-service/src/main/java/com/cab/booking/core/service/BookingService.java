@@ -7,7 +7,7 @@ import java.util.UUID;
 
 public interface BookingService {
     
-    BookingResponse createRide(String customerId, BookingRequest request);
+    BookingResponse createRide(String customerId, String accessToken, BookingRequest request);
     
     BookingResponse acceptRide(UUID bookingId, String driverId);
 
