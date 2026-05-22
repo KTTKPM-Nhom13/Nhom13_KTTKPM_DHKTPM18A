@@ -6,7 +6,9 @@ import iuh.fit.driverservice.dto.event.DriverAcceptedEvent;
 import iuh.fit.driverservice.dto.event.DriverLocationPayload;
 import iuh.fit.driverservice.dto.event.DriverRejectedEvent;
 import iuh.fit.driverservice.dto.event.RideAssignedEvent;
+import iuh.fit.driverservice.dto.request.CompleteCurrentRideRequest;
 import iuh.fit.driverservice.dto.request.HandleDriverAssignmentRequest;
+import iuh.fit.driverservice.dto.request.UpdateCurrentRideStatusRequest;
 import iuh.fit.driverservice.dto.response.DriverCurrentRideResponse;
 import iuh.fit.driverservice.entity.DriverAssignmentAction;
 import iuh.fit.driverservice.entity.DriverAvailabilityStatus;
@@ -143,6 +145,87 @@ public class DriverRideCommandService {
         clearPendingRide(savedProfile.getExternalUserId());
         driverStatusService.writeDriverStatus(savedProfile);
         publishDriverRejected(rideId, savedProfile.getExternalUserId(), "Driver rejected assignment");
+        return toCurrentRideResponse(savedProfile);
+    }
+
+    @Transactional
+    public DriverCurrentRideResponse updateCurrentRideStatus(String externalUserId,
+                                                              UpdateCurrentRideStatusRequest request) {
+        DriverProfile profile = getRequiredProfile(externalUserId);
+
+        if (profile.getCurrentRideId() == null || profile.getCurrentRideStatus() == null) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
+
+        DriverRideStatus requestedStatus;
+        try {
+            requestedStatus = DriverRideStatus.valueOf(request.getRideStatus().trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
+
+        DriverRideStatus current = profile.getCurrentRideStatus();
+
+        // Allow idempotent calls: same status → same status is a no-op success
+        if (requestedStatus == current) {
+            log.info("Idempotent ride status update (no-op) | rideId={} | driverId={} | status={}",
+                    profile.getCurrentRideId(), externalUserId, current);
+            return toCurrentRideResponse(profile);
+        }
+
+        // Validate allowed transitions
+        boolean allowed = switch (requestedStatus) {
+            case EN_ROUTE_PICKUP -> current == DriverRideStatus.ACCEPTED;
+            case ARRIVED_PICKUP  -> current == DriverRideStatus.EN_ROUTE_PICKUP
+                                 || current == DriverRideStatus.ACCEPTED;
+            case IN_PROGRESS     -> current == DriverRideStatus.ACCEPTED
+                                 || current == DriverRideStatus.EN_ROUTE_PICKUP
+                                 || current == DriverRideStatus.ARRIVED_PICKUP;
+            default -> false;
+        };
+
+        if (!allowed) {
+            log.warn("Illegal ride status transition | from={} | to={} | driverId={}",
+                    current, requestedStatus, externalUserId);
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
+
+        profile.setCurrentRideStatus(requestedStatus);
+        if (request.getCurrentLatitude() != null) {
+            profile.setCurrentLatitude(request.getCurrentLatitude());
+        }
+        if (request.getCurrentLongitude() != null) {
+            profile.setCurrentLongitude(request.getCurrentLongitude());
+        }
+        profile.setLastOnlineAt(LocalDateTime.now());
+
+        DriverProfile savedProfile = driverProfileRepository.save(profile);
+        driverStatusService.writeDriverStatus(savedProfile);
+        log.info("Ride status updated | rideId={} | driverId={} | status={}",
+                savedProfile.getCurrentRideId(), externalUserId, requestedStatus);
+        return toCurrentRideResponse(savedProfile);
+    }
+
+    @Transactional
+    public DriverCurrentRideResponse completeCurrentRide(String externalUserId,
+                                                         CompleteCurrentRideRequest request) {
+        DriverProfile profile = getRequiredProfile(externalUserId);
+
+        if (profile.getCurrentRideId() == null) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
+
+        String rideId = profile.getCurrentRideId();
+        profile.setCurrentRideStatus(DriverRideStatus.COMPLETED);
+        driverProfileRepository.save(profile);
+
+        // Let the ride.completed Kafka event (from ride-service) do the full cleanup;
+        // but also do a local cleanup so driver is immediately ONLINE again.
+        clearCurrentRide(profile, DriverAvailabilityStatus.ONLINE);
+        DriverProfile savedProfile = driverProfileRepository.save(profile);
+        clearPendingRide(savedProfile.getExternalUserId());
+        driverStatusService.writeDriverStatus(savedProfile);
+        log.info("Ride completed locally | rideId={} | driverId={}", rideId, externalUserId);
         return toCurrentRideResponse(savedProfile);
     }
 
