@@ -45,7 +45,7 @@ public class PricingClient {
     public PricingConfirmResponse confirmEstimate(String estimateId, String quotePayloadHash, String bearerToken) {
         try {
             return restClient.post()
-                    .uri("/api/pricing/confirm/{estimateId}", estimateId)
+                    .uri("/api/v1/pricing/confirm/{estimateId}", estimateId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .header(QUOTE_HASH_HEADER, quotePayloadHash)
                     .headers(headers -> setBearerToken(headers, bearerToken))

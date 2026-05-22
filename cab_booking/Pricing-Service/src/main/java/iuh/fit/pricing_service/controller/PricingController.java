@@ -33,7 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/pricing")
+@RequestMapping("/api/v1/pricing")
 @RequiredArgsConstructor
 @Validated
 @Slf4j
