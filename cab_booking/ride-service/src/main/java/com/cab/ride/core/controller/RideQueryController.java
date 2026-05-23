@@ -46,7 +46,7 @@ public class RideQueryController {
         String userId = jwt.getSubject();
 
         // ADMIN can access any ride
-        boolean isAdmin = jwt.getAuthorities().stream()
+        boolean isAdmin = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .anyMatch(auth -> auth.equals("ROLE_ADMIN"));
         if (isAdmin) {
