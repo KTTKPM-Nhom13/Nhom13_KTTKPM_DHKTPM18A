@@ -8,5 +8,6 @@ public enum PaymentMethod {
     VNPAY,
     STRIPE,
     MOMO,
-    ZALOPAY
+    ZALOPAY,
+    SEPAY
 }

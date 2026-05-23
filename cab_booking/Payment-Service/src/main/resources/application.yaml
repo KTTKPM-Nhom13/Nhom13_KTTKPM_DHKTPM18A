@@ -112,7 +112,7 @@ resilience4j:
 
 app:
   security:
-    public-endpoints: /internal/**,/actuator/**,/swagger-ui/**,/v3/api-docs/**,/api/v1/payments/momo/**,/api/v1/payments/zalopay/**,/api/v1/payments/vnpay/**
+    public-endpoints: /internal/**,/actuator/**,/swagger-ui/**,/v3/api-docs/**,/api/v1/payments/momo/**,/api/v1/payments/zalopay/**,/api/v1/payments/vnpay/**,/api/v1/payments/sepay/**
   payment:
     gateway:
       base-url: http://localhost:8088/internal/gateway
@@ -171,6 +171,7 @@ vnpay:
   hash-secret: ${VNPAY_HASH_SECRET:A6GA3NSBPW7ZE1P3R1KRZKESNELHRTY3}
   return-url: ${VNPAY_RETURN_URL:https://scratch-heaving-create.ngrok-free.dev/api/v1/payments/vnpay/return}
   ipn-url: ${VNPAY_IPN_URL:https://scratch-heaving-create.ngrok-free.dev/api/v1/payments/vnpay/ipn}
+  mobile-return-url: ${VNPAY_MOBILE_RETURN_URL:cabbookingmobile://payment}
   version: ${VNPAY_VERSION:2.1.0}
   command: ${VNPAY_COMMAND:pay}
   curr-code: ${VNPAY_CURR_CODE:VND}
@@ -179,3 +180,14 @@ vnpay:
   bank-code: ${VNPAY_BANK_CODE:NCB}
   default-ip-address: ${VNPAY_DEFAULT_IP_ADDRESS:127.0.0.1}
   expire-minutes: ${VNPAY_EXPIRE_MINUTES:15}
+
+sepay:
+  qr-base-url: ${SEPAY_QR_BASE_URL:https://qr.sepay.vn/img}
+  account-number: ${SEPAY_ACCOUNT_NUMBER:}
+  bank-code: ${SEPAY_BANK_CODE:}
+  description-prefix: ${SEPAY_DESCRIPTION_PREFIX:}
+  webhook-api-key: ${SEPAY_WEBHOOK_API_KEY:}
+  webhook-secret: ${SEPAY_WEBHOOK_SECRET:}
+  verify-api-key: ${SEPAY_VERIFY_API_KEY:false}
+  verify-hmac: ${SEPAY_VERIFY_HMAC:false}
+  timestamp-tolerance-seconds: ${SEPAY_TIMESTAMP_TOLERANCE_SECONDS:300}

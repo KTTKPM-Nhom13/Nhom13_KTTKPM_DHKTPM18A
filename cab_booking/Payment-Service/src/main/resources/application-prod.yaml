@@ -17,4 +17,5 @@ vnpay:
   hashSecret: ${VNPAY_HASH_SECRET:}
   returnUrl: ${VNPAY_RETURN_URL:https://production.example.com/api/v1/payments/vnpay/return}
   ipnUrl: ${VNPAY_IPN_URL:https://production.example.com/api/v1/payments/vnpay/ipn}
+  mobileReturnUrl: ${VNPAY_MOBILE_RETURN_URL:cabbookingmobile://payment}
   bankCode: ${VNPAY_BANK_CODE:}

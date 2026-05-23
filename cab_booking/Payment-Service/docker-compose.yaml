@@ -62,6 +62,7 @@ services:
       - VNPAY_HASH_SECRET=${VNPAY_HASH_SECRET:-A6GA3NSBPW7ZE1P3R1KRZKESNELHRTY3}
       - VNPAY_RETURN_URL=${VNPAY_RETURN_URL:-https://scratch-heaving-create.ngrok-free.dev/api/v1/payments/vnpay/return}
       - VNPAY_IPN_URL=${VNPAY_IPN_URL:-https://scratch-heaving-create.ngrok-free.dev/api/v1/payments/vnpay/ipn}
+      - VNPAY_MOBILE_RETURN_URL=${VNPAY_MOBILE_RETURN_URL:-cabbookingmobile://payment}
       - VNPAY_BANK_CODE=${VNPAY_BANK_CODE:-NCB}
     volumes:
       - maven-cache:/root/.m2
