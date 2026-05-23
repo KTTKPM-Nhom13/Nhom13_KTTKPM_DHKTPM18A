@@ -150,7 +150,6 @@ public class AdminService {
 
         SurgeRule saved = surgeRuleRepository.save(rule);
         surgePricingService.cacheSurgeMultiplier(zoneId, multiplier);
-        zoneMetricsService.syncMetricsForZone(zoneId);
         log.info("Created new surge rule for zone: {} with multiplier: {}", zoneId, multiplier);
         return toSurgeRuleResponse(saved);
     }
@@ -197,7 +196,6 @@ public class AdminService {
 
         SurgeRule saved = surgeRuleRepository.save(existing);
         surgePricingService.cacheSurgeMultiplier(existing.getZoneId(), saved.getSurgeMultiplier());
-        zoneMetricsService.syncMetricsForZone(existing.getZoneId());
         log.info("Updated surge rule {} for zone: {}", id, saved.getZoneId());
         return toSurgeRuleResponse(saved);
     }
@@ -254,7 +252,7 @@ public class AdminService {
         List<SurgeRuleResponse> results = requests.stream()
                 .map(this::createSurgeRule)
                 .collect(Collectors.toList());
-        zoneMetricsService.syncAllActiveZones();
+        log.info("Created {} surge rules in bulk", results.size());
         return results;
     }
 
