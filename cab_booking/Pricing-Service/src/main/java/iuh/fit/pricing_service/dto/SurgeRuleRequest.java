@@ -2,9 +2,7 @@ package iuh.fit.pricing_service.dto;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,7 +14,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SurgeRuleRequest {
 
-    @NotBlank(message = "Zone ID is required")
     private String zoneId;
 
     private String zoneName;
@@ -26,8 +23,12 @@ public class SurgeRuleRequest {
     @DecimalMax(value = "5.0", message = "Surge multiplier must not exceed 5.0")
     private Double surgeMultiplier;
 
+    @DecimalMin(value = "-90.0", message = "Latitude must be between -90 and 90")
+    @DecimalMax(value = "90.0", message = "Latitude must be between -90 and 90")
     private Double latitude;
 
+    @DecimalMin(value = "-180.0", message = "Longitude must be between -180 and 180")
+    @DecimalMax(value = "180.0", message = "Longitude must be between -180 and 180")
     private Double longitude;
 
     private Double radiusKm;

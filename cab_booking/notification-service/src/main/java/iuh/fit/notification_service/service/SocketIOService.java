@@ -48,6 +48,15 @@ public class SocketIOService {
             }
         });
 
+        // Event listener for real-time chat messages within a booking room
+        server.addEventListener("send_message", Map.class, (client, data, ackRequest) -> {
+            String bookingId = (String) data.get("bookingId");
+            if (bookingId != null && !bookingId.trim().isEmpty()) {
+                server.getRoomOperations(bookingId).sendEvent("receive_message", data);
+                log.info("Broadcasted chat message in room: {}", bookingId);
+            }
+        });
+
         // Event listener for clients leaving a booking room
         server.addEventListener("leave_room", String.class, (client, bookingId, ackRequest) -> {
             if (bookingId != null && !bookingId.trim().isEmpty()) {

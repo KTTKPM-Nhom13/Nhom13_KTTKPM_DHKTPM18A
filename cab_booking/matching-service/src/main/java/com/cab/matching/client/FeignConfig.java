@@ -44,7 +44,7 @@ public class FeignConfig {
      */
     @Bean
     public feign.Retryer aiScoringRetryer() {
-        return new feign.Retryer.Default(500L, 2000L, 3);
+        return feign.Retryer.NEVER_RETRY;
     }
 
     /**

@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -39,6 +40,8 @@ public class RideService {
     private static final String TOPIC_RIDE_STARTED = "ride.started";
     private static final String TOPIC_RIDE_COMPLETED = "ride.completed";
     private static final String TOPIC_RIDE_FINISHED = "ride.finished";
+    private static final String PUBLISHED_EVENT_PREFIX = "ride:published:";
+    private static final Duration PUBLISHED_EVENT_TTL = Duration.ofHours(24);
 
     private final RideRepository rideRepository;
     private final RedisTemplate<String, Object> redisTemplate;
@@ -236,8 +239,7 @@ public class RideService {
                     .customerId(saved.getCustomerId())
                     .timestamp(Instant.now().toString())
                     .build();
-            kafkaTemplate.send(TOPIC_RIDE_ARRIVED, rideId, event);
-            log.info("[RideService] ride.arrived published | rideId={} | driverId={}", rideId, driverId);
+            publishOnce(TOPIC_RIDE_ARRIVED, rideId, event);
         }
         return saved;
     }
@@ -256,8 +258,7 @@ public class RideService {
                     .customerId(saved.getCustomerId())
                     .timestamp(Instant.now().toString())
                     .build();
-            kafkaTemplate.send(TOPIC_RIDE_STARTED, rideId, event);
-            log.info("[RideService] ride.started published | rideId={} | driverId={}", rideId, driverId);
+            publishOnce(TOPIC_RIDE_STARTED, rideId, event);
         }
         return saved;
     }
@@ -290,11 +291,8 @@ public class RideService {
                     .paymentMethod(paymentMethod)
                     .timestamp(Instant.now().toString())
                     .build();
-            kafkaTemplate.send(TOPIC_RIDE_COMPLETED, rideId, event);
-            kafkaTemplate.send(TOPIC_RIDE_FINISHED, rideId, event);
-            log.info("[RideService] ride.completed published | rideId={} | driverId={}", rideId, driverId);
-            log.info("[RideService] ride.finished published for compatibility (deprecated) | rideId={} | driverId={}",
-                    rideId, driverId);
+            publishOnce(TOPIC_RIDE_COMPLETED, rideId, event);
+            publishOnce(TOPIC_RIDE_FINISHED, rideId, event);
         }
         return saved;
     }
@@ -333,6 +331,16 @@ public class RideService {
                         result.getRecordMetadata().offset());
             }
         });
+    }
+
+    /**
+     * Find ride by ID for query endpoints.
+     * Returns the entity so callers can perform authorization checks.
+     */
+    public Ride getRideById(String rideId) {
+        UUID uuid = parseUuid(rideId);
+        return rideRepository.findById(uuid)
+                .orElseThrow(() -> rideNotFound(rideId));
     }
 
     private UUID parseUuid(String rideId) {
@@ -474,6 +482,17 @@ public class RideService {
 
     private ResponseStatusException rideNotFound(String rideId) {
         return new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found: " + rideId);
+    }
+
+    private void publishOnce(String topic, String rideId, Object event) {
+        String key = PUBLISHED_EVENT_PREFIX + topic + ":" + rideId;
+        Boolean firstPublish = redisTemplate.opsForValue().setIfAbsent(key, "true", PUBLISHED_EVENT_TTL);
+        if (!Boolean.TRUE.equals(firstPublish)) {
+            log.info("[RideService] Duplicate publish skipped | topic={} | rideId={}", topic, rideId);
+            return;
+        }
+        kafkaTemplate.send(topic, rideId, event);
+        log.info("[RideService] Published lifecycle event | topic={} | rideId={}", topic, rideId);
     }
 
 }

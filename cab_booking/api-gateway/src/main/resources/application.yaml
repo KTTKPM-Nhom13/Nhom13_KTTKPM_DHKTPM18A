@@ -50,9 +50,12 @@ spring:
         - id: booking-service
           uri: lb://booking-service
           predicates:
-            - Path=/booking/**
-          filters:
-            - RewritePath=/booking/(?<segment>.*), /${segment}
+            - Path=/api/v1/bookings/**
+
+        - id: booking-service-admin
+          uri: lb://booking-service
+          predicates:
+            - Path=/api/admin/bookings/**
 
         - id: driver-service
           uri: lb://driver-service
@@ -63,7 +66,7 @@ spring:
         - id: pricing-service
           uri: lb://pricing-service
           predicates:
-            - Path=/api/pricing/**
+            - Path=/api/v1/pricing/**,/api/v1/admin/**
 
         - id: payment-service
           uri: lb://payment-service
@@ -78,7 +81,7 @@ spring:
         - id: ride-service
           uri: lb://ride-service
           predicates:
-            - Path=/api/rides/**,/api/v1/rides/**
+            - Path=/api/v1/rides/**
 
         - id: notification-service
           uri: lb://notification-service
@@ -89,6 +92,7 @@ spring:
           uri: http://ai-agent-service:8099
           predicates:
             - Path=/api/v1/ai-agent/**
+
 
       # ── Mặc định khi bị 429: trả JSON thay vì body rỗng ────────
       default-filters:

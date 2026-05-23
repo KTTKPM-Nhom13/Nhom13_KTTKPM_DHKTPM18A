@@ -25,29 +25,38 @@
   ],
   "variable": [
     {
-      "key": "auth_base_url",
-      "value": "http://localhost:8081",
-      "type": "string"
-    },
-    {
-      "key": "booking_base_url",
-      "value": "http://localhost:8084",
-      "type": "string"
-    },
-    {
-      "key": "driver_base_url",
-      "value": "http://localhost:8083",
-      "type": "string"
-    },
-    {
-      "key": "pricing_base_url",
-      "value": "http://localhost:8088",
+      "key": "apiGatewayUrl",
+      "value": "http://localhost:8080",
       "type": "string"
     },
     {
       "key": "gateway_url",
       "value": "http://localhost:8080",
       "type": "string"
+    },
+    {
+      "key": "auth_base_url",
+      "value": "http://localhost:8080",
+      "type": "string",
+      "description": "Auth calls go through gateway"
+    },
+    {
+      "key": "booking_base_url",
+      "value": "http://localhost:8080",
+      "type": "string",
+      "description": "Booking calls go through gateway"
+    },
+    {
+      "key": "driver_base_url",
+      "value": "http://localhost:8080",
+      "type": "string",
+      "description": "Driver calls go through gateway"
+    },
+    {
+      "key": "pricing_base_url",
+      "value": "http://localhost:8080",
+      "type": "string",
+      "description": "Pricing calls go through gateway"
     }
   ],
   "item": [

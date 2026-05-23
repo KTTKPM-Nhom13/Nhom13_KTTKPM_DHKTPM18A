@@ -32,6 +32,9 @@ public class BookingResponse {
     private String paymentMethod;
     private BigDecimal estimatedFare;
     private String promoCode;
+    private String estimateId;
+    private String quoteId;
+    private String quoteHashAlgorithm;
 
     private BookingStatus status;
     private LocalDateTime createdAt;
@@ -55,6 +58,9 @@ public class BookingResponse {
                 .paymentMethod(booking.getPaymentMethod())
                 .estimatedFare(booking.getEstimatedFare())
                 .promoCode(booking.getPromoCode())
+                .estimateId(booking.getEstimateId())
+                .quoteId(booking.getQuoteId())
+                .quoteHashAlgorithm(booking.getQuoteHashAlgorithm())
                 .status(booking.getStatus())
                 .createdAt(booking.getCreatedAt())
                 .updatedAt(booking.getUpdatedAt())

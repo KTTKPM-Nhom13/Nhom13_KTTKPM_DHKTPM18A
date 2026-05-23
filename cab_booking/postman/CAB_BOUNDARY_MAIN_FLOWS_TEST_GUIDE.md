@@ -18,19 +18,41 @@ Can cac container core dang chay:
 - `auth-service` 8081
 - `api-gateway` 8080
 - `driver-service` 8083
-- `booking-service` 8084
-- `ride-service` 8085
+- `pricing-service` 8084
 - `matching-service` 8086
 - `kafka`, `redis`, cac database
 
 Neu import collection vao Postman, check variables:
 
 ```text
-gatewayUrl        = http://localhost:8080
-bookingServiceUrl = http://localhost:8084
+apiGatewayUrl     = http://localhost:8080
+pricingServiceUrl = http://localhost:8084
 driverServiceUrl  = http://localhost:8083
-rideServiceUrl    = http://localhost:8085
 ```
+
+Booking va Ride trong collection di qua API Gateway:
+
+```text
+POST {{apiGatewayUrl}}/api/v1/bookings
+GET  {{apiGatewayUrl}}/api/v1/bookings/customer/{{customerUserId}}/active
+POST {{apiGatewayUrl}}/api/v1/rides/{rideId}/arrive
+POST {{apiGatewayUrl}}/api/v1/rides/{rideId}/start
+POST {{apiGatewayUrl}}/api/v1/rides/{rideId}/complete
+```
+
+## Quote hash flow moi
+
+Booking-Service hien tai bat buoc confirm quote voi Pricing-Service truoc khi tao booking.
+Vi vay collection da them request `Estimate Fare ...` ngay truoc moi request `Create Booking ...`.
+
+Thu tu bat buoc cho moi flow tao booking:
+
+1. Chay request `Estimate Fare ...`.
+2. Postman tu dong luu `estimateId`, `quoteId`, `quotePayloadHash`, `quoteHashAlgorithm`, `quoteExpiresAt`, `estimatedFare`.
+3. Chay request `Create Booking ...` ngay sau do.
+
+Khong chay lai `Create Booking ...` voi cung mot `estimateId`, vi quote da confirm se khong con `PENDING`.
+Neu can tao booking moi, chay lai request `Estimate Fare ...` de lay quote moi.
 
 ## 1. Auth
 
@@ -83,12 +105,13 @@ Neu `driver:status` null, Matching se skip driver.
 
 Chay folder `3. Accept Flow`:
 
-1. `3.1 Create Booking For Accept`
-2. Doi 2-5 giay cho Kafka async.
-3. `3.2 Poll Driver Current Ride After ride.assigned`
-4. `3.3 Driver Accept Ride -> ride.accepted`
-5. Doi 1-3 giay.
-6. `3.4 Poll Booking Active After Accept`
+1. `3.0 Estimate Fare For Accept`
+2. `3.1 Create Booking For Accept`
+3. Doi 2-5 giay cho Kafka async.
+4. `3.2 Poll Driver Current Ride After ride.assigned`
+5. `3.3 Driver Accept Ride -> ride.accepted`
+6. Doi 1-3 giay.
+7. `3.4 Poll Booking Active After Accept`
 
 Expected:
 

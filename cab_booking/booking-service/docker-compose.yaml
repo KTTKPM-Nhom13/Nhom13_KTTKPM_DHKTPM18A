@@ -35,6 +35,8 @@ services:
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT}
       - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - PRICING_SERVICE_URL=${PRICING_SERVICE_URL:-http://pricing-service:8084}
+      - USER_SERVICE_URL=${USER_SERVICE_URL:-http://user-service:8082}
       - SPRING_PROFILES_ACTIVE=default
     volumes:
       - maven-cache:/root/.m2

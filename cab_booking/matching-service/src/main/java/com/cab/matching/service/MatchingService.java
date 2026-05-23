@@ -1,7 +1,6 @@
 package com.cab.matching.service;
 
-import com.cab.matching.client.AiScoringClient;
-import com.cab.matching.client.AiScoringResponse;
+import com.cab.matching.client.AiScoringResilienceClient;
 import com.cab.matching.client.DriverFeatureDto;
 import com.cab.matching.client.RankingEntry;
 import com.cab.matching.core.dto.event.inbound.DriverRejectedEvent;
@@ -22,6 +21,7 @@ import org.springframework.data.redis.domain.geo.GeoReference;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -48,6 +48,7 @@ public class MatchingService {
     private static final String MATCHING_FAILED_PREFIX = "matching:failed:";
     private static final String MATCHING_DRIVER_PREFIX = "matching:driver:";
     private static final String MATCHING_ATTEMPT_PREFIX = "matching:attempt:";
+    private static final String RIDE_REJECTED_DRIVERS_PREFIX = "ride:%s:rejected-drivers";
     private static final String DRIVER_STATUS_AVAILABLE = "AVAILABLE";
     private static final String DRIVER_LOCK_VALUE = "LOCKED";
     private static final String MATCHING_LOCK_VALUE = "LOCKED";
@@ -58,11 +59,12 @@ public class MatchingService {
     private static final long RETRY_DELAY_SECONDS = 5L;
     private static final int MAX_MATCHING_ATTEMPTS = 3;
     private static final String TOPIC_RIDE_ASSIGNED = "ride.assigned";
+    private static final String TOPIC_RIDE_CANCELLED = "ride.cancelled";
     private static final String TOPIC_MATCHING_RETRY_REQUESTED = "matching.retry.requested";
     private static final String TOPIC_MATCHING_FAILED = "matching.failed";
 
     private final RedisTemplate<String, String> redisTemplate;
-    private final AiScoringClient aiScoringClient;
+    private final AiScoringResilienceClient aiScoringResilienceClient;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     private final Random random = new Random();
@@ -125,12 +127,13 @@ public class MatchingService {
 
         log.info("Start matching | rideId={} | vehicleType={}", event.rideId(), requestedVehicleType);
 
+        List<String> excludedDriverIds = withRejectedDrivers(event.rideId(), event.excludedDriverIds());
         List<DriverFeatureDto> candidates = fetchCandidatesFromRedis(
                 event.pickupLat(),
                 event.pickupLng(),
                 event.searchRadiusKmOrDefault(),
                 requestedVehicleType,
-                event.excludedDriverIds());
+                excludedDriverIds);
 
         if (candidates.isEmpty()) {
             log.warn("No available driver candidates | rideId={} | vehicleType={}", event.rideId(), requestedVehicleType);
@@ -148,25 +151,7 @@ public class MatchingService {
     }
 
     private List<RankingEntry> callAiWithFallback(List<DriverFeatureDto> candidates, String rideId) {
-        try {
-            log.info("Calling AI scoring | candidates={} | rideId={}", candidates.size(), rideId);
-            AiScoringResponse response = aiScoringClient.getBestMatch(candidates);
-            log.info("AI suggested bestDriver={} | score={} | rideId={}",
-                    response.getBestDriverId(), response.getHighestScore(), rideId);
-            return response.getRanking() != null ? response.getRanking() : List.of();
-        } catch (Exception ex) {
-            log.error("AI scoring failed, fallback to nearest drivers | rideId={} | reason={}",
-                    rideId, ex.getMessage());
-            List<RankingEntry> fallbackRanking = new ArrayList<>();
-            for (DriverFeatureDto candidate : candidates) {
-                fallbackRanking.add(RankingEntry.builder()
-                        .driverId(candidate.getDriverId())
-                        .score(0.0)
-                        .details("fallback-nearest-driver")
-                        .build());
-            }
-            return fallbackRanking;
-        }
+        return aiScoringResilienceClient.rankCandidates(candidates, rideId);
     }
 
     private void assignDriverWithLock(List<RankingEntry> ranking, RideCreatedEvent event) {
@@ -177,9 +162,15 @@ public class MatchingService {
             String lockKey = DRIVER_LOCK_PREFIX + driverId;
 
             Boolean locked = redisTemplate.opsForValue()
-                    .setIfAbsent(lockKey, DRIVER_LOCK_VALUE, LOCK_TTL_SECONDS, TimeUnit.SECONDS);
+                    .setIfAbsent(lockKey, event.rideId(), LOCK_TTL_SECONDS, TimeUnit.SECONDS);
 
             if (Boolean.TRUE.equals(locked)) {
+                if (isBookingCancelled(event.rideId()) || hasAssigned(event.rideId())) {
+                    log.info("Ride already cancelled/assigned after driver lock, releasing | rideId={} | driverId={}",
+                            event.rideId(), driverId);
+                    releaseDriverLockIfOwned(driverId, event.rideId());
+                    return;
+                }
                 RideAssignedEvent assignedEvent = RideAssignedEvent.builder()
                         .eventId(UUID.randomUUID().toString())
                         .eventType("DRIVER_ASSIGNED")
@@ -205,7 +196,8 @@ public class MatchingService {
                 return;
             }
 
-            log.warn("Driver lock already taken | driverId={} | rideId={}", driverId, event.rideId());
+            log.warn("Driver lock already taken | driverId={} | rideId={} | owner={}",
+                    driverId, event.rideId(), redisTemplate.opsForValue().get(lockKey));
         }
 
         log.warn("No driver remained after lock loop | rideId={}", event.rideId());
@@ -300,7 +292,9 @@ public class MatchingService {
 
         String rejectedDriverId = normalizeDriverId(event.getDriverId());
         if (rejectedDriverId != null && !rejectedDriverId.isBlank()) {
-            redisTemplate.delete(DRIVER_LOCK_PREFIX + rejectedDriverId);
+            releaseDriverLockIfOwned(rejectedDriverId, rideId);
+            redisTemplate.opsForSet().add(rejectedDriversKey(rideId), rejectedDriverId);
+            redisTemplate.expire(rejectedDriversKey(rideId), 15, TimeUnit.MINUTES);
             log.info("Released driver lock after ride.rejected | rideId={} | driverId={}", rideId, rejectedDriverId);
         }
         redisTemplate.delete(MATCHING_ASSIGNED_PREFIX + rideId);
@@ -318,9 +312,9 @@ public class MatchingService {
     private void scheduleRetryIfPossible(RideCreatedEvent event) {
         int currentAttempt = event.attemptOrDefault();
         if (currentAttempt >= MAX_MATCHING_ATTEMPTS || isBookingCancelled(event.rideId())) {
-            log.warn("No retry for rideId={} | attempt={} | cancelled={}",
-                    event.rideId(), currentAttempt, isBookingCancelled(event.rideId()));
+            log.warn("Matching failed after {} attempts or cancelled | rideId={}", currentAttempt, event.rideId());
             markFailed(event.rideId(), "NO_DRIVER_AVAILABLE");
+            publishRideCancelled(event, currentAttempt, "NO_DRIVER_AVAILABLE_AFTER_RETRY");
             publishMatchingFailed(event, currentAttempt, "NO_DRIVER_AVAILABLE");
             return;
         }
@@ -388,6 +382,7 @@ public class MatchingService {
         redisTemplate.delete(MATCHING_ASSIGNED_PREFIX + rideId);
         redisTemplate.delete(MATCHING_DRIVER_PREFIX + rideId);
         redisTemplate.delete(MATCHING_ATTEMPT_PREFIX + rideId);
+        redisTemplate.delete(rejectedDriversKey(rideId));
         log.info("Processed ride.cancelled cleanup in matching-service | rideId={}", rideId);
     }
 
@@ -420,15 +415,48 @@ public class MatchingService {
         log.warn("Published matching.failed | rideId={} | attempt={} | reason={}", event.rideId(), attempt, reason);
     }
 
+    private void publishRideCancelled(RideCreatedEvent event, int attempt, String reason) {
+        Map<String, Object> cancelledEvent = new HashMap<>();
+        cancelledEvent.put("eventId", UUID.randomUUID().toString());
+        cancelledEvent.put("eventType", "RIDE_CANCELLED");
+        cancelledEvent.put("rideId", event.rideId());
+        cancelledEvent.put("bookingId", event.rideId());
+        cancelledEvent.put("customerId", event.customerId());
+        cancelledEvent.put("reason", reason + " (attempts: " + attempt + ")");
+        cancelledEvent.put("timestamp", Instant.now().toString());
+
+        kafkaTemplate.send(TOPIC_RIDE_CANCELLED, event.rideId(), cancelledEvent);
+        log.info("Published ride.cancelled from matching-service | rideId={} | reason={}", 
+                event.rideId(), reason);
+    }
+
     private void releaseAssignedDriverLock(String rideId, String driverIdFromEvent) {
         String driverId = normalizeDriverId(driverIdFromEvent);
         if (driverId == null || driverId.isBlank()) {
             driverId = redisTemplate.opsForValue().get(MATCHING_DRIVER_PREFIX + rideId);
         }
         if (driverId != null && !driverId.isBlank()) {
-            redisTemplate.delete(DRIVER_LOCK_PREFIX + driverId);
+            releaseDriverLockIfOwned(driverId, rideId);
             log.info("Released driver lock | rideId={} | driverId={}", rideId, driverId);
         }
+    }
+
+    private void releaseDriverLockIfOwned(String driverId, String rideId) {
+        String normalizedDriverId = normalizeDriverId(driverId);
+        if (normalizedDriverId == null || normalizedDriverId.isBlank()) {
+            return;
+        }
+        String lockKey = DRIVER_LOCK_PREFIX + normalizedDriverId;
+        String ownerRideId = redisTemplate.opsForValue().get(lockKey);
+        if (ownerRideId == null) {
+            return;
+        }
+        if (ownerRideId.equals(rideId) || DRIVER_LOCK_VALUE.equals(ownerRideId)) {
+            redisTemplate.delete(lockKey);
+            return;
+        }
+        log.warn("Skip releasing driver lock owned by another ride | driverId={} | ownerRideId={} | requestedRideId={}",
+                normalizedDriverId, ownerRideId, rideId);
     }
 
     private VehicleType resolveDriverVehicleType(String driverId) {
@@ -509,7 +537,7 @@ public class MatchingService {
                 coordinateMap(parseDoubleObject(raw.get("dropoffLat")), parseDoubleObject(raw.get("dropoffLng"))),
                 stringValue(raw.get("vehicleType"), null),
                 stringValue(raw.get("paymentMethod"), null),
-                null,
+                parseBigDecimal(raw.get("estimatedFare")),
                 stringValue(raw.get("promoCode"), null),
                 nextAttempt,
                 nextRadiusKm,
@@ -519,7 +547,31 @@ public class MatchingService {
     }
 
     private boolean isExcluded(String driverId, List<String> excludedDriverIds) {
-        return normalizeList(excludedDriverIds).contains(normalizeDriverId(driverId));
+        String normalizedDriverId = normalizeDriverId(driverId);
+        return normalizeList(excludedDriverIds).contains(normalizedDriverId);
+    }
+
+    private List<String> withRejectedDrivers(String rideId, List<String> excludedDriverIds) {
+        List<String> excluded = normalizeList(excludedDriverIds);
+        try {
+            java.util.Set<String> rejected = redisTemplate.opsForSet().members(rejectedDriversKey(rideId));
+            if (rejected != null) {
+                for (String driverId : rejected) {
+                    String normalizedDriverId = normalizeDriverId(driverId);
+                    if (normalizedDriverId != null && !normalizedDriverId.isBlank()
+                            && !excluded.contains(normalizedDriverId)) {
+                        excluded.add(normalizedDriverId);
+                    }
+                }
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Could not load rejected driver set | rideId={} | reason={}", rideId, ex.getMessage());
+        }
+        return excluded;
+    }
+
+    private String rejectedDriversKey(String rideId) {
+        return String.format(RIDE_REJECTED_DRIVERS_PREFIX, rideId);
     }
 
     private List<String> normalizeList(List<String> values) {
@@ -576,6 +628,14 @@ public class MatchingService {
     private double parseDouble(Object value, double fallback) {
         Double parsed = parseDoubleObject(value);
         return parsed == null ? fallback : parsed;
+    }
+
+    private BigDecimal parseBigDecimal(Object value) {
+        try {
+            return value == null ? null : new BigDecimal(value.toString());
+        } catch (NumberFormatException | ArithmeticException ex) {
+            return null;
+        }
     }
 
     private Double parseDoubleObject(Object value) {

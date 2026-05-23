@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 import iuh.fit.common.model.BaseEntity;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -21,7 +22,8 @@ import java.math.BigDecimal;
 @Table(name = "bookings", indexes = {
         @Index(name = "idx_customer_id", columnList = "customerId"),
         @Index(name = "idx_status", columnList = "status"),
-        @Index(name = "idx_idempotency_key", columnList = "idempotencyKey", unique = true)
+        @Index(name = "idx_idempotency_key", columnList = "idempotencyKey", unique = true),
+        @Index(name = "idx_booking_quote_id", columnList = "quoteId", unique = true)
 })
 public class Booking extends BaseEntity {
 
@@ -69,6 +71,20 @@ public class Booking extends BaseEntity {
     // Zero Trust — lưu token để verify giá
     @Column(length = 2000)
     private String quoteToken;
+
+    @Column(length = 64)
+    private String estimateId;
+
+    @Column(length = 64, unique = true)
+    private String quoteId;
+
+    @Column(length = 128)
+    private String quotePayloadHash;
+
+    @Column(length = 32)
+    private String quoteHashAlgorithm;
+
+    private LocalDateTime quoteExpiresAt;
 
     // Idempotency — unique constraint trên DB tránh trùng cuốc
     @Column(unique = true, length = 64)

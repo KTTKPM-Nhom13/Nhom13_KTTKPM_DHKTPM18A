@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "f5e9d9e0-1234-4567-89ab-cdef01234567",
-    "name": "Pricing Service - Rule Based Flow",
-    "description": "End-to-end Pricing Service tests aligned with the rule-based design: external APIs, config, demand/supply metrics, surge rules, fare estimate, quote locking, duplicate confirm protection, and fallback-observable response fields.",
+    "name": "Pricing Service v1 - Rule Based Flow",
+    "description": "End-to-end Pricing Service v1 API tests: external APIs, config, demand/supply metrics, surge rules, fare estimate, quote locking, duplicate confirm protection, revenue statistics, and fallback-observable response fields.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -37,13 +37,8 @@
             },
             "url": {
               "raw": "{{AUTH_URL}}/auth/register",
-              "host": [
-                "{{AUTH_URL}}"
-              ],
-              "path": [
-                "auth",
-                "register"
-              ]
+              "host": ["{{AUTH_URL}}"],
+              "path": ["auth", "register"]
             }
           },
           "response": []
@@ -76,13 +71,8 @@
             },
             "url": {
               "raw": "{{AUTH_URL}}/auth/login",
-              "host": [
-                "{{AUTH_URL}}"
-              ],
-              "path": [
-                "auth",
-                "login"
-              ]
+              "host": ["{{AUTH_URL}}"],
+              "path": ["auth", "login"]
             }
           },
           "response": []
@@ -115,13 +105,8 @@
             },
             "url": {
               "raw": "{{AUTH_URL}}/auth/register",
-              "host": [
-                "{{AUTH_URL}}"
-              ],
-              "path": [
-                "auth",
-                "register"
-              ]
+              "host": ["{{AUTH_URL}}"],
+              "path": ["auth", "register"]
             }
           },
           "response": []
@@ -154,13 +139,8 @@
             },
             "url": {
               "raw": "{{AUTH_URL}}/auth/login",
-              "host": [
-                "{{AUTH_URL}}"
-              ],
-              "path": [
-                "auth",
-                "login"
-              ]
+              "host": ["{{AUTH_URL}}"],
+              "path": ["auth", "login"]
             }
           },
           "response": []
@@ -193,13 +173,8 @@
             },
             "url": {
               "raw": "{{AUTH_URL}}/auth/login",
-              "host": [
-                "{{AUTH_URL}}"
-              ],
-              "path": [
-                "auth",
-                "login"
-              ]
+              "host": ["{{AUTH_URL}}"],
+              "path": ["auth", "login"]
             }
           },
           "response": []
@@ -223,13 +198,8 @@
             "header": [],
             "url": {
               "raw": "{{AUTH_URL}}/auth/token",
-              "host": [
-                "{{AUTH_URL}}"
-              ],
-              "path": [
-                "auth",
-                "token"
-              ]
+              "host": ["{{AUTH_URL}}"],
+              "path": ["auth", "token"]
             }
           },
           "response": []
@@ -268,27 +238,14 @@
             "url": {
               "raw": "https://api.mapbox.com/directions-matrix/v1/mapbox/driving/{{pickup_lng}},{{pickup_lat}};{{dropoff_lng}},{{dropoff_lat}}?annotations=distance,duration&access_token={{MAPBOX_API_KEY}}",
               "protocol": "https",
-              "host": [
-                "api",
-                "mapbox",
-                "com"
-              ],
+              "host": ["api", "mapbox", "com"],
               "path": [
-                "directions-matrix",
-                "v1",
-                "mapbox",
-                "driving",
+                "directions-matrix", "v1", "mapbox", "driving",
                 "{{pickup_lng}},{{pickup_lat}};{{dropoff_lng}},{{dropoff_lat}}"
               ],
               "query": [
-                {
-                  "key": "annotations",
-                  "value": "distance,duration"
-                },
-                {
-                  "key": "access_token",
-                  "value": "{{MAPBOX_API_KEY}}"
-                }
+                {"key": "annotations", "value": "distance,duration"},
+                {"key": "access_token", "value": "{{MAPBOX_API_KEY}}"}
               ]
             }
           },
@@ -320,28 +277,12 @@
             "url": {
               "raw": "https://api.open-meteo.com/v1/forecast?latitude={{pickup_lat}}&longitude={{pickup_lng}}&current=temperature_2m,weather_code",
               "protocol": "https",
-              "host": [
-                "api",
-                "open-meteo",
-                "com"
-              ],
-              "path": [
-                "v1",
-                "forecast"
-              ],
+              "host": ["api", "open-meteo", "com"],
+              "path": ["v1", "forecast"],
               "query": [
-                {
-                  "key": "latitude",
-                  "value": "{{pickup_lat}}"
-                },
-                {
-                  "key": "longitude",
-                  "value": "{{pickup_lng}}"
-                },
-                {
-                  "key": "current",
-                  "value": "temperature_2m,weather_code"
-                }
+                {"key": "latitude", "value": "{{pickup_lat}}"},
+                {"key": "longitude", "value": "{{pickup_lng}}"},
+                {"key": "current", "value": "temperature_2m,weather_code"}
               ]
             }
           },
@@ -385,21 +326,12 @@
           "request": {
             "method": "GET",
             "header": [
-              {
-                "key": "Idempotency-Key",
-                "value": "estimate-cache-{{$timestamp}}"
-              }
+              {"key": "Idempotency-Key", "value": "estimate-cache-{{$timestamp}}"}
             ],
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/config",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "config"
-              ]
+              "raw": "{{BASE_URL}}/api/v1/pricing/config",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "config"]
             }
           },
           "response": []
@@ -426,16 +358,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/surge/{{pickup_zone}}",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "surge",
-                "{{pickup_zone}}"
-              ]
+              "raw": "{{BASE_URL}}/api/v1/pricing/surge/{{pickup_zone}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "surge", "{{pickup_zone}}"]
             }
           },
           "response": []
@@ -479,25 +404,16 @@
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              {"key": "Content-Type", "value": "application/json"}
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"pickupLat\": {{pickup_lat}},\n  \"pickupLng\": {{pickup_lng}},\n  \"dropoffLat\": {{dropoff_lat}},\n  \"dropoffLng\": {{dropoff_lng}},\n  \"vehicleType\": \"{{vehicle_type}}\"\n}"
             },
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/estimate",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "estimate"
-              ]
+              "raw": "{{BASE_URL}}/api/v1/pricing/estimate",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "estimate"]
             }
           },
           "response": []
@@ -530,25 +446,16 @@
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              {"key": "Content-Type", "value": "application/json"}
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"pickupLat\": {{pickup_lat}},\n  \"pickupLng\": {{pickup_lng}},\n  \"dropoffLat\": {{dropoff_lat}},\n  \"dropoffLng\": {{dropoff_lng}},\n  \"vehicleType\": \"{{vehicle_type}}\"\n}"
             },
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/estimate",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "estimate"
-              ]
+              "raw": "{{BASE_URL}}/api/v1/pricing/estimate",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "estimate"]
             }
           },
           "response": []
@@ -582,16 +489,9 @@
             "method": "POST",
             "header": [],
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/confirm/{{estimate_id}}",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "confirm",
-                "{{estimate_id}}"
-              ]
+              "raw": "{{BASE_URL}}/api/v1/pricing/confirm/{{estimate_id}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "confirm", "{{estimate_id}}"]
             }
           },
           "response": []
@@ -617,16 +517,9 @@
             "method": "POST",
             "header": [],
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/confirm/{{estimate_id}}",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "confirm",
-                "{{estimate_id}}"
-              ]
+              "raw": "{{BASE_URL}}/api/v1/pricing/confirm/{{estimate_id}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "confirm", "{{estimate_id}}"]
             }
           },
           "response": []
@@ -652,16 +545,9 @@
             "method": "POST",
             "header": [],
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/confirm/missing-estimate-id",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "confirm",
-                "missing-estimate-id"
-              ]
+              "raw": "{{BASE_URL}}/api/v1/pricing/confirm/missing-estimate-id",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "confirm", "missing-estimate-id"]
             }
           },
           "response": []
@@ -692,25 +578,16 @@
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              {"key": "Content-Type", "value": "application/json"}
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"distanceKm\": {{simple_distance_km}},\n  \"demandIndex\": {{simple_demand_index}}\n}"
             },
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/calculate",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "calculate"
-              ]
+              "raw": "{{BASE_URL}}/api/v1/pricing/calculate",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "calculate"]
             }
           },
           "response": []
@@ -735,16 +612,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/surge/all",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "surge",
-                "all"
-              ]
+              "raw": "{{BASE_URL}}/api/v1/pricing/surge/all",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "surge", "all"]
             }
           },
           "response": []
@@ -767,25 +637,16 @@
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              {"key": "Content-Type", "value": "application/json"}
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"pickupLat\": 999,\n  \"pickupLng\": {{pickup_lng}},\n  \"dropoffLat\": {{dropoff_lat}},\n  \"dropoffLng\": {{dropoff_lng}},\n  \"vehicleType\": \"{{vehicle_type}}\"\n}"
             },
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/estimate",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "estimate"
-              ]
+              "raw": "{{BASE_URL}}/api/v1/pricing/estimate",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "estimate"]
             }
           },
           "response": []
@@ -830,21 +691,12 @@
           "request": {
             "method": "GET",
             "header": [
-              {
-                "key": "Idempotency-Key",
-                "value": "estimate-{{$timestamp}}"
-              }
+              {"key": "Idempotency-Key", "value": "estimate-{{$timestamp}}"}
             ],
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/test-mapbox",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "test-mapbox"
-              ]
+              "raw": "{{BASE_URL}}/api/v1/pricing/test-mapbox",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "test-mapbox"]
             }
           },
           "response": []
@@ -871,25 +723,16 @@
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              {"key": "Content-Type", "value": "application/json"}
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"zoneId\": \"{{pickup_zone}}\",\n  \"activeDrivers\": {{active_drivers}},\n  \"pendingRides\": {{pending_rides}}\n}"
             },
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/demand-supply",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "demand-supply"
-              ]
+              "raw": "{{BASE_URL}}/api/v1/pricing/demand-supply",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "demand-supply"]
             }
           },
           "response": []
@@ -915,26 +758,16 @@
           "request": {
             "method": "PUT",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              {"key": "Content-Type", "value": "application/json"}
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"multiplier\": {{manual_surge}}\n}"
             },
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/surge/{{pickup_zone}}",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "surge",
-                "{{pickup_zone}}"
-              ]
+              "raw": "{{BASE_URL}}/api/v1/pricing/surge/{{pickup_zone}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "surge", "{{pickup_zone}}"]
             }
           },
           "response": []
@@ -959,973 +792,1414 @@
           "request": {
             "method": "PUT",
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              {"key": "Content-Type", "value": "application/json"}
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"multiplier\": 99\n}"
             },
             "url": {
-              "raw": "{{BASE_URL}}/api/pricing/surge/{{pickup_zone}}",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "pricing",
-                "surge",
-                "{{pickup_zone}}"
-              ]
+              "raw": "{{BASE_URL}}/api/v1/pricing/surge/{{pickup_zone}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "surge", "{{pickup_zone}}"]
             }
           },
           "response": []
         }
       ]
     },
-  {
-    "name": "04 - Estimate Management",
-    "item": [
-      {
-        "name": "13 - Get Estimate By ID",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Get estimate by ID succeeded', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.estimateId).to.eql(pm.collectionVariables.get('estimate_id'));",
-                "  pm.expect(json.totalFare).to.exist;",
-                "  pm.expect(json.zoneFee).to.exist;",
-                "  pm.expect(json.airportFee).to.exist;",
-                "  pm.expect(json.tollFee).to.exist;",
-                "  pm.expect(json.quotePayloadHash).to.exist;",
-                "  pm.expect(json.message).to.eql('Fare estimate generated successfully');",
-                "});"
-              ]
-            }
-          }
-        ],
-        "request": {
-          "method": "GET",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/pricing/estimate/{{estimate_id}}",
-            "host": [
-              "{{BASE_URL}}"
-            ],
-            "path": [
-              "api",
-              "pricing",
-              "estimate",
-              "{{estimate_id}}"
-            ]
-          },
-          "response": []
-        }
-      },
-      {
-        "name": "14 - Cancel Estimate",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Cancel estimate succeeded', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.status).to.eql('CANCELLED');",
-                "});"
-              ]
-            }
-          }
-        ],
-        "request": {
-          "method": "DELETE",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/pricing/estimate/{{estimate_id}}",
-            "host": [
-              "{{BASE_URL}}"
-            ],
-            "path": [
-              "api",
-              "pricing",
-              "estimate",
-              "{{estimate_id}}"
-            ]
-          },
-          "response": []
-        }
-      },
-      {
-        "name": "15 - List Estimates with Filters",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('List estimates succeeded', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.estimates).to.be.an('array');",
-                "  pm.expect(json.count).to.exist;",
-                "});"
-              ]
-            }
-          }
-        ],
-        "request": {
-          "method": "GET",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/pricing/estimates?status=PENDING&limit=10&offset=0",
-            "host": [
-              "{{BASE_URL}}"
-            ],
-            "path": [
-              "api",
-              "pricing",
-              "estimates"
-            ],
-            "query": [
-              {
-                "key": "status",
-                "value": "PENDING"
-              },
-              {
-                "key": "limit",
-                "value": "10"
-              },
-              {
-                "key": "offset",
-                "value": "0"
-              }
-            ]
-          },
-          "response": []
-        }
-      }
-    ]
-  },
-  {
-    "name": "05 - Surge & Metrics",
-    "item": [
-      {
-        "name": "16 - Get Zone Metrics",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Get zone metrics succeeded', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.zone_id).to.eql(pm.collectionVariables.get('pickup_zone'));",
-                "  pm.expect(json.active_drivers).to.exist;",
-                "  pm.expect(json.pending_rides).to.exist;",
-                "});"
-              ]
-            }
-          }
-        ],
-        "request": {
-          "method": "GET",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/pricing/zones/{{pickup_zone}}/metrics",
-            "host": [
-              "{{BASE_URL}}"
-            ],
-            "path": [
-              "api",
-              "pricing",
-              "zones",
-              "{{pickup_zone}}",
-              "metrics"
-            ]
-          },
-          "response": []
-        }
-      },
-      {
-        "name": "17 - Compute Surge Multiplier",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Compute surge succeeded', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.zone_id).to.eql(pm.collectionVariables.get('pickup_zone'));",
-                "  pm.expect(json.previous_multiplier).to.exist;",
-                "  pm.expect(json.predicted_multiplier).to.exist;",
-                "  pm.expect(json.updated).to.exist;",
-                "});"
-              ]
-            }
-          }
-        ],
-        "request": {
-          "method": "POST",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/pricing/surge/compute/{{pickup_zone}}?badWeather=false",
-            "host": [
-              "{{BASE_URL}}"
-            ],
-            "path": [
-              "api",
-              "pricing",
-              "surge",
-              "compute",
-              "{{pickup_zone}}"
-            ],
-            "query": [
-              {
-                "key": "badWeather",
-                "value": "false"
-              }
-            ]
-          },
-          "response": []
-        }
-      },
-      {
-        "name": "18 - Get Zone Metrics Not Found",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Get zone metrics not found handled', function () {",
-                "  pm.response.to.have.status(404);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.error).to.eql('METRICS_NOT_FOUND');",
-                "});"
-              ]
-            }
-          }
-        ],
-        "request": {
-          "method": "GET",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/pricing/zones/UNKNOWN_ZONE/metrics",
-            "host": [
-              "{{BASE_URL}}"
-            ],
-            "path": [
-              "api",
-              "pricing",
-              "zones",
-              "UNKNOWN_ZONE",
-              "metrics"
-            ]
-          },
-          "response": []
-        }
-      }
-    ]
-  },
-  {
-    "name": "06 - Admin Pricing Config & Surge Management",
-    "auth": {
-      "type": "bearer",
-      "bearer": [
+    {
+      "name": "04 - Estimate Management",
+      "item": [
         {
-          "key": "token",
-          "value": "{{ADMIN_JWT_TOKEN}}",
-          "type": "string"
+          "name": "13 - Get Estimate By ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get estimate by ID succeeded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.estimateId).to.eql(pm.collectionVariables.get('estimate_id'));",
+                  "  pm.expect(json.totalFare).to.exist;",
+                  "  pm.expect(json.zoneFee).to.exist;",
+                  "  pm.expect(json.airportFee).to.exist;",
+                  "  pm.expect(json.tollFee).to.exist;",
+                  "  pm.expect(json.quotePayloadHash).to.exist;",
+                  "  pm.expect(json.message).to.eql('Fare estimate generated successfully');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/pricing/estimate/{{estimate_id}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "estimate", "{{estimate_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14 - Cancel Estimate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cancel estimate succeeded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.status).to.eql('CANCELLED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/pricing/estimate/{{estimate_id}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "estimate", "{{estimate_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "15 - List Estimates with Filters",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('List estimates succeeded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.estimates).to.be.an('array');",
+                  "  pm.expect(json.count).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/pricing/estimates?status=PENDING&limit=10&offset=0",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "estimates"],
+              "query": [
+                {"key": "status", "value": "PENDING"},
+                {"key": "limit", "value": "10"},
+                {"key": "offset", "value": "0"}
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },
-    "item": [
-      {
-        "name": "01 - Get Admin Dashboard",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Dashboard retrieved successfully', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "  pm.expect(json.data).to.exist;",
-                "  pm.expect(json.data.totalPricingConfigs).to.exist;",
-                "  pm.expect(json.data.totalSurgeRules).to.exist;",
-                "});"
-              ]
+    {
+      "name": "05 - Surge & Metrics",
+      "item": [
+        {
+          "name": "16 - Get Zone Metrics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get zone metrics succeeded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.zone_id).to.eql(pm.collectionVariables.get('pickup_zone'));",
+                  "  pm.expect(json.active_drivers).to.exist;",
+                  "  pm.expect(json.pending_rides).to.exist;",
+                  "});"
+                ]
+              }
             }
-          }
-        ],
-        "request": {
-          "method": "GET",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/dashboard",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "dashboard"]
-          }
-        },
-        "response": []
-      },
-      {
-        "name": "02 - Create Pricing Config (BIKE)",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Pricing config created', function () {",
-                "  pm.response.to.have.status(201);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "  pm.expect(json.data.vehicleType).to.eql('BIKE');",
-                "  pm.expect(json.data.baseFare).to.eql(10000);",
-                "});",
-                "if (pm.response.code === 201) {",
-                "  const json = pm.response.json();",
-                "  pm.collectionVariables.set('pricing_config_id', json.data.id);",
-                "}"
-              ]
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/pricing/zones/{{pickup_zone}}/metrics",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "zones", "{{pickup_zone}}", "metrics"]
             }
-          }
-        ],
-        "request": {
-          "method": "POST",
-          "header": [{"key": "Content-Type", "value": "application/json"}],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"vehicleType\": \"BIKE\",\n  \"baseFare\": 10000,\n  \"perKmRate\": 3500,\n  \"perMinuteRate\": 200,\n  \"multiplier\": 1.0,\n  \"active\": true\n}"
           },
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/pricing-configs",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "pricing-configs"]
-          }
+          "response": []
         },
-        "response": []
-      },
-      {
-        "name": "03 - Create Pricing Config (CAR4)",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Pricing config created', function () {",
-                "  pm.response.to.have.status(201);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "  pm.expect(json.data.vehicleType).to.eql('CAR4');",
-                "});",
-                "if (pm.response.code === 201) {",
-                "  const json = pm.response.json();",
-                "  pm.collectionVariables.set('car4_config_id', json.data.id);",
-                "}"
+        {
+          "name": "17 - Compute Surge Multiplier",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Compute surge succeeded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.zone_id).to.eql(pm.collectionVariables.get('pickup_zone'));",
+                  "  pm.expect(json.previous_multiplier).to.exist;",
+                  "  pm.expect(json.predicted_multiplier).to.exist;",
+                  "  pm.expect(json.updated).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/pricing/surge/compute/{{pickup_zone}}?badWeather=false",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "surge", "compute", "{{pickup_zone}}"],
+              "query": [
+                {"key": "badWeather", "value": "false"}
               ]
             }
-          }
-        ],
-        "request": {
-          "method": "POST",
-          "header": [{"key": "Content-Type", "value": "application/json"}],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"vehicleType\": \"CAR4\",\n  \"baseFare\": 20000,\n  \"perKmRate\": 8500,\n  \"perMinuteRate\": 500,\n  \"multiplier\": 1.0,\n  \"active\": true\n}"
           },
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/pricing-configs",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "pricing-configs"]
-          }
+          "response": []
         },
-        "response": []
-      },
-      {
-        "name": "04 - Create Duplicate Pricing Config Should Fail",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Duplicate config rejected', function () {",
-                "  pm.response.to.have.status(409);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.error).to.eql('CONFLICT');",
-                "});"
-              ]
+        {
+          "name": "18 - Get Zone Metrics Not Found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Get zone metrics not found handled', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.error).to.eql('METRICS_NOT_FOUND');",
+                  "});"
+                ]
+              }
             }
-          }
-        ],
-        "request": {
-          "method": "POST",
-          "header": [{"key": "Content-Type", "value": "application/json"}],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"vehicleType\": \"BIKE\",\n  \"baseFare\": 15000,\n  \"perKmRate\": 4000,\n  \"perMinuteRate\": 300,\n  \"active\": true\n}"
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/pricing/zones/UNKNOWN_ZONE/metrics",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "zones", "UNKNOWN_ZONE", "metrics"]
+            }
           },
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/pricing-configs",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "pricing-configs"]
-          }
-        },
-        "response": []
-      },
-      {
-        "name": "05 - Get All Pricing Configs",
-        "event": [
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "06 - Admin Pricing Config & Surge Management",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
           {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('All configs retrieved', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "  pm.expect(json.data).to.be.an('array');",
-                "  pm.expect(json.data.length).to.be.at.least(1);",
-                "});"
-              ]
-            }
+            "key": "token",
+            "value": "{{ADMIN_JWT_TOKEN}}",
+            "type": "string"
           }
-        ],
-        "request": {
-          "method": "GET",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/pricing-configs",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "pricing-configs"]
-          }
-        },
-        "response": []
+        ]
       },
-      {
-        "name": "06 - Get Pricing Config By Vehicle Type",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Config by vehicle type retrieved', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "  pm.expect(json.data.vehicleType).to.eql('BIKE');",
-                "});"
-              ]
+      "item": [
+        {
+          "name": "01 - Get Admin Dashboard",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Dashboard retrieved successfully', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json.data).to.exist;",
+                  "  pm.expect(json.data.totalPricingConfigs).to.exist;",
+                  "  pm.expect(json.data.totalSurgeRules).to.exist;",
+                  "});"
+                ]
+              }
             }
-          }
-        ],
-        "request": {
-          "method": "GET",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/pricing-configs/vehicle/BIKE",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "pricing-configs", "vehicle", "BIKE"]
-          }
-        },
-        "response": []
-      },
-      {
-        "name": "07 - Update Pricing Config",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Pricing config updated', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "  pm.expect(json.data.baseFare).to.eql(12000);",
-                "});"
-              ]
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/dashboard",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "dashboard"]
             }
-          }
-        ],
-        "request": {
-          "method": "PUT",
-          "header": [{"key": "Content-Type", "value": "application/json"}],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"vehicleType\": \"BIKE\",\n  \"baseFare\": 12000,\n  \"perKmRate\": 4000,\n  \"perMinuteRate\": 250,\n  \"multiplier\": 1.0,\n  \"active\": true\n}"
           },
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/pricing-configs/{{pricing_config_id}}",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "pricing-configs", "{{pricing_config_id}}"]
-          }
+          "response": []
         },
-        "response": []
-      },
-      {
-        "name": "08 - Toggle Pricing Config Status",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Pricing config status toggled', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "});"
-              ]
+        {
+          "name": "02 - Create Pricing Config (BIKE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Pricing config created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json.data.vehicleType).to.eql('BIKE');",
+                  "  pm.expect(json.data.baseFare).to.eql(10000);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('pricing_config_id', json.data.id);",
+                  "}"
+                ]
+              }
             }
-          }
-        ],
-        "request": {
-          "method": "PATCH",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/pricing-configs/{{pricing_config_id}}/toggle",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "pricing-configs", "{{pricing_config_id}}", "toggle"]
-          }
-        },
-        "response": []
-      },
-      {
-        "name": "09 - Create Surge Rule",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Surge rule created', function () {",
-                "  pm.response.to.have.status(201);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "  pm.expect(json.data.zoneId).to.eql(pm.collectionVariables.get('pickup_zone'));",
-                "  pm.expect(Number(json.data.surgeMultiplier)).to.eql(1.5);",
-                "});",
-                "if (pm.response.code === 201) {",
-                "  const json = pm.response.json();",
-                "  pm.collectionVariables.set('surge_rule_id', json.data.id);",
-                "}"
-              ]
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicleType\": \"BIKE\",\n  \"baseFare\": 10000,\n  \"perKmRate\": 3500,\n  \"perMinuteRate\": 200,\n  \"multiplier\": 1.0,\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/pricing-configs",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "pricing-configs"]
             }
-          }
-        ],
-        "request": {
-          "method": "POST",
-          "header": [{"key": "Content-Type", "value": "application/json"}],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"zoneId\": \"{{pickup_zone}}\",\n  \"zoneName\": \"District 1 Downtown\",\n  \"surgeMultiplier\": 1.5,\n  \"latitude\": 10.8231,\n  \"longitude\": 106.6297,\n  \"radiusKm\": 2.0,\n  \"activeDrivers\": 20,\n  \"pendingRides\": 50,\n  \"source\": \"MANUAL\"\n}"
           },
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/surge-rules",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "surge-rules"]
-          }
+          "response": []
         },
-        "response": []
-      },
-      {
-        "name": "10 - Create Another Surge Rule",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Surge rule created', function () {",
-                "  pm.response.to.have.status(201);",
-                "});"
-              ]
+        {
+          "name": "03 - Create Pricing Config (CAR4)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Pricing config created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json.data.vehicleType).to.eql('CAR4');",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('car4_config_id', json.data.id);",
+                  "}"
+                ]
+              }
             }
-          }
-        ],
-        "request": {
-          "method": "POST",
-          "header": [{"key": "Content-Type", "value": "application/json"}],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"zoneId\": \"Z60207\",\n  \"zoneName\": \"District 3\",\n  \"surgeMultiplier\": 1.2,\n  \"latitude\": 10.7875,\n  \"longitude\": 106.6819,\n  \"radiusKm\": 1.5,\n  \"source\": \"MANUAL\"\n}"
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicleType\": \"CAR4\",\n  \"baseFare\": 20000,\n  \"perKmRate\": 8500,\n  \"perMinuteRate\": 500,\n  \"multiplier\": 1.0,\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/pricing-configs",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "pricing-configs"]
+            }
           },
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/surge-rules",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "surge-rules"]
-          }
+          "response": []
         },
-        "response": []
-      },
-      {
-        "name": "11 - Create Bulk Surge Rules",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Bulk surge rules created', function () {",
-                "  pm.response.to.have.status(201);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "  pm.expect(json.data).to.be.an('array');",
-                "  pm.expect(json.data.length).to.eql(2);",
-                "});"
-              ]
+        {
+          "name": "04 - Create Duplicate Pricing Config Should Fail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Duplicate config rejected', function () {",
+                  "  pm.response.to.have.status(409);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.error).to.eql('CONFLICT');",
+                  "});"
+                ]
+              }
             }
-          }
-        ],
-        "request": {
-          "method": "POST",
-          "header": [{"key": "Content-Type", "value": "application/json"}],
-          "body": {
-            "mode": "raw",
-            "raw": "[\n  {\n    \"zoneId\": \"Z60208\",\n    \"zoneName\": \"District 5\",\n    \"surgeMultiplier\": 1.3,\n    \"latitude\": 10.7456,\n    \"longitude\": 106.6563,\n    \"source\": \"MANUAL\"\n  },\n  {\n    \"zoneId\": \"Z60209\",\n    \"zoneName\": \"District 10\",\n    \"surgeMultiplier\": 1.1,\n    \"latitude\": 10.7654,\n    \"longitude\": 106.6789,\n    \"source\": \"MANUAL\"\n  }\n]"
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicleType\": \"BIKE\",\n  \"baseFare\": 15000,\n  \"perKmRate\": 4000,\n  \"perMinuteRate\": 300,\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/pricing-configs",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "pricing-configs"]
+            }
           },
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/surge-rules/bulk",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "surge-rules", "bulk"]
-          }
+          "response": []
         },
-        "response": []
-      },
-      {
-        "name": "12 - Get All Surge Rules",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('All surge rules retrieved', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "  pm.expect(json.data).to.be.an('array');",
-                "  pm.expect(json.data.length).to.be.at.least(3);",
-                "});"
-              ]
+        {
+          "name": "05 - Get All Pricing Configs",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('All configs retrieved', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json.data).to.be.an('array');",
+                  "  pm.expect(json.data.length).to.be.at.least(1);",
+                  "});"
+                ]
+              }
             }
-          }
-        ],
-        "request": {
-          "method": "GET",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/surge-rules",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "surge-rules"]
-          }
-        },
-        "response": []
-      },
-      {
-        "name": "13 - Get Surge Rule By Zone ID",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Surge rule by zone retrieved', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "  pm.expect(json.data.zoneId).to.eql(pm.collectionVariables.get('pickup_zone'));",
-                "});"
-              ]
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/pricing-configs",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "pricing-configs"]
             }
-          }
-        ],
-        "request": {
-          "method": "GET",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/surge-rules/zone/{{pickup_zone}}",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "surge-rules", "zone", "{{pickup_zone}}"]
-          }
-        },
-        "response": []
-      },
-      {
-        "name": "14 - Update Surge Rule",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Surge rule updated', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "  pm.expect(Number(json.data.surgeMultiplier)).to.eql(1.8);",
-                "});"
-              ]
-            }
-          }
-        ],
-        "request": {
-          "method": "PUT",
-          "header": [{"key": "Content-Type", "value": "application/json"}],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"zoneId\": \"{{pickup_zone}}\",\n  \"surgeMultiplier\": 1.8,\n  \"activeDrivers\": 30,\n  \"pendingRides\": 80,\n  \"source\": \"MANUAL\"\n}"
           },
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/surge-rules/{{surge_rule_id}}",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "surge-rules", "{{surge_rule_id}}"]
-          }
+          "response": []
         },
-        "response": []
-      },
-      {
-        "name": "15 - Update Bulk Zone Metrics",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Bulk zone metrics updated', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "});"
-              ]
+        {
+          "name": "06 - Get Pricing Config By Vehicle Type",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Config by vehicle type retrieved', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json.data.vehicleType).to.eql('BIKE');",
+                  "});"
+                ]
+              }
             }
-          }
-        ],
-        "request": {
-          "method": "POST",
-          "header": [{"key": "Content-Type", "value": "application/json"}],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"zoneMetrics\": [\n    {\"zoneId\": \"{{pickup_zone}}\", \"activeDrivers\": 25, \"pendingRides\": 60},\n    {\"zoneId\": \"Z60207\", \"activeDrivers\": 15, \"pendingRides\": 40},\n    {\"zoneId\": \"Z60208\", \"activeDrivers\": 10, \"pendingRides\": 30}\n  ]\n}"
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/pricing-configs/vehicle/BIKE",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "pricing-configs", "vehicle", "BIKE"]
+            }
           },
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/zone-metrics/bulk",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "zone-metrics", "bulk"]
-          }
+          "response": []
         },
-        "response": []
-      },
-      {
-        "name": "16 - Delete Surge Rule By Zone",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Surge rule deleted by zone', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "});"
-              ]
+        {
+          "name": "07 - Update Pricing Config",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Pricing config updated', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json.data.baseFare).to.eql(12000);",
+                  "});"
+                ]
+              }
             }
-          }
-        ],
-        "request": {
-          "method": "DELETE",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/surge-rules/zone/Z60207",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "surge-rules", "zone", "Z60207"]
-          }
-        },
-        "response": []
-      },
-      {
-        "name": "17 - Delete Surge Rule By ID",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Surge rule deleted by ID', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "});"
-              ]
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicleType\": \"BIKE\",\n  \"baseFare\": 12000,\n  \"perKmRate\": 4000,\n  \"perMinuteRate\": 250,\n  \"multiplier\": 1.0,\n  \"active\": true\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/pricing-configs/{{pricing_config_id}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "pricing-configs", "{{pricing_config_id}}"]
             }
-          }
-        ],
-        "request": {
-          "method": "DELETE",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/surge-rules/{{surge_rule_id}}",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "surge-rules", "{{surge_rule_id}}"]
-          }
-        },
-        "response": []
-      },
-      {
-        "name": "18 - Delete Pricing Config",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Pricing config deleted', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "});"
-              ]
-            }
-          }
-        ],
-        "request": {
-          "method": "DELETE",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/pricing-configs/{{pricing_config_id}}",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "pricing-configs", "{{pricing_config_id}}"]
-          }
-        },
-        "response": []
-      },
-      {
-        "name": "19 - Get Dashboard After Changes",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Dashboard reflects changes', function () {",
-                "  pm.response.to.have.status(200);",
-                "  const json = pm.response.json();",
-                "  pm.expect(json.success).to.eql(true);",
-                "  pm.expect(json.data.totalPricingConfigs).to.be.at.least(1);",
-                "  pm.expect(json.data.totalSurgeRules).to.be.at.least(3);",
-                "});"
-              ]
-            }
-          }
-        ],
-        "request": {
-          "method": "GET",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/dashboard",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "dashboard"]
-          }
-        },
-        "response": []
-      },
-      {
-        "name": "20 - Get Non-Existent Pricing Config Returns 404",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Not found handled', function () {",
-                "  pm.response.to.have.status(404);",
-                "});"
-              ]
-            }
-          }
-        ],
-        "request": {
-          "method": "GET",
-          "header": [],
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/pricing-configs/nonexistent-id",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "pricing-configs", "nonexistent-id"]
-          }
-        },
-        "response": []
-      },
-      {
-        "name": "21 - Invalid Surge Multiplier Should Be Rejected",
-        "event": [
-          {
-            "listen": "test",
-            "script": {
-              "type": "text/javascript",
-              "exec": [
-                "pm.test('Invalid surge multiplier validation works', function () {",
-                "  pm.response.to.have.status(400);",
-                "});"
-              ]
-            }
-          }
-        ],
-        "request": {
-          "method": "POST",
-          "header": [{"key": "Content-Type", "value": "application/json"}],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"zoneId\": \"Z99999\",\n  \"surgeMultiplier\": 10.0,\n  \"source\": \"MANUAL\"\n}"
           },
-          "url": {
-            "raw": "{{BASE_URL}}/api/admin/surge-rules",
-            "host": ["{{BASE_URL}}"],
-            "path": ["api", "admin", "surge-rules"]
-          }
+          "response": []
         },
-        "response": []
-      }
-    ]
-  }
-],
+        {
+          "name": "08 - Toggle Pricing Config Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Pricing config status toggled', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/pricing-configs/{{pricing_config_id}}/toggle",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "pricing-configs", "{{pricing_config_id}}", "toggle"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09 - Create Surge Rule (with explicit zoneId)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Surge rule created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json.data.zoneId).to.eql(pm.collectionVariables.get('pickup_zone'));",
+                  "  pm.expect(Number(json.data.surgeMultiplier)).to.eql(1.5);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('surge_rule_id', json.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"zoneId\": \"{{pickup_zone}}\",\n  \"zoneName\": \"District 1 Downtown\",\n  \"surgeMultiplier\": 1.5,\n  \"latitude\": 10.8231,\n  \"longitude\": 106.6297,\n  \"radiusKm\": 2.0,\n  \"activeDrivers\": 20,\n  \"pendingRides\": 50,\n  \"source\": \"MANUAL\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/surge-rules",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "surge-rules"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09b - Create Surge Rule (AUTO-GENERATE zoneId from coordinates)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Surge rule auto-generated zoneId', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json.data.zoneId).to.be.a('string');",
+                  "  pm.expect(json.data.zoneId).to.match(/^Z\\d+$/);",
+                  "  pm.expect(Number(json.data.surgeMultiplier)).to.eql(1.3);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('autogen_surge_rule_id', json.data.id);",
+                  "  pm.collectionVariables.set('autogen_zone_id', json.data.zoneId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"zoneName\": \"Tan Binh Airport Area\",\n  \"surgeMultiplier\": 1.3,\n  \"latitude\": 10.8183,\n  \"longitude\": 106.6520,\n  \"radiusKm\": 3.0,\n  \"source\": \"MANUAL\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/surge-rules",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "surge-rules"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09c - Upsert: Create Surge Rule for Zone That Already Exists (should UPDATE, not 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Upsert: existing zone updated, not 409 conflict', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json.data.zoneId).to.eql(pm.collectionVariables.get('autogen_zone_id'));",
+                  "  pm.expect(Number(json.data.surgeMultiplier)).to.eql(2.0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"zoneId\": \"{{autogen_zone_id}}\",\n  \"zoneName\": \"Tan Binh Airport Area - Updated\",\n  \"surgeMultiplier\": 2.0,\n  \"latitude\": 10.8183,\n  \"longitude\": 106.6520,\n  \"radiusKm\": 3.0,\n  \"source\": \"MANUAL\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/surge-rules",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "surge-rules"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09d - Missing Coordinates Should Return 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing coordinates and zoneId returns 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"zoneName\": \"Orphan Zone\",\n  \"surgeMultiplier\": 1.5,\n  \"source\": \"MANUAL\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/surge-rules",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "surge-rules"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09e - Create Surge Rule: Tan Son Nhat International Airport",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Airport surge rule created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json.data.zoneId).to.eql('Z601206');",
+                  "  pm.expect(json.data.zoneName).to.eql('Tan Son Nhat International Airport');",
+                  "  pm.expect(Number(json.data.surgeMultiplier)).to.eql(1.5);",
+                  "  pm.expect(Number(json.data.latitude)).to.eql(10.8169828);",
+                  "  pm.expect(Number(json.data.longitude)).to.eql(106.6565808);",
+                  "  pm.expect(Number(json.data.radiusKm)).to.eql(3.0);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  pm.collectionVariables.set('airport_surge_rule_id', json.data.id);",
+                  "  pm.collectionVariables.set('airport_zone_id', json.data.zoneId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"zoneId\": \"Z601206\",\n  \"zoneName\": \"Tan Son Nhat International Airport\",\n  \"surgeMultiplier\": 1.5,\n  \"latitude\": 10.8169828,\n  \"longitude\": 106.6565808,\n  \"radiusKm\": 3.0,\n  \"activeDrivers\": 15,\n  \"pendingRides\": 45,\n  \"source\": \"MANUAL\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/surge-rules",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "surge-rules"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09f - Upsert: Update Airport Surge Rule (existing zone - should UPDATE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Airport surge rule updated', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json.data.zoneId).to.eql('Z601206');",
+                  "  pm.expect(Number(json.data.surgeMultiplier)).to.eql(2.0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"zoneId\": \"Z601206\",\n  \"zoneName\": \"Tan Son Nhat International Airport\",\n  \"surgeMultiplier\": 2.0,\n  \"latitude\": 10.8169828,\n  \"longitude\": 106.6565808,\n  \"radiusKm\": 3.0,\n  \"activeDrivers\": 20,\n  \"pendingRides\": 60,\n  \"source\": \"MANUAL\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/surge-rules",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "surge-rules"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10 - Create Another Surge Rule",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Surge rule created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"zoneId\": \"Z60207\",\n  \"zoneName\": \"District 3\",\n  \"surgeMultiplier\": 1.2,\n  \"latitude\": 10.7875,\n  \"longitude\": 106.6819,\n  \"radiusKm\": 1.5,\n  \"source\": \"MANUAL\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/surge-rules",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "surge-rules"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "11 - Create Bulk Surge Rules",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Bulk surge rules created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json.data).to.be.an('array');",
+                  "  pm.expect(json.data.length).to.eql(2);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"zoneId\": \"Z60208\",\n    \"zoneName\": \"District 5\",\n    \"surgeMultiplier\": 1.3,\n    \"latitude\": 10.7456,\n    \"longitude\": 106.6563,\n    \"source\": \"MANUAL\"\n  },\n  {\n    \"zoneId\": \"Z60209\",\n    \"zoneName\": \"District 10\",\n    \"surgeMultiplier\": 1.1,\n    \"latitude\": 10.7654,\n    \"longitude\": 106.6789,\n    \"source\": \"MANUAL\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/surge-rules/bulk",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "surge-rules", "bulk"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "12 - Get All Surge Rules",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('All surge rules retrieved', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json.data).to.be.an('array');",
+                  "  pm.expect(json.data.length).to.be.at.least(3);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/surge-rules",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "surge-rules"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "13 - Get Surge Rule By Zone ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Surge rule by zone retrieved', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json.data.zoneId).to.eql(pm.collectionVariables.get('pickup_zone'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/surge-rules/zone/{{pickup_zone}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "surge-rules", "zone", "{{pickup_zone}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14 - Update Surge Rule",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Surge rule updated', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(Number(json.data.surgeMultiplier)).to.eql(1.8);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"zoneId\": \"{{pickup_zone}}\",\n  \"surgeMultiplier\": 1.8,\n  \"activeDrivers\": 30,\n  \"pendingRides\": 80,\n  \"source\": \"MANUAL\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/surge-rules/{{surge_rule_id}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "surge-rules", "{{surge_rule_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "15 - Update Bulk Zone Metrics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Bulk zone metrics updated', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"zoneMetrics\": [\n    {\"zoneId\": \"{{pickup_zone}}\", \"activeDrivers\": 25, \"pendingRides\": 60},\n    {\"zoneId\": \"Z60207\", \"activeDrivers\": 15, \"pendingRides\": 40},\n    {\"zoneId\": \"Z60208\", \"activeDrivers\": 10, \"pendingRides\": 30}\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/zone-metrics/bulk",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "zone-metrics", "bulk"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "16 - Delete Surge Rule By Zone",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Surge rule deleted by zone', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/surge-rules/zone/Z60207",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "surge-rules", "zone", "Z60207"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "17 - Delete Surge Rule By ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Surge rule deleted by ID', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/surge-rules/{{surge_rule_id}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "surge-rules", "{{surge_rule_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "18 - Delete Pricing Config",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Pricing config deleted', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/pricing-configs/{{pricing_config_id}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "pricing-configs", "{{pricing_config_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "19 - Get Dashboard After Changes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Dashboard reflects changes', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.success).to.eql(true);",
+                  "  pm.expect(json.data.totalPricingConfigs).to.be.at.least(1);",
+                  "  pm.expect(json.data.totalSurgeRules).to.be.at.least(3);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/dashboard",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "dashboard"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "20 - Get Non-Existent Pricing Config Returns 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Not found handled', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/pricing-configs/nonexistent-id",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "pricing-configs", "nonexistent-id"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "21 - Invalid Surge Multiplier Should Be Rejected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid surge multiplier validation works', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"zoneId\": \"Z99999\",\n  \"surgeMultiplier\": 10.0,\n  \"source\": \"MANUAL\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/admin/surge-rules",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "admin", "surge-rules"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "07 - Revenue Statistics",
+      "item": [
+        {
+          "name": "01 - Get Revenue Statistics (Custom Date Range)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Revenue statistics retrieved', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.totalRevenue).to.exist;",
+                  "  pm.expect(json.totalTrips).to.exist;",
+                  "  pm.expect(json.averageFare).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/pricing/revenue/statistics?startDate=2026-05-01T00:00:00&endDate=2026-05-22T23:59:59",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "revenue", "statistics"],
+              "query": [
+                {"key": "startDate", "value": "2026-05-01T00:00:00"},
+                {"key": "endDate", "value": "2026-05-22T23:59:59"}
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "02 - Get Daily Revenue",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Daily revenue retrieved', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.totalRevenue).to.exist;",
+                  "  pm.expect(json.totalTrips).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/pricing/revenue/daily/2026-05-22",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "revenue", "daily", "2026-05-22"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "03 - Get Weekly Revenue (Last 7 Days)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Weekly revenue retrieved', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.totalRevenue).to.exist;",
+                  "  pm.expect(json.totalTrips).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/pricing/revenue/weekly",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "revenue", "weekly"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "04 - Get Monthly Revenue (Last 30 Days)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Monthly revenue retrieved', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.totalRevenue).to.exist;",
+                  "  pm.expect(json.totalTrips).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/pricing/revenue/monthly",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "revenue", "monthly"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "05 - Get Revenue By Zone",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Zone revenue retrieved', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.totalRevenue).to.exist;",
+                  "  pm.expect(json.totalTrips).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/pricing/revenue/zone/{{pickup_zone}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "revenue", "zone", "{{pickup_zone}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "06 - Get Revenue By Zone (Custom Date Range)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Zone revenue with date range retrieved', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.totalRevenue).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/pricing/revenue/zone/{{pickup_zone}}?startDate=2026-05-01T00:00:00&endDate=2026-05-22T23:59:59",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "revenue", "zone", "{{pickup_zone}}"],
+              "query": [
+                {"key": "startDate", "value": "2026-05-01T00:00:00"},
+                {"key": "endDate", "value": "2026-05-22T23:59:59"}
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "07 - Get Revenue By Vehicle Type",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Vehicle type revenue retrieved', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.totalRevenue).to.exist;",
+                  "  pm.expect(json.totalTrips).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/pricing/revenue/vehicle/CAR4",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "revenue", "vehicle", "CAR4"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "08 - Get Revenue By Vehicle Type (Custom Date Range)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Vehicle type revenue with date range retrieved', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.totalRevenue).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/pricing/revenue/vehicle/CAR4?startDate=2026-05-01T00:00:00&endDate=2026-05-22T23:59:59",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "revenue", "vehicle", "CAR4"],
+              "query": [
+                {"key": "startDate", "value": "2026-05-01T00:00:00"},
+                {"key": "endDate", "value": "2026-05-22T23:59:59"}
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "09 - Get Revenue By Unknown Zone Returns 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Unknown zone revenue returns 404 or empty', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/pricing/revenue/zone/UNKNOWN_ZONE",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "revenue", "zone", "UNKNOWN_ZONE"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10 - Invalid Date Format Should Return 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid date format returns 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/pricing/revenue/daily/invalid-date",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "pricing", "revenue", "daily", "invalid-date"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
   "event": [
     {
       "listen": "prerequest",
       "script": {
         "type": "text/javascript",
-        "exec": [
-          ""
-        ]
+        "exec": [""]
       }
     },
     {
       "listen": "test",
       "script": {
         "type": "text/javascript",
-        "exec": [
-          ""
-        ]
+        "exec": [""]
       }
     }
   ],
@@ -2072,6 +2346,26 @@
     },
     {
       "key": "surge_rule_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "autogen_surge_rule_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "autogen_zone_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "airport_surge_rule_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "airport_zone_id",
       "value": "",
       "type": "string"
     }

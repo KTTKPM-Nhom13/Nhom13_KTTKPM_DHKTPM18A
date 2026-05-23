@@ -23,7 +23,8 @@ import java.util.UUID;
         @Index(name = "idx_ride_customer_id",  columnList = "customerId"),
         @Index(name = "idx_ride_driver_id",    columnList = "driverId"),
         @Index(name = "idx_ride_status",       columnList = "status"),
-        @Index(name = "idx_ride_created_at",   columnList = "createdAt")
+        @Index(name = "idx_ride_created_at",   columnList = "createdAt"),
+        @Index(name = "idx_ride_booking_id",   columnList = "bookingId", unique = true)
 })
 public class Ride {
 
@@ -41,7 +42,7 @@ public class Ride {
     @Column(length = 100)
     private String customerId;
 
-    @Column(length = 100)
+    @Column(length = 100, unique = true)
     private String bookingId;
 
     /** ID của tài xế được chỉ định (null cho đến khi ASSIGNED). */

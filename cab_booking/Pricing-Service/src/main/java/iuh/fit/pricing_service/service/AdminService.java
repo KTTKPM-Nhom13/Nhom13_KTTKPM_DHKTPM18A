@@ -26,6 +26,8 @@ public class AdminService {
     private final PricingConfigRepository pricingConfigRepository;
     private final SurgeRuleRepository surgeRuleRepository;
     private final SurgePricingService surgePricingService;
+    private final ZoneService zoneService;
+    private final ZoneMetricsService zoneMetricsService;
 
     // ==================== PRICING CONFIG CRUD ====================
 
@@ -111,15 +113,26 @@ public class AdminService {
     // ==================== SURGE RULE CRUD ====================
 
     public SurgeRuleResponse createSurgeRule(SurgeRuleRequest request) {
-        if (surgeRuleRepository.findByZoneId(request.getZoneId()).isPresent()) {
-            throw new IllegalStateException("Surge rule for zone '" + request.getZoneId() + "' already exists");
+        String zoneId = request.getZoneId();
+        if (zoneId == null || zoneId.isBlank()) {
+            if (request.getLatitude() == null || request.getLongitude() == null) {
+                throw new IllegalArgumentException(
+                        "Either 'zoneId' OR both 'latitude' and 'longitude' must be provided to create a surge rule.");
+            }
+            zoneId = zoneService.determineZone(request.getLatitude(), request.getLongitude());
+            log.info("Zone ID auto-generated from coordinates: {}", zoneId);
+        }
+
+        if (surgeRuleRepository.findByZoneId(zoneId).isPresent()) {
+            throw new IllegalStateException(
+                    "Surge rule for zone '" + zoneId + "' already exists. Use PUT to update or choose a different zoneId.");
         }
 
         BigDecimal multiplier = BigDecimal.valueOf(request.getSurgeMultiplier())
                 .setScale(2, RoundingMode.HALF_UP);
 
         SurgeRule rule = SurgeRule.builder()
-                .zoneId(request.getZoneId())
+                .zoneId(zoneId)
                 .zoneName(request.getZoneName())
                 .surgeMultiplier(multiplier)
                 .latitude(request.getLatitude())
@@ -136,8 +149,8 @@ public class AdminService {
                 .build();
 
         SurgeRule saved = surgeRuleRepository.save(rule);
-        surgePricingService.cacheSurgeMultiplier(request.getZoneId(), multiplier);
-        log.info("Created surge rule for zone: {} with multiplier: {}", saved.getZoneId(), saved.getSurgeMultiplier());
+        surgePricingService.cacheSurgeMultiplier(zoneId, multiplier);
+        log.info("Created new surge rule for zone: {} with multiplier: {}", zoneId, multiplier);
         return toSurgeRuleResponse(saved);
     }
 
@@ -145,8 +158,10 @@ public class AdminService {
         SurgeRule existing = surgeRuleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Surge rule not found with id: " + id));
 
-        if (request.getZoneId() != null) {
+        if (request.getZoneId() != null && !request.getZoneId().isBlank()) {
             existing.setZoneId(request.getZoneId());
+        } else if (request.getLatitude() != null && request.getLongitude() != null) {
+            existing.setZoneId(zoneService.determineZone(request.getLatitude(), request.getLongitude()));
         }
         if (request.getZoneName() != null) {
             existing.setZoneName(request.getZoneName());
@@ -206,14 +221,17 @@ public class AdminService {
     public void deleteSurgeRule(String id) {
         SurgeRule rule = surgeRuleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Surge rule not found with id: " + id));
+        String zoneId = rule.getZoneId();
         surgeRuleRepository.delete(rule);
-        surgePricingService.invalidateSurgeCache(rule.getZoneId());
-        log.info("Deleted surge rule {} for zone: {}", id, rule.getZoneId());
+        surgePricingService.invalidateSurgeCache(zoneId);
+        surgePricingService.removeFromActiveZones(zoneId);
+        log.info("Deleted surge rule {} for zone: {}", id, zoneId);
     }
 
     public void deleteSurgeRuleByZoneId(String zoneId) {
         surgeRuleRepository.deleteByZoneId(zoneId);
         surgePricingService.invalidateSurgeCache(zoneId);
+        surgePricingService.removeFromActiveZones(zoneId);
         log.info("Deleted surge rule for zone: {}", zoneId);
     }
 
@@ -231,9 +249,11 @@ public class AdminService {
     }
 
     public List<SurgeRuleResponse> createBulkSurgeRules(List<SurgeRuleRequest> requests) {
-        return requests.stream()
+        List<SurgeRuleResponse> results = requests.stream()
                 .map(this::createSurgeRule)
                 .collect(Collectors.toList());
+        log.info("Created {} surge rules in bulk", results.size());
+        return results;
     }
 
     // ==================== DASHBOARD ====================

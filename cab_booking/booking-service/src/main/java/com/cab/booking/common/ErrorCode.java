@@ -33,11 +33,17 @@ public enum ErrorCode {
     BOOKING_ALREADY_COMPLETED(HttpStatus.CONFLICT, "Chuyến đi đã hoàn thành"),
     DRIVER_ALREADY_ASSIGNED(HttpStatus.CONFLICT, "Tài xế đã được phân công cho chuyến đi khác"),
     RIDE_IN_PROGRESS(HttpStatus.CONFLICT, "Chuyến đi đang trong quá trình thực hiện"),
+    IDEMPOTENCY_REQUEST_PROCESSING(HttpStatus.CONFLICT, "Hệ thống đang bận xử lý request này. Vui lòng thử lại sau!"),
 
     // ===== 422 Unprocessable Entity — Nghiệp vụ vi phạm logic =====
     DRIVER_NOT_AVAILABLE(HttpStatus.UNPROCESSABLE_ENTITY, "Tài xế hiện không khả dụng"),
     NO_DRIVERS_AVAILABLE(HttpStatus.UNPROCESSABLE_ENTITY, "Không có tài xế nào khả dụng trong khu vực"),
     PASSENGER_HAS_ACTIVE_RIDE(HttpStatus.UNPROCESSABLE_ENTITY, "Hành khách đang có chuyến đi đang hoạt động"),
+    QUOTE_HASH_MISMATCH(HttpStatus.UNPROCESSABLE_ENTITY, "Báo giá không khớp. Vui lòng lấy báo giá mới"),
+    ESTIMATE_EXPIRED(HttpStatus.UNPROCESSABLE_ENTITY, "Báo giá đã hết hạn. Vui lòng lấy báo giá mới"),
+    INVALID_QUOTE_STATUS(HttpStatus.UNPROCESSABLE_ENTITY, "Trạng thái báo giá không hợp lệ"),
+    ESTIMATE_NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy báo giá"),
+    QUOTE_CONFIRMATION_FAILED(HttpStatus.UNPROCESSABLE_ENTITY, "Không thể xác nhận báo giá"),
 
     // ===== 503 Service Unavailable — Lỗi phụ thuộc =====
     DRIVER_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Driver Service tạm thời không khả dụng"),

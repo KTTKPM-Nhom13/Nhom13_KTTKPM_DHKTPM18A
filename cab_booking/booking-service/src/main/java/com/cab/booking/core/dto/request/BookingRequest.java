@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Map;
 
 @Data
@@ -41,6 +42,16 @@ public class BookingRequest {
      * BE giải mã & verify trước khi chấp nhận estimatedFare.
      */
     private String quoteToken;
+
+    /**
+     * Quote snapshot returned by Pricing-Service when FE gets an estimate.
+     * Booking-Service confirms estimateId with quotePayloadHash before creating booking.
+     */
+    private String estimateId;
+    private String quoteId;
+    private String quotePayloadHash;
+    private String quoteHashAlgorithm;
+    private LocalDateTime quoteExpiresAt;
 
     /**
      * Idempotency key — chống double-click / retry gây trùng cuốc.

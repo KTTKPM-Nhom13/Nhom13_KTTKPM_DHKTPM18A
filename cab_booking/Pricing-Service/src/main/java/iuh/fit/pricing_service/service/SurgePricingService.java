@@ -209,6 +209,16 @@ public class SurgePricingService {
         ZoneMetrics metrics = getCurrentZoneMetrics(zoneId)
                 .orElse(new ZoneMetrics(zoneId, 0, 0, Instant.now()));
 
+        // If the zone has no metrics seeded yet, fall back to the stored surge rule
+        // rather than recalculating from scratch (which would ignore manual surge values)
+        if (metrics.activeDrivers() == 0 && metrics.pendingRides() == 0) {
+            BigDecimal storedSurge = surgeRuleRepository.findByZoneId(zoneId)
+                    .map(SurgeRule::getSurgeMultiplier)
+                    .map(this::clampSurge)
+                    .orElse(pricingConfig.getSurge().getDefaultMultiplier());
+            return new SurgeComputationResult(zoneId, storedSurge, storedSurge, false);
+        }
+
         RuleBasedSurgeCalculator.SurgeCalculation calculation = ruleBasedSurgeCalculator.calculate(
                 new RuleBasedSurgeCalculator.SurgeInput(
                         zoneId,
@@ -302,6 +312,15 @@ public class SurgePricingService {
             redisTemplate.delete(surgeKey(zoneId));
         } catch (Exception e) {
             log.warn("Failed to invalidate surge cache for zone {}: {}", zoneId, e.getMessage());
+        }
+    }
+
+    public void removeFromActiveZones(String zoneId) {
+        try {
+            redisTemplate.opsForSet().remove(ACTIVE_ZONES_KEY, zoneId);
+            log.debug("Removed zone {} from active zones set", zoneId);
+        } catch (Exception e) {
+            log.warn("Failed to remove zone {} from active zones set: {}", zoneId, e.getMessage());
         }
     }
 
