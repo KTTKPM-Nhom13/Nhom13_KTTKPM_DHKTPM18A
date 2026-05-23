@@ -44,7 +44,7 @@ class VnPaySignatureUtilTest {
         params.put("vnp_Locale", "vn");
         params.put("vnp_OrderInfo", "Payment for booking B VNPAY 1779179413330");
         params.put("vnp_OrderType", "other");
-        params.put("vnp_ReturnUrl", "https://scratch-heaving-create.ngrok-free.dev/api/payments/vnpay/return");
+        params.put("vnp_ReturnUrl", "https://scratch-heaving-create.ngrok-free.dev/api/v1/payments/vnpay/return");
         params.put("vnp_TmnCode", "TL1HKBCX");
         params.put("vnp_TxnRef", "TXN8C90F495CE75");
         params.put("vnp_Version", "2.1.0");

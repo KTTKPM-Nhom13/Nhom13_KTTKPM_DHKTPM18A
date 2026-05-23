@@ -249,7 +249,7 @@ public class PaymentSagaService {
                 .bookingId(request.getBookingId())
                 .customerId(request.getCustomerId())
                 .driverId(request.getDriverId())
-                .amount(request.getAmount())
+                .amount(normalizeGatewayAmount(request.getAmount(), request.getPaymentMethod(), request.getCurrency()))
                 .currency(request.getCurrency() != null ? request.getCurrency() : "VND")
                 .paymentMethod(request.getPaymentMethod())
                 .status(PaymentStatus.PENDING)
@@ -547,6 +547,32 @@ public class PaymentSagaService {
         return "MOCK_GATEWAY";
     }
 
+    private BigDecimal normalizeGatewayAmount(BigDecimal amount, PaymentMethod paymentMethod, String currency) {
+        if (amount == null) {
+            return null;
+        }
+        if (paymentMethod == PaymentMethod.VNPAY && isVnd(currency)) {
+            return amount.setScale(0, RoundingMode.DOWN);
+        }
+        return amount;
+    }
+
+    private boolean amountMatches(PaymentTransaction transaction, BigDecimal callbackAmount) {
+        if (callbackAmount == null) {
+            return false;
+        }
+        if (transaction.getPaymentMethod() == PaymentMethod.VNPAY && isVnd(transaction.getCurrency())) {
+            BigDecimal expected = transaction.getAmount().setScale(0, RoundingMode.DOWN);
+            BigDecimal actual = callbackAmount.setScale(0, RoundingMode.DOWN);
+            return expected.compareTo(actual) == 0;
+        }
+        return transaction.getAmount().compareTo(callbackAmount) == 0;
+    }
+
+    private boolean isVnd(String currency) {
+        return currency == null || currency.isBlank() || "VND".equalsIgnoreCase(currency);
+    }
+
     private void waitBeforeRetry(int attempt) {
         try {
             long delayMs = (long) Math.pow(2, attempt) * 1000L;
@@ -655,7 +681,7 @@ public class PaymentSagaService {
             return;
         }
 
-        if (callbackResult.getAmount() == null || transaction.getAmount().compareTo(callbackResult.getAmount()) != 0) {
+        if (!amountMatches(transaction, callbackResult.getAmount())) {
             log.error("[Saga] ZaloPay callback amount mismatch - txnId={}, expected={}, actual={}",
                     transaction.getTransactionId(), transaction.getAmount(), callbackResult.getAmount());
             throw new PaymentException(ErrorCode.VALIDATION_ERROR,
@@ -700,7 +726,7 @@ public class PaymentSagaService {
             return PaymentResponse.fromEntity(transaction);
         }
 
-        if (callbackResult.getAmount() == null || transaction.getAmount().compareTo(callbackResult.getAmount()) != 0) {
+        if (!amountMatches(transaction, callbackResult.getAmount())) {
             log.error("[Saga] VNPay callback amount mismatch - txnId={}, expected={}, actual={}",
                     transaction.getTransactionId(), transaction.getAmount(), callbackResult.getAmount());
             throw new PaymentException(ErrorCode.VALIDATION_ERROR,

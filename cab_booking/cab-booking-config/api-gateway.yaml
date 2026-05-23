@@ -87,9 +87,16 @@ spring:
             - Path=/api/v1/pricing/**,/api/v1/admin/**
 
         - id: payment-service
-          uri: lb://payment-service
+          uri: http://payment-service:8090
+          predicates:
+            - Path=/api/v1/payments/**
+
+        - id: payment-service-legacy
+          uri: http://payment-service:8090
           predicates:
             - Path=/api/payments/**
+          filters:
+            - RewritePath=/api/payments/(?<segment>.*), /api/v1/payments/$\{segment}
 
         - id: ai-scoring-service
           uri: http://cab-ai-scoring-service:8000

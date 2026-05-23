@@ -65,7 +65,8 @@ public class RateLimitConfig {
             HttpStatus status = HttpStatus.TOO_MANY_REQUESTS;
 
             if (ex instanceof NotFoundException
-                    || (ex instanceof ResponseStatusException rse && rse.getStatusCode() == status)
+                    || (ex instanceof ResponseStatusException
+                    && ((ResponseStatusException) ex).getStatusCode() == status)
                     || (ex.getMessage() != null && ex.getMessage().contains("429"))
                     || (ex.getMessage() != null && ex.getMessage().toLowerCase().contains("rate limit"))) {
 

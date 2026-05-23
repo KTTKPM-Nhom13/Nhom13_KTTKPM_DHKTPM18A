@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/payments")
+@RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor
 @FieldDefaults(level = lombok.AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
@@ -56,7 +56,7 @@ public class PaymentController {
             @Parameter(description = "Idempotency key to prevent duplicate charges")
             @RequestHeader(value = "X-Idempotency-Key", required = false) String headerIdempotencyKey
     ) {
-        log.info("[Controller] POST /api/payments/charge - bookingId={}, customerId={}, amount={}, headerIdemKey={}",
+        log.info("[Controller] POST /api/v1/payments/charge - bookingId={}, customerId={}, amount={}, headerIdemKey={}",
                 request.getBookingId(), request.getCustomerId(), request.getAmount(), headerIdempotencyKey);
 
         if (headerIdempotencyKey != null && !headerIdempotencyKey.isBlank()
@@ -99,7 +99,7 @@ public class PaymentController {
             @Parameter(description = "Transaction ID", example = "txn_abc123def456")
             @PathVariable String transactionId
     ) {
-        log.info("[Controller] GET /api/payments/txn/{}", transactionId);
+        log.info("[Controller] GET /api/v1/payments/txn/{}", transactionId);
         PaymentResponse response = paymentSagaService.getPaymentByTransactionId(transactionId);
         return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
                 .message("Payment retrieved successfully")
@@ -117,7 +117,7 @@ public class PaymentController {
             @Parameter(description = "Booking ID", example = "b_123")
             @PathVariable String bookingId
     ) {
-        log.info("[Controller] GET /api/payments/booking/{}", bookingId);
+        log.info("[Controller] GET /api/v1/payments/booking/{}", bookingId);
         PaymentResponse response = paymentSagaService.getPaymentByBookingId(bookingId);
         return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
                 .message("Payment retrieved successfully")
@@ -137,7 +137,7 @@ public class PaymentController {
     public ResponseEntity<Void> handleMoMoIpn(
             @RequestBody MoMoIpnRequest ipnRequest
     ) {
-        log.info("[Controller] POST /api/payments/momo/ipn - orderId={}, resultCode={}, amount={}",
+        log.info("[Controller] POST /api/v1/payments/momo/ipn - orderId={}, resultCode={}, amount={}",
                 ipnRequest.getOrderId(), ipnRequest.getResultCode(), ipnRequest.getAmount());
 
         MoMoIpnResult result = moMoPaymentService.processIpn(ipnRequest);
@@ -157,7 +157,7 @@ public class PaymentController {
     public ResponseEntity<ZaloPayCallbackResponse> handleZaloPayCallback(
             @RequestBody ZaloPayCallbackRequest callbackRequest
     ) {
-        log.info("[Controller] POST /api/payments/zalopay/callback - type={}", callbackRequest.getType());
+        log.info("[Controller] POST /api/v1/payments/zalopay/callback - type={}", callbackRequest.getType());
 
         try {
             ZaloPayCallbackResult result = zaloPayPaymentService.processCallback(callbackRequest);
@@ -177,7 +177,7 @@ public class PaymentController {
     public ResponseEntity<ApiResponse<PaymentResponse>> handleVnPayReturn(
             @RequestParam Map<String, String> params
     ) {
-        log.info("[Controller] GET /api/payments/vnpay/return - txnRef={}, responseCode={}",
+        log.info("[Controller] GET /api/v1/payments/vnpay/return - txnRef={}, responseCode={}",
                 params.get("vnp_TxnRef"), params.get("vnp_ResponseCode"));
 
         VnPayCallbackResult result = vnPayPaymentService.processCallback(params);
@@ -196,7 +196,7 @@ public class PaymentController {
     public ResponseEntity<VnPayIpnResponse> handleVnPayIpn(
             @RequestParam Map<String, String> params
     ) {
-        log.info("[Controller] GET /api/payments/vnpay/ipn - txnRef={}, responseCode={}",
+        log.info("[Controller] GET /api/v1/payments/vnpay/ipn - txnRef={}, responseCode={}",
                 params.get("vnp_TxnRef"), params.get("vnp_ResponseCode"));
 
         try {
