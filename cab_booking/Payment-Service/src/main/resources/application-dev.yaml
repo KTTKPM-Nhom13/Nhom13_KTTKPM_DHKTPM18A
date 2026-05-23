@@ -17,4 +17,15 @@ vnpay:
   hashSecret: ${VNPAY_HASH_SECRET:A6GA3NSBPW7ZE1P3R1KRZKESNELHRTY3}
   returnUrl: ${VNPAY_RETURN_URL:https://scratch-heaving-create.ngrok-free.dev/api/v1/payments/vnpay/return}
   ipnUrl: ${VNPAY_IPN_URL:https://scratch-heaving-create.ngrok-free.dev/api/v1/payments/vnpay/ipn}
+  mobileReturnUrl: ${VNPAY_MOBILE_RETURN_URL:cabbookingmobile://payment}
   bankCode: ${VNPAY_BANK_CODE:NCB}
+
+sepay:
+  qrBaseUrl: ${SEPAY_QR_BASE_URL:https://qr.sepay.vn/img}
+  accountNumber: ${SEPAY_ACCOUNT_NUMBER:}
+  bankCode: ${SEPAY_BANK_CODE:}
+  descriptionPrefix: ${SEPAY_DESCRIPTION_PREFIX:}
+  webhookApiKey: ${SEPAY_WEBHOOK_API_KEY:}
+  webhookSecret: ${SEPAY_WEBHOOK_SECRET:}
+  verifyApiKey: ${SEPAY_VERIFY_API_KEY:false}
+  verifyHmac: ${SEPAY_VERIFY_HMAC:false}

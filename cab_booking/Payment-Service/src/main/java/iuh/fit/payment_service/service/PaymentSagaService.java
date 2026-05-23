@@ -13,6 +13,7 @@ import iuh.fit.payment_service.dto.request.ChargePaymentRequest;
 import iuh.fit.payment_service.dto.request.GatewayChargeRequest;
 import iuh.fit.payment_service.dto.response.GatewayChargeResponse;
 import iuh.fit.payment_service.dto.response.PaymentResponse;
+import iuh.fit.payment_service.dto.sepay.SePayWebhookResult;
 import iuh.fit.payment_service.dto.vnpay.VnPayCallbackResult;
 import iuh.fit.payment_service.dto.zalopay.ZaloPayCallbackResult;
 import iuh.fit.payment_service.entity.PaymentTransaction;
@@ -42,6 +43,7 @@ public class PaymentSagaService {
     private final MoMoPaymentService moMoPaymentService;
     private final ZaloPayPaymentService zaloPayPaymentService;
     private final VnPayPaymentService vnPayPaymentService;
+    private final SePayPaymentService sePayPaymentService;
     private final OutboxService outboxService;
     private final ObjectMapper objectMapper;
 
@@ -446,6 +448,9 @@ public class PaymentSagaService {
         if (transaction.getPaymentMethod() == PaymentMethod.VNPAY) {
             return vnPayPaymentService.charge(gatewayRequest);
         }
+        if (transaction.getPaymentMethod() == PaymentMethod.SEPAY) {
+            return sePayPaymentService.charge(gatewayRequest);
+        }
         return gatewayService.charge(gatewayRequest);
     }
 
@@ -506,6 +511,7 @@ public class PaymentSagaService {
         return switch (rawPaymentMethod.trim().toUpperCase()) {
             case "MOMO", "MOMO_WALLET" -> PaymentMethod.MOMO;
             case "ZALOPAY", "ZALO_PAY" -> PaymentMethod.ZALOPAY;
+            case "SEPAY", "VIETQR", "QR_BANK_TRANSFER" -> PaymentMethod.SEPAY;
             case "VNPAY", "VNPAY_ATM", "ATM", "BANK_TRANSFER", "BANK", "TRANSFER" -> PaymentMethod.VNPAY;
             case "CARD", "CREDITCARD", "CREDIT_CARD" -> PaymentMethod.CREDIT_CARD;
             case "DEBITCARD", "DEBIT_CARD" -> PaymentMethod.DEBIT_CARD;
@@ -544,6 +550,9 @@ public class PaymentSagaService {
         if (paymentMethod == PaymentMethod.VNPAY) {
             return "VNPAY";
         }
+        if (paymentMethod == PaymentMethod.SEPAY) {
+            return "SEPAY";
+        }
         return "MOCK_GATEWAY";
     }
 
@@ -551,7 +560,7 @@ public class PaymentSagaService {
         if (amount == null) {
             return null;
         }
-        if (paymentMethod == PaymentMethod.VNPAY && isVnd(currency)) {
+        if ((paymentMethod == PaymentMethod.VNPAY || paymentMethod == PaymentMethod.SEPAY) && isVnd(currency)) {
             return amount.setScale(0, RoundingMode.DOWN);
         }
         return amount;
@@ -561,7 +570,8 @@ public class PaymentSagaService {
         if (callbackAmount == null) {
             return false;
         }
-        if (transaction.getPaymentMethod() == PaymentMethod.VNPAY && isVnd(transaction.getCurrency())) {
+        if ((transaction.getPaymentMethod() == PaymentMethod.VNPAY || transaction.getPaymentMethod() == PaymentMethod.SEPAY)
+                && isVnd(transaction.getCurrency())) {
             BigDecimal expected = transaction.getAmount().setScale(0, RoundingMode.DOWN);
             BigDecimal actual = callbackAmount.setScale(0, RoundingMode.DOWN);
             return expected.compareTo(actual) == 0;
@@ -775,6 +785,53 @@ public class PaymentSagaService {
                     )
             );
         }
+
+        return PaymentResponse.fromEntity(transaction);
+    }
+
+    @Transactional
+    public PaymentResponse completePaymentFromSePayWebhook(SePayWebhookResult webhookResult) {
+        log.info("[Saga] Processing SePay webhook completion - txnId={}, gatewayTxnId={}, success={}",
+                webhookResult.getTransactionId(), webhookResult.getGatewayTransactionId(), webhookResult.isSuccess());
+
+        PaymentTransaction transaction = paymentRepository.findByTransactionId(webhookResult.getTransactionId())
+                .orElseThrow(() -> new PaymentException(ErrorCode.PAYMENT_NOT_FOUND,
+                        "Transaction not found: " + webhookResult.getTransactionId()));
+
+        if (transaction.getStatus() != PaymentStatus.PENDING) {
+            log.info("[Saga] Ignoring SePay webhook for non-pending transaction - txnId={}, status={}",
+                    transaction.getTransactionId(), transaction.getStatus());
+            return PaymentResponse.fromEntity(transaction);
+        }
+
+        if (!amountMatches(transaction, webhookResult.getAmount())) {
+            log.error("[Saga] SePay webhook amount mismatch - txnId={}, expected={}, actual={}",
+                    transaction.getTransactionId(), transaction.getAmount(), webhookResult.getAmount());
+            throw new PaymentException(ErrorCode.VALIDATION_ERROR,
+                    "SePay webhook amount mismatch for transaction: " + transaction.getTransactionId());
+        }
+
+        transaction.markSuccess(
+                webhookResult.getGatewayTransactionId(),
+                webhookResult.getMessage()
+        );
+        paymentRepository.save(transaction);
+        log.info("[Saga] SePay payment SUCCESS from webhook - txnId={}, gatewayTxnId={}",
+                transaction.getTransactionId(), webhookResult.getGatewayTransactionId());
+
+        outboxService.saveOutboxEventInTx(
+                "PaymentTransaction",
+                transaction.getTransactionId(),
+                "PAYMENT_COMPLETED",
+                PaymentCompletedEvent.fromTransaction(
+                        transaction.getBookingId(),
+                        transaction.getDriverId(),
+                        transaction.getAmount(),
+                        transaction.getCurrency(),
+                        transaction.getGatewayTransactionId(),
+                        transaction.getPaymentMethod().name()
+                )
+        );
 
         return PaymentResponse.fromEntity(transaction);
     }

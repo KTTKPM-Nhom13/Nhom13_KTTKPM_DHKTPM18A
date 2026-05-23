@@ -84,6 +84,10 @@ public class VnPayPaymentService {
                 .build();
     }
 
+    public String getMobileReturnUrl() {
+        return vnPayProperties.getMobileReturnUrl();
+    }
+
     private Map<String, String> buildPaymentParams(GatewayChargeRequest request, String vnPayTxnRef) {
         LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
         LocalDateTime expireAt = now.plusMinutes(vnPayProperties.getExpireMinutes());
