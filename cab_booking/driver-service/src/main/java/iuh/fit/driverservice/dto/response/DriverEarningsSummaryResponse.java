@@ -17,6 +17,8 @@ public class DriverEarningsSummaryResponse {
     Integer totalCompletedRides;
     BigDecimal averageRating;
     BigDecimal totalEarnings;
+    BigDecimal totalGrossAmount;
+    BigDecimal totalDriverAmount;
     boolean currentRideActive;
     LocalDateTime lastOnlineAt;
 }

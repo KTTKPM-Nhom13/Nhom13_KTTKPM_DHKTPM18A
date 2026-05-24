@@ -104,7 +104,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Boundary Flow Customer\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"phoneNumber\": \"0901000001\",\n  \"avatarUrl\": \"https://example.com/customer.png\",\n  \"role\": \"CUSTOMER\",\n  \"deviceId\": \"boundary-customer\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
+              "raw": "{\n  \"fullName\": \"Boundary Flow Customer\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"phoneNumber\": \"0901000001\",\n  \"avatarUrl\": \"https://example.com/customer.png\",\n  \"role\": \"USER\",\n  \"deviceId\": \"boundary-customer\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1051,7 +1051,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Boundary Flow Customer\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"phoneNumber\": \"0901000001\",\n  \"avatarUrl\": \"https://example.com/customer.png\",\n  \"role\": \"CUSTOMER\",\n  \"deviceId\": \"boundary-customer\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
+              "raw": "{\n  \"fullName\": \"Boundary Flow Customer\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"phoneNumber\": \"0901000001\",\n  \"avatarUrl\": \"https://example.com/customer.png\",\n  \"role\": \"USER\",\n  \"deviceId\": \"boundary-customer\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
