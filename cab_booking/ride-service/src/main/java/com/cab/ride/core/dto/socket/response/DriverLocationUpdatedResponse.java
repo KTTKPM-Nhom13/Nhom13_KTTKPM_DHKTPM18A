@@ -1,4 +1,4 @@
-package com.cab.ride.core.dto.event;
+package com.cab.ride.core.dto.socket.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -6,14 +6,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Event payload được bắn lên Kafka topic {@code driver.location.updated}.
- * Consumer (ví dụ: matching-service, tracking-service) sẽ nhận tọa độ thời gian thực của tài xế.
+ * Server → Client response for {@code driver.location.updated} event.
+ * Broadcast to all clients in the ride room after successful location update.
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DriverLocationEvent {
+public class DriverLocationUpdatedResponse {
 
     private String eventId;
     private String eventType;
@@ -24,6 +24,5 @@ public class DriverLocationEvent {
     private double lng;
     private Double heading;
     private Double speed;
-    /** ISO-8601 UTC timestamp, e.g. "2026-05-23T19:15:00Z". */
     private String timestamp;
 }

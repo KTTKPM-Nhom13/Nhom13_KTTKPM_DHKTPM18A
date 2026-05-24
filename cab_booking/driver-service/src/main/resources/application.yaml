@@ -27,12 +27,13 @@ spring:
       properties:
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: "*"
+        # All Kafka domain events use typed DTO classes. No Map payloads.
         spring.json.type.mapping: >
           ride-assigned:iuh.fit.driverservice.dto.event.RideAssignedEvent,
           ride-completed:iuh.fit.driverservice.dto.event.RideLifecycleEvent,
           ride-cancelled:iuh.fit.driverservice.dto.event.RideLifecycleEvent,
+          ride-finished:iuh.fit.driverservice.dto.event.RideFinishedEvent,
           payment-completed:iuh.fit.driverservice.dto.event.PaymentCompletedEvent
-        spring.json.value.default.type: java.util.Map
 
 driver:
   assignment:

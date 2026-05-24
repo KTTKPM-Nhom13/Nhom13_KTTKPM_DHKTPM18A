@@ -1,0 +1,390 @@
+{
+  "info": {
+    "_postman_id": "cab-websocket-ride-test",
+    "name": "CAB WebSocket & Realtime - Ride Events Test",
+    "description": "Test WebSocket connections for ride realtime events.\n\nTwo systems:\n1. ride-service STOMP (port 8089) — Driver GPS location updates\n2. notification-service Socket.IO (port 9093) — Ride event notifications\n\nNOTE: Postman supports raw WebSocket but NOT Socket.IO protocol natively.\nFor Socket.IO testing, use the HTML test page or a Socket.IO client.\nFor STOMP, use Postman WebSocket with STOMP frames.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "apiGatewayUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "rideServiceWsUrl",
+      "value": "ws://localhost:8089",
+      "type": "string"
+    },
+    {
+      "key": "notificationSocketUrl",
+      "value": "http://localhost:9093",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Setup - Get Tokens",
+      "item": [
+        {
+          "name": "0.1 Register Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "const result = json.result || {};",
+                  "const user = result.user || {};",
+                  "pm.environment.set('customer_token', result.accessToken);",
+                  "pm.environment.set('customerId', user.userId);",
+                  "console.log('customerId:', user.userId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"WS Test Customer\",\n  \"email\": \"ws_customer_{{$timestamp}}@test.com\",\n  \"password\": \"Test@123456\",\n  \"phoneNumber\": \"+84910000099\",\n  \"role\": \"CUSTOMER\",\n  \"deviceId\": \"ws-dev-{{$timestamp}}\",\n  \"platform\": \"android\",\n  \"userAgent\": \"Postman WS Test\",\n  \"appVersion\": \"1.0.0\"\n}"
+            },
+            "url": {
+              "raw": "{{apiGatewayUrl}}/auth/register",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "0.2 Register Driver",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "const result = json.result || {};",
+                  "const user = result.user || {};",
+                  "pm.environment.set('driver_token', result.accessToken);",
+                  "pm.environment.set('driverId', user.userId);",
+                  "console.log('driverId:', user.userId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"WS Test Driver\",\n  \"email\": \"ws_driver_{{$timestamp}}@test.com\",\n  \"password\": \"Test@123456\",\n  \"phoneNumber\": \"+84910000098\",\n  \"role\": \"DRIVER\",\n  \"deviceId\": \"ws-drv-{{$timestamp}}\",\n  \"platform\": \"android\",\n  \"userAgent\": \"Postman WS Test\",\n  \"appVersion\": \"1.0.0\"\n}"
+            },
+            "url": {
+              "raw": "{{apiGatewayUrl}}/auth/register",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. STOMP WebSocket - Driver Location (ride-service:8089)",
+      "description": "ride-service uses Spring STOMP over WebSocket at /ws/rides.\n\nConnection flow:\n1. Open WebSocket to ws://localhost:8089/ws/rides\n2. Send STOMP CONNECT frame\n3. Send location updates to /app/location.update\n4. Subscribe to /topic/driver-location/{driverId} for broadcasts\n\nNOTE: In Postman, create a WebSocket request to ws://localhost:8089/ws/rides/websocket (SockJS transport)",
+      "item": [
+        {
+          "name": "1.1 STOMP Connect + Subscribe",
+          "request": {
+            "method": "WSS",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "CONNECT\naccept-version:1.1,1.0\nheart-beat:10000,10000\n\n\u0000"
+            },
+            "url": {
+              "raw": "ws://localhost:8089/ws/rides/websocket",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "8089",
+              "path": ["ws", "rides", "websocket"]
+            },
+            "description": "STOMP CONNECT frame. After connecting, you'll receive:\nCONNECTED\nversion:1.1\nheart-beat:0,0\n\nThen send SUBSCRIBE frame to listen for location broadcasts."
+          }
+        },
+        {
+          "name": "1.2 STOMP Subscribe /topic/driver-location/{driverId}",
+          "request": {
+            "method": "WSS",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "SUBSCRIBE\nid:sub-0\ndestination:/topic/driver-location/{{driverId}}\n\n\u0000"
+            },
+            "url": {
+              "raw": "ws://localhost:8089/ws/rides/websocket",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "8089",
+              "path": ["ws", "rides", "websocket"]
+            },
+            "description": "Subscribe to driver location updates. You'll receive LOCATION messages when the driver's GPS position changes."
+          }
+        },
+        {
+          "name": "1.3 STOMP Send GPS Location Update",
+          "request": {
+            "method": "WSS",
+            "header": [
+              {
+                "key": "content-type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "SEND\ndestination:/app/location.update\ncontent-type:application/json\n\n{\"driverId\":\"{{driverId}}\",\"lat\":10.8221,\"lng\":106.6885}\u0000"
+            },
+            "url": {
+              "raw": "ws://localhost:8089/ws/rides/websocket",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "8089",
+              "path": ["ws", "rides", "websocket"]
+            },
+            "description": "Send driver GPS coordinates via STOMP.\n\nPayload:\n{\n  \"driverId\": \"driver-user-id\",\n  \"lat\": 10.8221,\n  \"lng\": 106.6885\n}\n\nThis writes to Redis GEO and publishes Kafka driver.location.updated event."
+          }
+        },
+        {
+          "name": "1.4 STOMP Send Multiple GPS Updates (simulated movement)",
+          "request": {
+            "method": "WSS",
+            "header": [
+              {
+                "key": "content-type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "SEND\ndestination:/app/location.update\ncontent-type:application/json\n\n{\"driverId\":\"{{driverId}}\",\"lat\":10.8230,\"lng\":106.6890}\u0000\n\nSEND\ndestination:/app/location.update\ncontent-type:application/json\n\n{\"driverId\":\"{{driverId}}\",\"lat\":10.8240,\"lng\":106.6895}\u0000\n\nSEND\ndestination:/app/location.update\ncontent-type:application/json\n\n{\"driverId\":\"{{driverId}}\",\"lat\":10.8250,\"lng\":106.6900}\u0000"
+            },
+            "url": {
+              "raw": "ws://localhost:8089/ws/rides/websocket",
+              "protocol": "ws",
+              "host": ["localhost"],
+              "port": "8089",
+              "path": ["ws", "rides", "websocket"]
+            },
+            "description": "Send multiple GPS updates to simulate driver movement. Each update writes to Redis GEO."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Socket.IO - Ride Notifications (notification-service:9093)",
+      "description": "notification-service uses Socket.IO (corundum) on port 9093.\n\nSocket.IO protocol is NOT raw WebSocket — it has its own handshake (EIO=4).\nPostman WebSocket cannot do Socket.IO handshake natively.\n\nUse one of these approaches:\nA) Browser console with Socket.IO client library\nB) The HTML test page included in this collection (Section 3)\nC) Postman's built-in Socket.IO support (Postman v10.21+)\n\nIf using Postman Socket.IO support:\n1. Create new request → change method to 'Socket.IO'\n2. Enter URL: http://localhost:9093\n3. Add query param: userId={your-user-id}\n4. Connect and emit/listen events",
+      "item": [
+        {
+          "name": "2.1 Socket.IO Events Reference",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{notificationSocketUrl}}",
+              "host": ["{{notificationSocketUrl}}"]
+            },
+            "description": "This is a placeholder. Use Socket.IO client or Postman Socket.IO support.\n\nEvents to EMIT (Client → Server):\n- join_room: send bookingId string\n- leave_room: send bookingId string\n- send_message: send { bookingId, message, senderId }\n\nEvents to LISTEN (Server → Client):\n- new_notification: { userId, title, message, type, status, createdAt }\n- joined_room_success: { bookingId, status }\n- left_room_success: { bookingId, status }\n- receive_message: { bookingId, message, senderId }\n\nConnection URL: http://localhost:9093?userId={userId}\n\nKafka topics that trigger notifications:\n- ride.created → 'Đang tìm tài xế...'\n- ride.assigned/ride.accepted → 'Đã tìm thấy tài xế!'\n- ride.rejected → 'Tài xế đã từ chối. Đang tìm tài xế khác...'\n- ride.arrived → 'Tài xế đã đến điểm đón!'\n- ride.started → 'Chuyến đi đã bắt đầu.'\n- ride.completed → 'Chuyến đi đã hoàn thành.'\n- ride.cancelled → 'Chuyến đi đã bị hủy.'\n- booking.timeout → 'Không tìm thấy tài xế.'\n- payment.completed → 'Thanh toán thành công!'"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Notification REST API (notification-service via gateway)",
+      "description": "Test notification-service REST endpoints through API Gateway.",
+      "item": [
+        {
+          "name": "3.1 Get User Notifications",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('Notifications returned', function () {",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(json.result).to.have.property('content');",
+                  "    pm.expect(json.result.content).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{customer_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/notifications/user/{{customerId}}?page=0&size=10",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "notifications", "user", "{{customerId}}"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. E2E Flow - Create Booking + Watch WebSocket",
+      "description": "Step-by-step flow:\n1. Create a booking (this triggers Kafka ride.created)\n2. notification-service consumes ride.created → emits Socket.IO 'new_notification'\n3. matching-service assigns driver → Kafka ride.assigned\n4. notification-service consumes ride.assigned → emits Socket.IO 'new_notification'\n5. Driver sends GPS via STOMP WebSocket\n\nFor each step, check the Socket.IO client or notification REST API.",
+      "item": [
+        {
+          "name": "4.1 Create Booking (CASH)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "const result = json.result || {};",
+                  "pm.test('Booking created', function () {",
+                  "    pm.expect(json.code).to.eql(200);",
+                  "    pm.expect(result.id).to.be.a('string');",
+                  "});",
+                  "pm.environment.set('bookingId', result.id);",
+                  "console.log('bookingId:', result.id, '- Use this to join_room in Socket.IO');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{customer_token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pickupLocation\": \"12 Nguyen Van Bao, Go Vap, HCMC\",\n  \"dropoffLocation\": \"Tan Son Nhat Airport\",\n  \"customerNote\": \"WS test booking\",\n  \"pickupCoordinates\": { \"lat\": 10.8221, \"lng\": 106.6885 },\n  \"dropoffCoordinates\": { \"lat\": 10.8188, \"lng\": 106.6619 },\n  \"vehicleType\": \"SEDAN\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": 75000.00,\n  \"idempotencyKey\": \"{{$guid}}\"\n}"
+            },
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/bookings",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "4.2 Check Booking Status (poll after Socket.IO notification)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{customer_token}}", "type": "string" }]
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/bookings/{{bookingId}}",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "bookings", "{{bookingId}}"]
+            },
+            "description": "Poll booking status. After matching-service assigns a driver:\n- Kafka ride.assigned emitted\n- notification-service sends Socket.IO 'new_notification' to customer\n- booking status changes to ASSIGNED\n\nExpected flow:\nCREATED → MATCHING → ASSIGNED → ACCEPTED → PICKUP → IN_PROGRESS → COMPLETED"
+          }
+        },
+        {
+          "name": "4.3 Driver Arrive (triggers ride.arrived → Socket.IO notification)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{driver_token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/rides/{{rideId}}/arrive",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "rides", "{{rideId}}", "arrive"]
+            },
+            "description": "Driver arrives at pickup. This triggers:\n1. Kafka ride.arrived\n2. notification-service → Socket.IO 'new_notification' to customer: 'Tài xế đã đến điểm đón!'\n3. Booking status → PICKUP"
+          }
+        },
+        {
+          "name": "4.4 Driver Start (triggers ride.started → Socket.IO notification)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{driver_token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/rides/{{rideId}}/start",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "rides", "{{rideId}}", "start"]
+            },
+            "description": "Driver starts ride. This triggers:\n1. Kafka ride.started\n2. notification-service → Socket.IO 'new_notification': 'Chuyến đi đã bắt đầu.'\n3. Booking status → IN_PROGRESS"
+          }
+        },
+        {
+          "name": "4.5 Driver Complete (triggers ride.completed → Socket.IO notification)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{driver_token}}", "type": "string" }]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"finalFare\": 75000.00,\n  \"paymentMethod\": \"CASH\"\n}"
+            },
+            "url": {
+              "raw": "{{apiGatewayUrl}}/api/v1/rides/{{rideId}}/complete",
+              "host": ["{{apiGatewayUrl}}"],
+              "path": ["api", "v1", "rides", "{{rideId}}", "complete"]
+            },
+            "description": "Driver completes ride. This triggers:\n1. Kafka ride.completed\n2. notification-service → Socket.IO 'new_notification': 'Chuyến đi đã hoàn thành.'\n3. Booking status → COMPLETED"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Socket.IO Test Script (Browser Console)",
+      "description": "Copy-paste these scripts into browser console (F12) to test Socket.IO.\n\nRequires: <script src=\"https://cdn.socket.io/4.7.4/socket.io.min.js\"></script>\nOr use this in an HTML page.",
+      "item": [
+        {
+          "name": "5.1 Connect + Join Room + Listen Events",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:9093/socket.io/?EIO=4&transport=polling",
+              "host": ["http:localhost:9093"],
+              "path": ["socket.io"],
+              "query": [
+                { "key": "EIO", "value": "4" },
+                { "key": "transport", "value": "polling" }
+              ]
+            },
+            "description": "Test Socket.IO polling endpoint is alive.\n\nFull browser test script:\n\n```javascript\n// 1. Load Socket.IO client\n// <script src=\"https://cdn.socket.io/4.7.4/socket.io.min.js\"></script>\n\n// 2. Connect with userId\nconst socket = io('http://localhost:9093', {\n  query: { userId: '{{customerId}}' }\n});\n\n// 3. Listen for connection\nsocket.on('connect', () => {\n  console.log('✅ Connected:', socket.id);\n  \n  // 4. Join booking room\n  socket.emit('join_room', '{{bookingId}}');\n});\n\n// 5. Listen for room join confirmation\nsocket.on('joined_room_success', (data) => {\n  console.log('🏠 Joined room:', data);\n});\n\n// 6. Listen for ride notifications\nsocket.on('new_notification', (data) => {\n  console.log('🔔 Notification:', data);\n  // data = { userId, title, message, type, status, createdAt }\n});\n\n// 7. Listen for chat messages\nsocket.on('receive_message', (data) => {\n  console.log('💬 Message:', data);\n});\n\n// 8. Disconnect\n// socket.disconnect();\n```\n\nExpected notifications during ride lifecycle:\n- ride.created → 'Đang tìm tài xế gần nhất cho bạn...'\n- ride.assigned → 'Đã tìm thấy tài xế! Tài xế đang đến điểm đón của bạn.'\n- ride.arrived → 'Tài xế đã đến điểm đón!'\n- ride.started → 'Chuyến đi đã bắt đầu. Chúc bạn một chuyến đi an toàn!'\n- ride.completed → 'Chuyến đi đã hoàn thành. Cảm ơn bạn đã sử dụng dịch vụ!'\n- ride.cancelled → 'Chuyến đi của bạn đã bị hủy. Lý do: ...'"
+          }
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{customer_token}}", "type": "string" }]
+  }
+}

@@ -5,6 +5,7 @@ import iuh.fit.driverservice.dto.request.CompleteCurrentRideRequest;
 import iuh.fit.driverservice.dto.request.HandleDriverAssignmentRequest;
 import iuh.fit.driverservice.dto.request.UpdateCurrentRideStatusRequest;
 import iuh.fit.driverservice.dto.request.UpdateDriverAvailabilityRequest;
+import iuh.fit.driverservice.dto.request.UpdateDriverLocationRequest;
 import iuh.fit.driverservice.dto.request.UpsertDriverProfileRequest;
 import iuh.fit.driverservice.dto.response.DriverAvailabilityResponse;
 import iuh.fit.driverservice.dto.response.DriverCurrentRideResponse;
@@ -57,6 +58,23 @@ public class DriverProfileController {
         return ApiResponse.<DriverAvailabilityResponse>builder()
                 .message("Updated driver availability successfully")
                 .result(driverProfileService.updateAvailability(currentUserFacade.getCurrentUserId(), request))
+                .build();
+    }
+
+    /**
+     * Heartbeat location endpoint for ONLINE drivers (no active ride).
+     * Updates PostgreSQL coordinates and Redis GEO for matching.
+     * driverId is extracted from JWT — never from request body.
+     */
+    @PatchMapping("/location")
+    public ApiResponse<DriverAvailabilityResponse> updateLocation(
+            @Valid @RequestBody UpdateDriverLocationRequest request) {
+        return ApiResponse.<DriverAvailabilityResponse>builder()
+                .message("Updated driver location successfully")
+                .result(driverProfileService.updateLocation(
+                        currentUserFacade.getCurrentUserId(),
+                        request.getLat(),
+                        request.getLng()))
                 .build();
     }
 
