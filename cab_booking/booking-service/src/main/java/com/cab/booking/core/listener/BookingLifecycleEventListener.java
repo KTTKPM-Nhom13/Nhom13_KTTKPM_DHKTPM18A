@@ -2,6 +2,7 @@ package com.cab.booking.core.listener;
 
 import com.cab.booking.core.dto.event.inbound.DriverAcceptedEvent;
 import com.cab.booking.core.dto.event.inbound.DriverRejectedEvent;
+import com.cab.booking.core.dto.event.inbound.MatchingFailedEvent;
 import com.cab.booking.core.dto.event.inbound.PaymentCompletedEvent;
 import com.cab.booking.core.dto.event.inbound.PaymentFailedEvent;
 import com.cab.booking.core.dto.event.inbound.RideArrivedEvent;import com.cab.booking.core.dto.event.inbound.RideCancelledEvent;import com.cab.booking.core.dto.event.inbound.RideAssignedEvent;
@@ -16,6 +17,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -32,6 +34,9 @@ public class BookingLifecycleEventListener {
 
     private static final Duration PROCESSED_EVENT_TTL = Duration.ofHours(6);
     private static final String PROCESSED_EVENT_PREFIX = "booking:processed-event:";
+
+    @Value("${app.booking.timeout.matching-minutes:5}")
+    private long matchingTimeoutMinutes;
 
     private final BookingRepository bookingRepository;
     private final BookingService bookingService;
@@ -101,36 +106,30 @@ public class BookingLifecycleEventListener {
         }
     }
 
-    @KafkaListener(
-            topics = "ride.cancelled",
-            groupId = "booking-service-group",
-            containerFactory = "rideCancelledKafkaListenerContainerFactory"
-    )
-        @Transactional
-        public void handleRideCancelled(String message) {
-            log.info("[ride.cancelled] message={}", message);
-            try {
-                RideCancelledEvent event = objectMapper.readValue(message, RideCancelledEvent.class);
-
-                if (isDuplicateEvent("ride.cancelled", event.getEventId())) {
-                    return;
-                }
-
-                UUID bookingId = UUID.fromString(event.getBookingId() != null ? event.getBookingId() : event.getRideId());
-                Booking booking = bookingRepository.findById(bookingId).orElse(null);
-                if (booking == null) return;
-
-                if (booking.getStatus() == BookingStatus.CANCELLED || hasReachedOrPassed(booking.getStatus(), BookingStatus.ACCEPTED)) {
-                    log.info("Booking {} already {}, ignoring ride.cancelled", bookingId, booking.getStatus());
-                    return;
-                }
-
-                log.info("Process ride.cancelled from system | bookingId={} | reason={}", bookingId, event.getReason());
-                bookingService.cancelRide(bookingId, "System Canceled: " + event.getReason());
-            } catch (Exception ex) {
-                log.error("Error processing ride.cancelled: {}", ex.getMessage());
+    @KafkaListener(topics = "ride.cancelled", groupId = "booking-service-group")
+    @Transactional
+    public void handleRideCancelled(RideCancelledEvent event) {
+        log.info("[ride.cancelled] rideId={} | reason={}", event.getRideId(), event.getReason());
+        try {
+            if (isDuplicateEvent("ride.cancelled", event.getEventId())) {
+                return;
             }
+
+            UUID bookingId = UUID.fromString(event.getBookingId() != null ? event.getBookingId() : event.getRideId());
+            Booking booking = bookingRepository.findById(bookingId).orElse(null);
+            if (booking == null) return;
+
+            if (booking.getStatus() == BookingStatus.CANCELLED || hasReachedOrPassed(booking.getStatus(), BookingStatus.ACCEPTED)) {
+                log.info("Booking {} already {}, ignoring ride.cancelled", bookingId, booking.getStatus());
+                return;
+            }
+
+            log.info("Process ride.cancelled from system | bookingId={} | reason={}", bookingId, event.getReason());
+            bookingService.cancelRide(bookingId, "System Canceled: " + event.getReason());
+        } catch (Exception ex) {
+            log.error("Error processing ride.cancelled: {}", ex.getMessage());
         }
+    }
 
     @KafkaListener(topics = "ride.arrived", groupId = "booking-service-group")
     @Transactional
@@ -201,7 +200,7 @@ public class BookingLifecycleEventListener {
                 com.cab.booking.core.dto.event.outbound.RideCreatedEvent rideCreatedEvent = impl.buildRideCreatedEventFromBooking(booking);
                 bookingEventPublisher.publishRideCreated(rideCreatedEvent);
             }
-            long timeoutScore = Instant.now().plus(Duration.ofMinutes(3)).toEpochMilli();
+            long timeoutScore = Instant.now().plus(Duration.ofMinutes(matchingTimeoutMinutes)).toEpochMilli();
             redisTemplate.opsForZSet().add("booking:timeout:queue", booking.getId().toString(), timeoutScore);
             return;
         }
@@ -213,6 +212,38 @@ public class BookingLifecycleEventListener {
         }
 
         log.warn("Booking {} is in status {}, skipping payment.completed", booking.getId(), booking.getStatus());
+    }
+
+    @KafkaListener(topics = "matching.failed", groupId = "booking-service-group")
+    public void handleMatchingFailed(MatchingFailedEvent event) {
+        log.info("[matching.failed] attempt={} | reason={}", event.getAttempt(), event.getReason());
+        try {
+            String rideId = event.getRideId() != null ? event.getRideId() : event.getBookingId();
+            if (rideId == null || rideId.isBlank()) {
+                log.warn("[matching.failed] event has no rideId/bookingId, skipping.");
+                return;
+            }
+
+            UUID bookingId = UUID.fromString(rideId);
+            Booking booking = bookingRepository.findById(bookingId).orElse(null);
+            if (booking == null) {
+                log.warn("[matching.failed] Booking not found | rideId={}", rideId);
+                return;
+            }
+
+            if (booking.getStatus() != BookingStatus.MATCHING) {
+                log.info("[matching.failed] Booking {} is {}, ignoring (not in MATCHING)", bookingId, booking.getStatus());
+                return;
+            }
+
+            // Do NOT cancel the booking — leave it in MATCHING status.
+            // The BookingTimeoutScheduler will cancel it after the configured total booking timeout.
+            log.warn("No driver available after {} matching attempts; waiting for booking timeout | bookingId={} | reason={}",
+                    event.getAttempt(), bookingId, event.getReason());
+
+        } catch (Exception ex) {
+            log.error("Error processing matching.failed: {}", ex.getMessage());
+        }
     }
 
     @KafkaListener(

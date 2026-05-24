@@ -66,5 +66,9 @@ app:
       /v3/api-docs/**,
       /swagger-ui/**,
       /swagger-ui.html,
-      /api/v1/rides/location,
       /api/v1/rides/ping
+
+ride-socket:
+  host: 0.0.0.0
+  port: 9095
+  allowed-origins: "*"

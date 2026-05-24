@@ -34,9 +34,13 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
-        # BOOKING PHÁT RA CÁC SỰ KIỆN LIÊN QUAN ĐẾN ĐƠN ĐẶT (Đã xóa ride-assigned khỏi đây)
+        # BOOKING PHÁT RA CÁC SỰ KIỆN LIÊN QUAN ĐẾN ĐƠN ĐẶT
+        # JsonSerializer sets __TypeId__ header using these aliases so downstream
+        # consumers (matching, ride, driver) can resolve the DTO via their type mappings.
+        spring.json.add.type.headers: true
         spring.json.type.mapping: >
           ride-created:com.cab.booking.core.dto.event.outbound.RideCreatedEvent,
+          payment-requested:com.cab.booking.core.dto.event.outbound.PaymentRequestedEvent,
           ride-cancelled:com.cab.booking.core.dto.event.outbound.RideCancelledEvent,
           booking-timeout:com.cab.booking.core.dto.event.outbound.BookingTimeoutEvent
     consumer:
@@ -48,15 +52,17 @@ spring:
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: "*"
         # BOOKING NHẬN VỀ CÁC SỰ KIỆN TỪ MATCHING, RIDE, VÀ PAYMENT
-        # Đã gom driver-matched thành ride-assigned và thêm đủ dấu phẩy
+        # All Kafka domain events use typed DTO classes. No Map payloads.
         spring.json.type.mapping: >
           ride-assigned:com.cab.booking.core.dto.event.inbound.RideAssignedEvent,
           com.cab.matching.core.dto.event.outbound.RideAssignedEvent:com.cab.booking.core.dto.event.inbound.RideAssignedEvent,
           ride-accepted:com.cab.booking.core.dto.event.inbound.DriverAcceptedEvent,
           ride-rejected:com.cab.booking.core.dto.event.inbound.DriverRejectedEvent,
+          ride-cancelled:com.cab.booking.core.dto.event.inbound.RideCancelledEvent,
           ride-arrived:com.cab.booking.core.dto.event.inbound.RideArrivedEvent,
           ride-started:com.cab.booking.core.dto.event.inbound.RideStartedEvent,
           ride-completed:com.cab.booking.core.dto.event.inbound.RideCompletedEvent,
+          matching-failed:com.cab.booking.core.dto.event.inbound.MatchingFailedEvent,
           payment-completed:com.cab.booking.core.dto.event.inbound.PaymentCompletedEvent,
           payment-failed:com.cab.booking.core.dto.event.inbound.PaymentFailedEvent
 
@@ -130,6 +136,11 @@ resilience4j:
 # Cấu hình bảo mật — đọc bởi iuh.fit.common.config.SecurityConfig
 # JWT được decode bằng RSA public key (từ certs/ hoặc biến môi trường JWT_PRIVATE_KEY)
 app:
+  booking:
+    timeout:
+      # Total booking timeout in minutes — how long a booking stays in MATCHING before auto-cancel.
+      # Applies to both CASH and online-payment bookings.
+      matching-minutes: ${BOOKING_TIMEOUT_MINUTES:5}
   services:
     pricing:
       base-url: ${PRICING_SERVICE_URL:http://localhost:8084}

@@ -1,0 +1,427 @@
+{
+  "info": {
+    "name": "CAB Ride Service — Socket.IO v4 Realtime Tracking Test",
+    "_postman_id": "ride-socket-io-test-001",
+    "description": "Verify Socket.IO v4 realtime GPS tracking in ride-service.\n\n## Prerequisites\n1. ride-service running on port 8085 (HTTP) and 9095 (Socket.IO)\n2. A valid DRIVER JWT token\n3. A valid ride ID with status ACCEPTED/PICKUP/IN_PROGRESS\n4. `socket.io-client@4` npm package installed (for script test)\n\n## Socket.IO v4 Connection\n- **Protocol:** Socket.IO v4 / Engine.IO v4 / EIO=4\n- **Postman URL:** `ws://localhost:9095/socket.io/?EIO=4&transport=websocket&token={{driver_jwt}}`\n- **Mobile/Node.js URL:** `http://localhost:9095` (socket.io-client@4 handles handshake)\n- **Auth (v4 style):** `{ auth: { token: jwt } }`\n- **Auth (fallback):** `?token=<JWT>` query param\n- Transport: websocket\n\n## Timestamp Format\nAll timestamps are ISO-8601 UTC strings (e.g. `2026-05-23T19:15:00Z`), NOT Unix epoch numbers.\n\n## Test Flow\n1. Health check (HTTP)\n2. Connect Socket.IO (EIO=4)\n3. join_ride\n4. driver.location.update (ACCEPTED ride)\n5. ASSIGNED ride → INVALID_STATUS rejection\n6. Invalid driver test\n7. leave_ride\n8. REST fallback (with rideId)\n9. REST fallback (without rideId → 400)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8085"
+    },
+    {
+      "key": "socket_port",
+      "value": "9095"
+    },
+    {
+      "key": "driver_jwt",
+      "value": "YOUR_DRIVER_JWT_HERE"
+    },
+    {
+      "key": "customer_jwt",
+      "value": "YOUR_CUSTOMER_JWT_HERE"
+    },
+    {
+      "key": "ride_id",
+      "value": "YOUR_RIDE_UUID_HERE"
+    },
+    {
+      "key": "assigned_ride_id",
+      "value": "YOUR_ASSIGNED_RIDE_UUID_HERE"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Health Check",
+      "item": [
+        {
+          "name": "GET /actuator/health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/actuator/health",
+              "host": ["{{base_url}}"],
+              "path": ["actuator", "health"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('ride-service is UP', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.status).to.eql('UP');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Socket.IO v4 Connect",
+      "description": "Use Postman WebSocket request or run `node scripts/socket-test.js`.\n\nConnection URL (Postman): `ws://localhost:9095/socket.io/?EIO=4&transport=websocket&token={{driver_jwt}}`\n\nProtocol: Socket.IO v4 / Engine.IO v4 / EIO=4\n\nExpected: Connected successfully. If JWT invalid → 401/disconnect.",
+      "item": [
+        {
+          "name": "WebSocket Connect (manual)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:{{socket_port}}/socket.io/?EIO=4&transport=websocket&token={{driver_jwt}}",
+              "host": ["ws://localhost:{{socket_port}}"],
+              "path": ["socket.io"],
+              "query": [
+                { "key": "EIO", "value": "4" },
+                { "key": "transport", "value": "websocket" },
+                { "key": "token", "value": "{{driver_jwt}}" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// In Postman WebSocket, expect to receive '0{\"sid\":\"...\"}' (open packet)",
+                  "pm.test('Socket.IO v4 connected (EIO=4)', function () {",
+                  "    pm.expect(pm.response.text()).to.include('sid');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. join_ride",
+      "description": "After connecting via WebSocket, emit:\n\n```\n42[\"join_ride\",{\"rideId\":\"{{ride_id}}\"}]\n```\n\nExpected response:\n```json\n{\"rideId\":\"{{ride_id}}\",\"status\":\"JOINED\"}\n```",
+      "item": [
+        {
+          "name": "Emit join_ride (WebSocket frame)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:{{socket_port}}/socket.io/?EIO=4&transport=websocket&token={{driver_jwt}}",
+              "host": ["ws://localhost:{{socket_port}}"],
+              "path": ["socket.io"],
+              "query": [
+                { "key": "EIO", "value": "4" },
+                { "key": "transport", "value": "websocket" },
+                { "key": "token", "value": "{{driver_jwt}}" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "42[\"join_ride\",{\"rideId\":\"{{ride_id}}\"}]"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Expected: 42[\"joined_ride\",{\"rideId\":\"...\",\"status\":\"JOINED\"}]",
+                  "pm.test('joined_ride received', function () {",
+                  "    var text = pm.response.text();",
+                  "    pm.expect(text).to.include('joined_ride');",
+                  "    pm.expect(text).to.include('JOINED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. driver.location.update (ACCEPTED ride)",
+      "description": "Emit location update from driver for an ACCEPTED ride:\n\n```\n42[\"driver.location.update\",{\"rideId\":\"{{ride_id}}\",\"lat\":10.7769,\"lng\":106.7009,\"heading\":120,\"speed\":32}]\n```\n\nExpected: Server broadcasts `driver.location.updated` to the ride room. Timestamp is ISO-8601 UTC string.",
+      "item": [
+        {
+          "name": "Emit driver.location.update (WebSocket frame)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:{{socket_port}}/socket.io/?EIO=4&transport=websocket&token={{driver_jwt}}",
+              "host": ["ws://localhost:{{socket_port}}"],
+              "path": ["socket.io"],
+              "query": [
+                { "key": "EIO", "value": "4" },
+                { "key": "transport", "value": "websocket" },
+                { "key": "token", "value": "{{driver_jwt}}" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "42[\"driver.location.update\",{\"rideId\":\"{{ride_id}}\",\"lat\":10.7769,\"lng\":106.7009,\"heading\":120,\"speed\":32}]"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Expected: 42[\"driver.location.updated\",{\"eventType\":\"DRIVER_LOCATION_UPDATED\",...}]",
+                  "// Timestamp should be ISO-8601 UTC string, not a number",
+                  "pm.test('driver.location.updated received', function () {",
+                  "    var text = pm.response.text();",
+                  "    pm.expect(text).to.include('driver.location.updated');",
+                  "    pm.expect(text).to.include('DRIVER_LOCATION_UPDATED');",
+                  "});",
+                  "pm.test('timestamp is ISO string', function () {",
+                  "    var text = pm.response.text();",
+                  "    // ISO-8601 pattern: YYYY-MM-DDTHH:mm:ssZ or with offset",
+                  "    pm.expect(text).to.include('timestamp');",
+                  "    // Verify it is NOT a bare number (old format was milliseconds)",
+                  "    var match = text.match(/\"timestamp\":\"(\\d{4}-\\d{2}-\\d{2}T/);",
+                  "    pm.expect(match).to.not.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. ASSIGNED ride → INVALID_STATUS",
+      "description": "Test that a ride in ASSIGNED status rejects location updates.\n\nDriver has NOT accepted the ride yet, so GPS streaming is not allowed.\n\nExpected: `socket_error` with code `INVALID_STATUS`.\n\n> **Note:** You need a ride in ASSIGNED status for this test. Replace `{{assigned_ride_id}}` with a ride that is in ASSIGNED state.",
+      "item": [
+        {
+          "name": "join_ride for ASSIGNED ride",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:{{socket_port}}/socket.io/?EIO=4&transport=websocket&token={{driver_jwt}}",
+              "host": ["ws://localhost:{{socket_port}}"],
+              "path": ["socket.io"],
+              "query": [
+                { "key": "EIO", "value": "4" },
+                { "key": "transport", "value": "websocket" },
+                { "key": "token", "value": "{{driver_jwt}}" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "42[\"join_ride\",{\"rideId\":\"{{assigned_ride_id}}\"}]"
+            }
+          }
+        },
+        {
+          "name": "Emit location for ASSIGNED ride → expect INVALID_STATUS",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:{{socket_port}}/socket.io/?EIO=4&transport=websocket&token={{driver_jwt}}",
+              "host": ["ws://localhost:{{socket_port}}"],
+              "path": ["socket.io"],
+              "query": [
+                { "key": "EIO", "value": "4" },
+                { "key": "transport", "value": "websocket" },
+                { "key": "token", "value": "{{driver_jwt}}" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "42[\"driver.location.update\",{\"rideId\":\"{{assigned_ride_id}}\",\"lat\":10.7769,\"lng\":106.7009}]"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Expected: socket_error with INVALID_STATUS",
+                  "pm.test('INVALID_STATUS for ASSIGNED ride', function () {",
+                  "    var text = pm.response.text();",
+                  "    pm.expect(text).to.include('socket_error');",
+                  "    pm.expect(text).to.include('INVALID_STATUS');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Invalid Driver Test",
+      "description": "Connect with a customer JWT (not a driver), then try to send location.\n\nExpected: `socket_error` with code FORBIDDEN.",
+      "item": [
+        {
+          "name": "Emit location with customer JWT (WebSocket frame)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:{{socket_port}}/socket.io/?EIO=4&transport=websocket&token={{customer_jwt}}",
+              "host": ["ws://localhost:{{socket_port}}"],
+              "path": ["socket.io"],
+              "query": [
+                { "key": "EIO", "value": "4" },
+                { "key": "transport", "value": "websocket" },
+                { "key": "token", "value": "{{customer_jwt}}" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "42[\"driver.location.update\",{\"rideId\":\"{{ride_id}}\",\"lat\":10.7769,\"lng\":106.7009}]"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Expected: socket_error with FORBIDDEN",
+                  "pm.test('socket_error FORBIDDEN received', function () {",
+                  "    var text = pm.response.text();",
+                  "    pm.expect(text).to.include('socket_error');",
+                  "    pm.expect(text).to.include('FORBIDDEN');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. leave_ride",
+      "description": "Emit leave_ride:\n\n```\n42[\"leave_ride\",{\"rideId\":\"{{ride_id}}\"}]\n```\n\nExpected: `left_ride` response.",
+      "item": [
+        {
+          "name": "Emit leave_ride (WebSocket frame)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "ws://localhost:{{socket_port}}/socket.io/?EIO=4&transport=websocket&token={{driver_jwt}}",
+              "host": ["ws://localhost:{{socket_port}}"],
+              "path": ["socket.io"],
+              "query": [
+                { "key": "EIO", "value": "4" },
+                { "key": "transport", "value": "websocket" },
+                { "key": "token", "value": "{{driver_jwt}}" }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "42[\"leave_ride\",{\"rideId\":\"{{ride_id}}\"}]"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Expected: 42[\"left_ride\",{\"rideId\":\"...\",\"status\":\"LEFT\"}]",
+                  "pm.test('left_ride received', function () {",
+                  "    var text = pm.response.text();",
+                  "    pm.expect(text).to.include('left_ride');",
+                  "    pm.expect(text).to.include('LEFT');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8. REST Fallback",
+      "item": [
+        {
+          "name": "POST /api/v1/rides/location (with rideId → 200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driver_jwt}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rideId\": \"{{ride_id}}\",\n  \"lat\": 10.7769,\n  \"lng\": 106.7009,\n  \"heading\": 120,\n  \"speed\": 32\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/rides/location",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "rides", "location"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('REST location update returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/rides/location (legacy, no rideId → 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{driver_jwt}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lat\": 10.7769,\n  \"lng\": 106.7009\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/rides/location",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "rides", "location"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Legacy mode without rideId is now deprecated and returns 400",
+                  "pm.test('Legacy REST without rideId returns 400 BAD_REQUEST', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

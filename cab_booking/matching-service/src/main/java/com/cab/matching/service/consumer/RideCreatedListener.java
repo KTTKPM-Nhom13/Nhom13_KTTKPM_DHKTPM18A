@@ -9,12 +9,21 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+/**
+ * Kafka listeners for matching-service.
+ * All listeners use typed DTO signatures — the JsonDeserializer handles
+ * deserialization via type mappings configured in application.yml.
+ *
+ * <p>All Kafka domain events must be DTO classes. No Map payloads except logs/debug/internal metadata.</p>
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class RideCreatedListener {
 
     private final MatchingService matchingService;
+
+    // ─── ride.created ───────────────────────────────────────────────
 
     @KafkaListener(topics = "ride.created", groupId = "matching-group")
     public void listenRideCreated(RideCreatedEvent event) {
@@ -29,6 +38,8 @@ public class RideCreatedListener {
         }
     }
 
+    // ─── matching.retry.requested ───────────────────────────────────
+
     @KafkaListener(topics = "matching.retry.requested", groupId = "matching-group")
     public void listenMatchingRetryRequested(RideCreatedEvent event) {
         log.info("Received matching.retry.requested: rideId={} | attempt={}",
@@ -42,6 +53,8 @@ public class RideCreatedListener {
         }
     }
 
+    // ─── ride.rejected ──────────────────────────────────────────────
+
     @KafkaListener(topics = "ride.rejected", groupId = "matching-group")
     public void listenRideRejected(DriverRejectedEvent event) {
         log.info("Received ride.rejected: rideId={} | driverId={}", event.aggregateId(), event.getDriverId());
@@ -52,6 +65,8 @@ public class RideCreatedListener {
                     event.aggregateId(), e.getMessage(), e);
         }
     }
+
+    // ─── ride.cancelled ─────────────────────────────────────────────
 
     @KafkaListener(topics = "ride.cancelled", groupId = "matching-group")
     public void listenRideCancelled(RideCancelledEvent event) {

@@ -1,48 +1,35 @@
 package com.cab.booking.config;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
-import org.springframework.kafka.core.DefaultKafkaProducerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.core.ProducerFactory;
-import org.springframework.kafka.support.serializer.JacksonJsonSerializer;
 
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Kafka configuration for booking-service.
+ *
+ * <p><b>Producer</b>: auto-configured by Spring Boot from {@code application.yaml}
+ * using {@code JsonSerializer} — sets {@code __TypeId__} headers so downstream
+ * consumers (matching-service, ride-service, driver-service) can resolve the DTO
+ * type via their {@code JsonDeserializer} type mappings.</p>
+ *
+ * <p><b>Payment consumer</b>: uses plain {@code StringDeserializer} because the
+ * payment-service publishes raw JSON strings to {@code payment.requested}.</p>
+ */
 @Configuration
 public class KafkaConfig {
 
     @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
     private String bootstrapServers;
 
-    @Bean
-    public ProducerFactory<String, Object> producerFactory() {
-        Map<String, Object> configProps = new HashMap<>();
-        configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JacksonJsonSerializer.class);
-        configProps.put("spring.json.type.mapping",
-                "ride-created:com.cab.booking.core.dto.event.outbound.RideCreatedEvent,"
-                        + "payment-requested:com.cab.booking.core.dto.event.outbound.PaymentRequestedEvent,"
-                        + "ride-cancelled:com.cab.booking.core.dto.event.outbound.RideCancelledEvent,"
-                        + "booking-timeout:com.cab.booking.core.dto.event.outbound.BookingTimeoutEvent");
-
-        return new DefaultKafkaProducerFactory<>(configProps);
-    }
-
-    @Bean
-    public KafkaTemplate<String, Object> kafkaTemplate() {
-        return new KafkaTemplate<>(producerFactory());
-    }
+    // ── Payment string consumer (for payment.requested / payment.completed) ──
 
     @Bean
     public ConsumerFactory<String, String> paymentStringConsumerFactory() {
@@ -60,19 +47,6 @@ public class KafkaConfig {
         ConcurrentKafkaListenerContainerFactory<String, String> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(paymentStringConsumerFactory());
-        return factory;
-    }
-
-    @Bean
-    public ConsumerFactory<String, String> rideCancelledStringConsumerFactory() {
-        return paymentStringConsumerFactory();
-    }
-
-    @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, String> rideCancelledKafkaListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, String> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(rideCancelledStringConsumerFactory());
         return factory;
     }
 }

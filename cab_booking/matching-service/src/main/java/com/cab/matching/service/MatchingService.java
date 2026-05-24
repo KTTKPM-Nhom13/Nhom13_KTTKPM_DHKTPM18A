@@ -6,6 +6,7 @@ import com.cab.matching.client.RankingEntry;
 import com.cab.matching.core.dto.event.inbound.DriverRejectedEvent;
 import com.cab.matching.core.dto.event.inbound.RideCancelledEvent;
 import com.cab.matching.core.dto.event.inbound.RideCreatedEvent;
+import com.cab.matching.core.dto.event.outbound.MatchingFailedEvent;
 import com.cab.matching.core.dto.event.outbound.RideAssignedEvent;
 import com.cab.matching.core.enums.VehicleType;
 import com.cab.matching.core.enums.VehicleTypeNormalizer;
@@ -37,7 +38,7 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class MatchingService {
 
-    private static final String DRIVER_LOCATION_KEY = "driver:locations";
+    private static final String DRIVER_LOCATION_KEY = "driver:available:locations";
     private static final String DRIVER_STATUS_PREFIX = "driver:status:";
     private static final String DRIVER_VEHICLE_TYPE_PREFIX = "driver:vehicleType:";
     private static final String DRIVER_PROFILE_PREFIX = "driver:profile:";
@@ -48,6 +49,7 @@ public class MatchingService {
     private static final String MATCHING_FAILED_PREFIX = "matching:failed:";
     private static final String MATCHING_DRIVER_PREFIX = "matching:driver:";
     private static final String MATCHING_ATTEMPT_PREFIX = "matching:attempt:";
+    private static final String MATCHING_COOLDOWN_PREFIX = "matching:cooldown:";
     private static final String RIDE_REJECTED_DRIVERS_PREFIX = "ride:%s:rejected-drivers";
     private static final String DRIVER_STATUS_AVAILABLE = "AVAILABLE";
     private static final String DRIVER_LOCK_VALUE = "LOCKED";
@@ -58,6 +60,7 @@ public class MatchingService {
     private static final long MATCHING_STATE_TTL_HOURS = 2L;
     private static final long RETRY_DELAY_SECONDS = 5L;
     private static final int MAX_MATCHING_ATTEMPTS = 3;
+    private static final long COOLDOWN_SECONDS = 30L;
     private static final String TOPIC_RIDE_ASSIGNED = "ride.assigned";
     private static final String TOPIC_RIDE_CANCELLED = "ride.cancelled";
     private static final String TOPIC_MATCHING_RETRY_REQUESTED = "matching.retry.requested";
@@ -84,8 +87,10 @@ public class MatchingService {
             log.info("Skip duplicate matching event because ride is already assigned | rideId={}", rideId);
             return;
         }
-        if (hasFailed(rideId)) {
-            log.info("Skip duplicate matching event because ride already reached final matching failure | rideId={}", rideId);
+        // Cooldown check: if a cooldown key exists, skip this attempt to prevent tight loops.
+        // This replaces the old permanent hasFailed() block.
+        if (isCoolingDown(rideId)) {
+            log.info("Skip matching event during cooldown period | rideId={}", rideId);
             return;
         }
 
@@ -125,7 +130,7 @@ public class MatchingService {
             return;
         }
 
-        log.info("Start matching | rideId={} | vehicleType={}", event.rideId(), requestedVehicleType);
+        log.info("Start matching | rideId={} | vehicleType={} | attempt={}", event.rideId(), requestedVehicleType, event.attemptOrDefault());
 
         List<String> excludedDriverIds = withRejectedDrivers(event.rideId(), event.excludedDriverIds());
         List<DriverFeatureDto> candidates = fetchCandidatesFromRedis(
@@ -309,16 +314,39 @@ public class MatchingService {
         processMatching(cached);
     }
 
+    /**
+     * Schedule a retry if the booking is still active.
+     *
+     * <p>When max attempts within a cycle are reached:
+     * <ol>
+     *   <li>Publish {@code matching.failed} for observability</li>
+     *   <li>Set a cooldown key ({@code matching:cooldown:{rideId}}) with 30s TTL</li>
+     *   <li>Schedule a new cycle retry after the cooldown expires</li>
+     * </ol>
+     * <p>This creates a cycle-based retry pattern:
+     * cycle 1: attempts 1→2→3 → cooldown 30s → cycle 2: attempts 1→2→3 → cooldown 30s → ...
+     * <p>The loop terminates only when:
+     * <ul>
+     *   <li>BookingTimeoutScheduler publishes ride.cancelled</li>
+     *   <li>A driver is successfully assigned (ride.assigned)</li>
+     * </ul>
+     */
     private void scheduleRetryIfPossible(RideCreatedEvent event) {
         int currentAttempt = event.attemptOrDefault();
-        if (currentAttempt >= MAX_MATCHING_ATTEMPTS || isBookingCancelled(event.rideId())) {
-            log.warn("Matching failed after {} attempts or cancelled | rideId={}", currentAttempt, event.rideId());
-            markFailed(event.rideId(), "NO_DRIVER_AVAILABLE");
-            publishRideCancelled(event, currentAttempt, "NO_DRIVER_AVAILABLE_AFTER_RETRY");
+        if (currentAttempt >= MAX_MATCHING_ATTEMPTS) {
+            // Max attempts in this cycle reached — enter cooldown before next cycle
+            log.warn("No driver available after {} attempts in current cycle; entering cooldown | rideId={}",
+                    currentAttempt, event.rideId());
+
+            // Publish matching.failed for observability (does NOT permanently block)
             publishMatchingFailed(event, currentAttempt, "NO_DRIVER_AVAILABLE");
+
+            // Set cooldown key to prevent tight loops; schedule next cycle after cooldown
+            setCooldownAndScheduleCycleRetry(event);
             return;
         }
 
+        // Still within a cycle — schedule next attempt with short delay
         int nextAttempt = currentAttempt + 1;
         double nextRadiusKm = switch (nextAttempt) {
             case 2 -> 5.0;
@@ -357,14 +385,77 @@ public class MatchingService {
         );
 
         java.util.concurrent.CompletableFuture.delayedExecutor(RETRY_DELAY_SECONDS, TimeUnit.SECONDS).execute(() -> {
-            if (isBookingCancelled(event.rideId())) {
-                log.info("Skip scheduled retry for cancelled rideId={}", event.rideId());
+            if (isBookingCancelled(event.rideId()) || hasAssigned(event.rideId())) {
+                log.info("Skip scheduled retry for cancelled/assigned rideId={}", event.rideId());
                 return;
             }
             kafkaTemplate.send(TOPIC_MATCHING_RETRY_REQUESTED, retryEvent.rideId(), retryEvent);
             log.info("Scheduled matching retry requested | topic={} | rideId={} | attempt={} | radiusKm={} | delaySeconds={}",
                     TOPIC_MATCHING_RETRY_REQUESTED, retryEvent.rideId(), retryEvent.matchingAttempt(),
                     retryEvent.searchRadiusKm(), RETRY_DELAY_SECONDS);
+        });
+    }
+
+    /**
+     * Set a cooldown key and schedule a new matching cycle after the cooldown expires.
+     * The cooldown prevents tight retry loops when no drivers are available.
+     *
+     * <p>The new cycle resets attempt to 1 with the original search radius,
+     * effectively starting a fresh matching cycle.</p>
+     */
+    private void setCooldownAndScheduleCycleRetry(RideCreatedEvent event) {
+        String cooldownKey = MATCHING_COOLDOWN_PREFIX + event.rideId();
+        redisTemplate.opsForValue().set(cooldownKey, "COOLING", COOLDOWN_SECONDS, TimeUnit.SECONDS);
+        log.info("Set matching cooldown | rideId={} | cooldownSeconds={}", event.rideId(), COOLDOWN_SECONDS);
+
+        java.util.concurrent.CompletableFuture.delayedExecutor(COOLDOWN_SECONDS, TimeUnit.SECONDS).execute(() -> {
+            // Clean up cooldown key (it will auto-expire, but delete early for clarity)
+            redisTemplate.delete(cooldownKey);
+
+            // Pre-checks before starting a new cycle
+            if (isBookingCancelled(event.rideId())) {
+                log.info("Skip cooldown retry for cancelled rideId={}", event.rideId());
+                return;
+            }
+            if (hasAssigned(event.rideId())) {
+                log.info("Skip cooldown retry — ride already assigned | rideId={}", event.rideId());
+                return;
+            }
+
+            // Build a fresh cycle retry event with attempt=1 and original radius
+            String normalizedVehicleType;
+            try {
+                normalizedVehicleType = VehicleTypeNormalizer.normalizeVehicleType(event.vehicleType()).name();
+            } catch (IllegalArgumentException ex) {
+                log.warn("Skip cooldown retry with invalid vehicleType | rideId={} | rawVehicleType={}",
+                        event.rideId(), event.vehicleType());
+                return;
+            }
+
+            RideCreatedEvent cycleRetryEvent = new RideCreatedEvent(
+                    UUID.randomUUID().toString(),
+                    event.type(),
+                    event.rideId(),
+                    event.customerId(),
+                    event.customerNote(),
+                    event.pickupAddress(),
+                    event.dropoffAddress(),
+                    event.pickup(),
+                    event.dropoff(),
+                    normalizedVehicleType,
+                    event.paymentMethod(),
+                    event.estimatedFare(),
+                    event.promoCode(),
+                    1,  // reset attempt to 1 for new cycle
+                    event.searchRadiusKmOrDefault(),
+                    true,
+                    event.excludedDriverIds(),
+                    Instant.now().toString()
+            );
+
+            kafkaTemplate.send(TOPIC_MATCHING_RETRY_REQUESTED, cycleRetryEvent.rideId(), cycleRetryEvent);
+            log.info("Scheduled new matching cycle after cooldown | topic={} | rideId={} | cooldownSeconds={}",
+                    TOPIC_MATCHING_RETRY_REQUESTED, cycleRetryEvent.rideId(), COOLDOWN_SECONDS);
         });
     }
 
@@ -382,6 +473,7 @@ public class MatchingService {
         redisTemplate.delete(MATCHING_ASSIGNED_PREFIX + rideId);
         redisTemplate.delete(MATCHING_DRIVER_PREFIX + rideId);
         redisTemplate.delete(MATCHING_ATTEMPT_PREFIX + rideId);
+        redisTemplate.delete(MATCHING_COOLDOWN_PREFIX + rideId);
         redisTemplate.delete(rejectedDriversKey(rideId));
         log.info("Processed ride.cancelled cleanup in matching-service | rideId={}", rideId);
     }
@@ -391,6 +483,11 @@ public class MatchingService {
         redisTemplate.opsForValue().set(MATCHING_DRIVER_PREFIX + rideId, driverId, MATCHING_STATE_TTL_HOURS, TimeUnit.HOURS);
     }
 
+    /**
+     * @deprecated No longer used for permanent failure blocking.
+     * Kept for reference. The new periodic rematch flow uses cooldown keys instead.
+     */
+    @Deprecated
     private void markFailed(String rideId, String reason) {
         redisTemplate.opsForValue().set(MATCHING_FAILED_PREFIX + rideId, reason, MATCHING_STATE_TTL_HOURS, TimeUnit.HOURS);
         releaseAssignedDriverLock(rideId, null);
@@ -402,31 +499,39 @@ public class MatchingService {
     }
 
     private void publishMatchingFailed(RideCreatedEvent event, int attempt, String reason) {
-        Map<String, Object> failedEvent = new HashMap<>();
-        failedEvent.put("eventId", UUID.randomUUID().toString());
-        failedEvent.put("eventType", "MATCHING_FAILED");
-        failedEvent.put("rideId", event.rideId());
-        failedEvent.put("bookingId", event.rideId());
-        failedEvent.put("customerId", event.customerId());
-        failedEvent.put("attempt", attempt);
-        failedEvent.put("reason", reason);
-        failedEvent.put("timestamp", Instant.now().toString());
+        MatchingFailedEvent failedEvent = MatchingFailedEvent.builder()
+                .eventId(UUID.randomUUID().toString())
+                .eventType("MATCHING_FAILED")
+                .rideId(event.rideId())
+                .bookingId(event.rideId())
+                .customerId(event.customerId())
+                .attempt(attempt)
+                .reason(reason)
+                .timestamp(Instant.now().toString())
+                .build();
         kafkaTemplate.send(TOPIC_MATCHING_FAILED, event.rideId(), failedEvent);
         log.warn("Published matching.failed | rideId={} | attempt={} | reason={}", event.rideId(), attempt, reason);
     }
 
+    /**
+     * Publish ride.cancelled using typed DTO.
+     * Currently not called — BookingTimeoutScheduler handles cancellation via booking-service.
+     * Kept for potential future use (e.g., explicit terminal failure policy).
+     */
     private void publishRideCancelled(RideCreatedEvent event, int attempt, String reason) {
-        Map<String, Object> cancelledEvent = new HashMap<>();
-        cancelledEvent.put("eventId", UUID.randomUUID().toString());
-        cancelledEvent.put("eventType", "RIDE_CANCELLED");
-        cancelledEvent.put("rideId", event.rideId());
-        cancelledEvent.put("bookingId", event.rideId());
-        cancelledEvent.put("customerId", event.customerId());
-        cancelledEvent.put("reason", reason + " (attempts: " + attempt + ")");
-        cancelledEvent.put("timestamp", Instant.now().toString());
+        com.cab.matching.core.dto.event.outbound.RideCancelledEvent cancelledEvent =
+                com.cab.matching.core.dto.event.outbound.RideCancelledEvent.builder()
+                        .eventId(UUID.randomUUID().toString())
+                        .eventType("RIDE_CANCELLED")
+                        .rideId(event.rideId())
+                        .bookingId(event.rideId())
+                        .customerId(event.customerId())
+                        .reason(reason + " (attempts: " + attempt + ")")
+                        .timestamp(Instant.now().toString())
+                        .build();
 
         kafkaTemplate.send(TOPIC_RIDE_CANCELLED, event.rideId(), cancelledEvent);
-        log.info("Published ride.cancelled from matching-service | rideId={} | reason={}", 
+        log.info("Published ride.cancelled from matching-service | rideId={} | reason={}",
                 event.rideId(), reason);
     }
 
@@ -654,6 +759,19 @@ public class MatchingService {
         return Boolean.TRUE.equals(redisTemplate.hasKey(MATCHING_ASSIGNED_PREFIX + rideId));
     }
 
+    /**
+     * Check if a ride is in cooldown period (between matching cycles).
+     * Returns true if the cooldown key exists with a short TTL.
+     * This prevents tight retry loops while allowing periodic retries.
+     */
+    private boolean isCoolingDown(String rideId) {
+        return Boolean.TRUE.equals(redisTemplate.hasKey(MATCHING_COOLDOWN_PREFIX + rideId));
+    }
+
+    /**
+     * @deprecated No longer used for permanent blocking. Replaced by {@link #isCoolingDown(String)}.
+     */
+    @Deprecated
     private boolean hasFailed(String rideId) {
         return Boolean.TRUE.equals(redisTemplate.hasKey(MATCHING_FAILED_PREFIX + rideId));
     }

@@ -18,6 +18,7 @@ import iuh.fit.common.exception.AppException;
 import iuh.fit.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import org.springframework.data.redis.core.RedisTemplate;
@@ -41,6 +42,9 @@ public class BookingServiceImpl implements BookingService {
     private static final String IDEMPOTENCY_KEY_PREFIX = "booking:idempotency:";
     private static final String BOOKING_CANCELLED_PREFIX = "booking:cancelled:";
     private static final Duration IDEMPOTENCY_TTL = Duration.ofHours(24);
+
+    @Value("${app.booking.timeout.matching-minutes:5}")
+    private long matchingTimeoutMinutes;
 
     private final BookingRepository bookingRepository;
     private final BookingStateMachine bookingStateMachine;
@@ -154,7 +158,7 @@ public class BookingServiceImpl implements BookingService {
             bookingEventPublisher.publishRideCreated(event);
             log.info("✅ RideCreated → Kafka | bookingId={} | fare={}", booking.getId(), verifiedFare);
 
-            long timeoutScore = Instant.now().plus(Duration.ofMinutes(3)).toEpochMilli();
+            long timeoutScore = Instant.now().plus(Duration.ofMinutes(matchingTimeoutMinutes)).toEpochMilli();
             redisTemplate.opsForZSet().add("booking:timeout:queue", booking.getId().toString(), timeoutScore);
         }
 
@@ -281,8 +285,13 @@ public class BookingServiceImpl implements BookingService {
         booking = bookingRepository.save(booking);
         redisTemplate.opsForValue().set("booking:" + bookingId, booking, Duration.ofHours(2));
 
-        log.info("Driver {} rejected booking {}. Status: ASSIGNED -> MATCHING (Waiting for rematch). Reason: {}",
-                driverId, bookingId, reason);
+        // Re-add timeout for the MATCHING state after driver rejection.
+        // The original timeout may have expired or been consumed by the scheduler.
+        long timeoutScore = Instant.now().plus(Duration.ofMinutes(matchingTimeoutMinutes)).toEpochMilli();
+        redisTemplate.opsForZSet().add("booking:timeout:queue", bookingId.toString(), timeoutScore);
+        log.info("Driver {} rejected booking {}. Status: ASSIGNED -> MATCHING (Waiting for rematch). "
+                + "Re-added booking timeout ({} min). Reason: {}",
+                driverId, bookingId, matchingTimeoutMinutes, reason);
         return BookingResponse.fromEntity(booking);
     }
 

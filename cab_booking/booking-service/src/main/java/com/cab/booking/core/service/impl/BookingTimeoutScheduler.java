@@ -7,6 +7,7 @@ import com.cab.booking.core.service.BookingEventPublisher;
 import com.cab.booking.core.statemachine.BookingStateMachine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -24,12 +25,15 @@ public class BookingTimeoutScheduler {
     public static final String TIMEOUT_QUEUE_KEY = "booking:timeout:queue";
     private static final String BOOKING_CANCELLED_PREFIX = "booking:cancelled:";
 
+    @Value("${app.booking.timeout.matching-minutes:5}")
+    private long matchingTimeoutMinutes;
+
     private final RedisTemplate<String, Object> redisTemplate;
     private final BookingRepository bookingRepository;
     private final BookingStateMachine bookingStateMachine;
     private final BookingEventPublisher bookingEventPublisher;
 
-    @Scheduled(fixedRate = 10000) // Chạy mỗi 10 giây
+    @Scheduled(fixedRate = 10000) // Runs every 10 seconds
     @Transactional
     public void processBookingTimeouts() {
         long now = Instant.now().toEpochMilli();
@@ -62,7 +66,7 @@ public class BookingTimeoutScheduler {
 
                     bookingEventPublisher.publishBookingTimeout(event);
                     bookingEventPublisher.publishRideCancelled(booking, "TIMEOUT_NO_DRIVER_FOUND");
-                    log.info("🚫 Booking {} bị CANCELLED do timeout (Không tìm thấy tài xế sau 3 phút)", bookingId);
+                    log.info("🚫 Booking {} CANCELLED due to timeout (no driver found after {} minutes)", bookingId, matchingTimeoutMinutes);
                 }
             });
 

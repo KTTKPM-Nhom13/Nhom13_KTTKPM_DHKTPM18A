@@ -36,6 +36,7 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
+        spring.json.add.type.headers: true
         spring.json.type.mapping: >
           ride-arrived:com.cab.ride.core.dto.event.outbound.RideArrivedEvent,
           ride-started:com.cab.ride.core.dto.event.outbound.RideStartedEvent,
@@ -52,6 +53,7 @@ spring:
         spring.json.trusted.packages: "*"
         spring.json.type.mapping: >
           ride-assigned:com.cab.ride.core.dto.event.inbound.RideAssignedEvent,
+          ride.created:com.cab.ride.core.dto.event.inbound.RideCreatedEvent,
           ride-created:com.cab.ride.core.dto.event.inbound.RideCreatedEvent,
           ride-accepted:com.cab.ride.core.dto.event.inbound.DriverAcceptedEvent,
           ride-cancelled:com.cab.ride.core.dto.event.inbound.RideCancelledEvent,
@@ -78,8 +80,13 @@ app:
       /v3/api-docs/**,
       /swagger-ui/**,
       /swagger-ui.html,
-      /api/v1/rides/location,
       /api/v1/rides/ping
+
+# ── Ride Socket.IO Server ───────────────────────────────────────────────────
+ride-socket:
+  host: 0.0.0.0
+  port: 9095
+  allowed-origins: "*"
 
 # ── Distributed Tracing ─────────────────────────────────────────────────────
 management:
