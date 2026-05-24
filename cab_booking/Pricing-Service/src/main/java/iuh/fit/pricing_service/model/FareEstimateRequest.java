@@ -39,4 +39,6 @@ public class FareEstimateRequest {
     private String vehicleType;
 
     private Integer estimatedDurationMinutes;
+
+    private String promoCode;
 }

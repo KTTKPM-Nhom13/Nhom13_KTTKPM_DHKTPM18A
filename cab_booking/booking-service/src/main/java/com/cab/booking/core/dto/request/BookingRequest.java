@@ -35,6 +35,8 @@ public class BookingRequest {
     @Positive(message = "Estimated fare must be positive")
     private BigDecimal estimatedFare;
 
+    private BigDecimal discountAmount;
+
     private String promoCode;
 
     /**

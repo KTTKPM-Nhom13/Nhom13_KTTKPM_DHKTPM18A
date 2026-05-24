@@ -66,6 +66,8 @@ public class Booking extends BaseEntity {
     @Column(precision = 12, scale = 2)
     private BigDecimal estimatedFare;
 
+    private BigDecimal discountAmount;
+
     private String promoCode;
 
     // Zero Trust — lưu token để verify giá

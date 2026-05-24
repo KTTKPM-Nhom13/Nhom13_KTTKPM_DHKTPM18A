@@ -56,6 +56,8 @@ public class FareEstimate {
 
     private BigDecimal discountAmount;
 
+    private String promoCode;
+
     private BigDecimal surgeMultiplier;
 
     private BigDecimal totalFare;
