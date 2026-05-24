@@ -1,0 +1,5065 @@
+{
+  "collection": {
+    "_": {
+      "postman_id": "cab-boundary-main-flows"
+    },
+    "item": [
+      {
+        "id": "4de70fe5-75d2-44f9-9d82-70fde9fb5f5b",
+        "name": "0. Health And Notes",
+        "item": [
+          {
+            "id": "f4b62492-0fa2-43ee-9dc9-048ee438bc1c",
+            "name": "0.1 Booking Ping",
+            "request": {
+              "description": {
+                "content": "Quick check that booking-service is reachable.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "bookings",
+                  "ping"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "dbeeab7e-2165-4c0d-8467-adfb2eaf0c22",
+            "name": "0.2 Ride Ping",
+            "request": {
+              "description": {
+                "content": "Quick check that ride-service is reachable.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "rides",
+                  "ping"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "9c855c50-6461-418b-919a-0521d7f9ee24",
+            "name": "0.3 Flow Notes",
+            "request": {
+              "description": {
+                "content": "Run auth first, then driver profile with vehicleType BIKE/CAR4/CAR7, driver online + GPS. Matching is Kafka async, so after create booking wait 2-5 seconds then poll Booking Active. Redis CLI checks: GET driver:status:{driverUserId}, GET driver:vehicleType:{driverUserId}, GEOPOS driver:locations {driverUserId}.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "gateway",
+                  "health"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": []
+          }
+        ],
+        "event": []
+      },
+      {
+        "id": "3f6d2f65-ad65-401e-9315-c9bf149396b2",
+        "name": "1. Auth",
+        "item": [
+          {
+            "id": "2df5b229-fc17-4fab-ac7a-d4c7d08a28b6",
+            "name": "1.1 Register Customer",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "auth",
+                  "register"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"fullName\": \"Boundary Flow Customer\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"phoneNumber\": \"0901000001\",\n  \"avatarUrl\": \"https://example.com/customer.png\",\n  \"role\": \"USER\",\n  \"deviceId\": \"boundary-customer\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "bbd4f18b-5e6c-440e-b830-0a30553a49ee",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('customerAccessToken', result.accessToken || pm.collectionVariables.get('customerAccessToken') || '');",
+                    "pm.collectionVariables.set('customerUserId', result.user?.userId || result.user?.id || result.userId || pm.collectionVariables.get('customerUserId') || '');",
+                    "pm.test('customer register ok/conflict', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 409]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "07c85b63-77fb-4105-b838-800c6d2f955e",
+            "name": "1.2 Login Customer",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "auth",
+                  "login"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"deviceId\": \"boundary-customer\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "b483a5b4-4f54-4903-94d4-b22c73933b0d",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('customerAccessToken', result.accessToken || '');",
+                    "pm.collectionVariables.set('customerUserId', result.user?.userId || result.user?.id || result.userId || '');",
+                    "pm.test('customer logged in', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "b2d17c7d-580d-48b8-b3ae-a1862ece4941",
+            "name": "1.3 Register Driver",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "auth",
+                  "register"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"fullName\": \"Boundary Flow Driver\",\n  \"email\": \"{{driverEmail}}\",\n  \"password\": \"{{driverPassword}}\",\n  \"phoneNumber\": \"0902000002\",\n  \"avatarUrl\": \"https://example.com/driver.png\",\n  \"role\": \"DRIVER\",\n  \"deviceId\": \"boundary-driver\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "4ff2a87c-5375-47b7-b2c8-6e6233698bdd",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('driverAccessToken', result.accessToken || pm.collectionVariables.get('driverAccessToken') || '');",
+                    "pm.collectionVariables.set('driverUserId', result.user?.userId || result.user?.id || result.userId || pm.collectionVariables.get('driverUserId') || '');",
+                    "pm.test('driver register ok/conflict', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 409]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "b335bfcd-715c-47a6-bc9e-6b265fe2bba0",
+            "name": "1.4 Login Driver",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "auth",
+                  "login"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"email\": \"{{driverEmail}}\",\n  \"password\": \"{{driverPassword}}\",\n  \"deviceId\": \"boundary-driver\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "77b78a5e-b255-44b1-848f-38796b12a15e",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('driverAccessToken', result.accessToken || '');",
+                    "pm.collectionVariables.set('driverUserId', result.user?.userId || result.user?.id || result.userId || '');",
+                    "pm.test('driver logged in', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "event": []
+      },
+      {
+        "id": "301753f5-138c-4ef9-b4b3-037d3ac038c4",
+        "name": "2. Prepare Driver Status And GPS",
+        "item": [
+          {
+            "id": "7f95cb68-2e62-4e8a-a831-a255e75bed51",
+            "name": "2.1 Upsert Driver Profile",
+            "request": {
+              "description": {
+                "content": "Driver Service owns driver profile. vehicleType must be one of BIKE, CAR4, CAR7.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "profile"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "PUT",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"fullName\": \"Boundary Flow Driver\",\n  \"email\": \"{{driverEmail}}\",\n  \"phoneNumber\": \"0902000002\",\n  \"avatarUrl\": \"https://example.com/driver.png\",\n  \"licenseNumber\": \"GPLX-BOUNDARY-001\",\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"vehiclePlate\": \"51A-99999\",\n  \"vehicleModel\": \"Toyota Vios\",\n  \"vehicleColor\": \"White\",\n  \"serviceArea\": \"Ho Chi Minh City\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "1cab6289-14d8-4b5a-a3d3-f1a742ed326f",
+            "name": "2.2 Set Driver ONLINE -> Redis driver:status AVAILABLE",
+            "request": {
+              "description": {
+                "content": "Expected side effect: Driver Service writes driver:status:{{driverUserId}} = AVAILABLE. Matching also requires driver vehicle metadata: driver:vehicleType:{{driverUserId}} = {{vehicleType}}.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "availability"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "PATCH",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"availabilityStatus\": \"ONLINE\",\n  \"currentLatitude\": 10.7769,\n  \"currentLongitude\": 106.7009\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "c646462f-065f-4adf-a106-7bd30cde1600",
+            "name": "2.3 Push Driver GPS To Ride Redis GEO",
+            "request": {
+              "description": {
+                "content": "Ride Service owns driver:locations. Expected Redis: GEOPOS driver:locations {{driverUserId}}.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "rides",
+                  "location"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"driverId\": \"{{driverUserId}}\",\n  \"lat\": 10.7769,\n  \"lng\": 106.7009\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "ad98d176-4095-4309-98dc-b883b4af6d3d",
+            "name": "2.4 Poll Driver Current Ride",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "current-ride"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "9e45c5dd-0f9a-4bcd-b334-46e54585e2da",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "if (result.rideId) pm.collectionVariables.set('assignedRideId', result.rideId);",
+                    "pm.test('current ride fetched', () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));"
+                  ],
+                  "_lastExecutionId": "68098674-b557-49f0-a9f0-719b6e382292"
+                }
+              }
+            ]
+          }
+        ],
+        "event": []
+      },
+      {
+        "id": "76bd4487-e1a4-4bf9-9cf0-1f324a439426",
+        "name": "3. Accept Flow",
+        "item": [
+          {
+            "id": "c28a11c0-2c98-4811-9407-839413ba9ac0",
+            "name": "3.0 Estimate Fare For Accept",
+            "request": {
+              "description": {
+                "content": "Lay quote moi tu Pricing-Service. Test script luu estimateId, quoteId, quotePayloadHash, quoteHashAlgorithm, expiresAt va totalFare vao collection variables de request tao booking dung ngay sau do.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "pricing",
+                  "estimate"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"pickupLat\": 10.7769,\n  \"pickupLng\": 106.7009,\n  \"dropoffLat\": 10.7798,\n  \"dropoffLng\": 106.699,\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"estimatedDurationMinutes\": 15\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "f2b8cbc3-47b9-4a87-9d29-ccfe9bb72186",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('estimateId', result.estimateId || result.id || '');",
+                    "pm.collectionVariables.set('quoteId', result.quoteId || result.estimateId || result.id || '');",
+                    "pm.collectionVariables.set('quotePayloadHash', result.quotePayloadHash || '');",
+                    "pm.collectionVariables.set('quoteHashAlgorithm', result.quoteHashAlgorithm || 'SHA-256');",
+                    "pm.collectionVariables.set('quoteExpiresAt', result.expiresAt || '');",
+                    "pm.collectionVariables.set('estimatedFare', result.totalFare || '');",
+                    "pm.collectionVariables.set('quoteCurrency', result.currency || 'VND');",
+                    "pm.test('estimate created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                    "pm.test('estimateId captured', () => pm.expect(pm.collectionVariables.get('estimateId')).to.not.be.empty);",
+                    "pm.test('quotePayloadHash captured', () => pm.expect(pm.collectionVariables.get('quotePayloadHash')).to.not.be.empty);"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "9984f126-af27-4871-876a-942391cff496",
+            "name": "3.1 Create Booking For Accept",
+            "request": {
+              "description": {
+                "content": "Expected async: Booking MATCHING -> ride.created(vehicleType) -> Matching reads Redis status/GEO/vehicleType -> driver.assigned canonical + ride.assigned legacy -> Booking ASSIGNED.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "bookings"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Saigon Notre Dame Cathedral\",\n  \"customerNote\": \"Accept boundary flow\",\n  \"pickupCoordinates\": {\n    \"lat\": 10.7769,\n    \"lng\": 106.7009\n  },\n  \"dropoffCoordinates\": {\n    \"lat\": 10.7798,\n    \"lng\": 106.699\n  },\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"promoCode\": \"BOUNDARY\",\n  \"quoteToken\": \"{{quoteToken}}\",\n  \"estimateId\": \"{{estimateId}}\",\n  \"quoteId\": \"{{quoteId}}\",\n  \"quotePayloadHash\": \"{{quotePayloadHash}}\",\n  \"quoteHashAlgorithm\": \"{{quoteHashAlgorithm}}\",\n  \"quoteExpiresAt\": \"{{quoteExpiresAt}}\",\n  \"idempotencyKey\": \"{{acceptIdempotencyKey}}\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "dd8d3eab-e76a-4954-ade7-3ff7b63ce936",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('acceptBookingId', result.id || result.bookingId || result.rideId || '');",
+                    "pm.test('booking created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                    "pm.test('booking initially MATCHING/CREATED', () => pm.expect(['MATCHING','CREATED']).to.include(result.status));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "cc23862c-d79a-4f08-9bb3-ec0888431110",
+            "name": "3.2 Poll Driver Current Ride After driver.assigned",
+            "request": {
+              "description": {
+                "content": "Run after waiting a few seconds. If Driver Service is not consuming assignment events directly, this can still be empty; Booking Active is the source of truth for ASSIGNED.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "current-ride"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "64794174-0bdb-47ac-ba85-cfa49b796c12",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "if (result.rideId) pm.collectionVariables.set('assignedRideId', result.rideId);",
+                    "pm.test('driver has assigned ride eventually', () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "7e841763-0dde-4213-835c-a208f8a94513",
+            "name": "3.3 Driver Accept Ride -> driver.accepted",
+            "request": {
+              "description": {
+                "content": "Driver Service publishes driver.accepted; Booking consumes and updates ASSIGNED -> ACCEPTED. Driver writes driver:status BUSY.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "rides",
+                  "{{acceptBookingId}}",
+                  "accept"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "POST",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "9451bb36-6734-4a43-8a92-fe7bff329205",
+            "name": "3.4 Poll Booking Active After Accept",
+            "request": {
+              "description": {
+                "content": "Expected status ACCEPTED after Kafka processing.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "bookings",
+                  "customer",
+                  "{{customerUserId}}",
+                  "active"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          }
+        ],
+        "event": []
+      },
+      {
+        "id": "c7f1893d-3018-469a-ab56-0f1c28c0fc8d",
+        "name": "4. Cancel Cleanup Flow",
+        "item": [
+          {
+            "id": "cc3ecc58-b1f5-4e51-8929-159fd07a2166",
+            "name": "4.1 Cancel Accepted Booking",
+            "request": {
+              "description": {
+                "content": "Booking marks the booking CANCELLED. Driver Service no longer owns ride lifecycle cleanup, so the next request releases the driver's local accepted ride for this demo driver.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "bookings",
+                  "{{acceptBookingId}}",
+                  "cancel"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [
+                  {
+                    "key": "reason",
+                    "value": "Customer%20cancel%20boundary%20test"
+                  }
+                ],
+                "variable": []
+              },
+              "method": "POST",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "de791121-a40e-4cda-97a2-de48f65739f8",
+            "name": "4.2 Driver Release Cancelled Assignment",
+            "request": {
+              "description": {
+                "content": "Demo cleanup for reusing one driver in the collection: clears driver-service currentRide after customer cancellation. Booking and Matching should ignore this late driver.rejected because the booking is already CANCELLED.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "rides",
+                  "{{acceptBookingId}}",
+                  "reject"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "POST",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "4c000b70-db45-4f98-9565-6cea0661797d",
+            "name": "4.3 Poll Driver Current Ride After Cancel Cleanup",
+            "request": {
+              "description": {
+                "content": "Expected no current ride / null rideId; Redis driver:status should be AVAILABLE.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "current-ride"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "9ce43105-9210-428c-bd11-162dce50b985",
+            "name": "4.4 Set Driver ONLINE Again If Needed",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "availability"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "PATCH",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"availabilityStatus\": \"ONLINE\",\n  \"currentLatitude\": 10.7769,\n  \"currentLongitude\": 106.7009\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          }
+        ],
+        "event": []
+      },
+      {
+        "id": "29dda931-2dee-4724-b07f-961ffd047b2b",
+        "name": "5. Reject Rematch Flow",
+        "item": [
+          {
+            "id": "be39c545-6f49-4050-a4cc-8c161a58e0dc",
+            "name": "5.0 Estimate Fare For Reject",
+            "request": {
+              "description": {
+                "content": "Lay quote moi tu Pricing-Service. Test script luu estimateId, quoteId, quotePayloadHash, quoteHashAlgorithm, expiresAt va totalFare vao collection variables de request tao booking dung ngay sau do.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "pricing",
+                  "estimate"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"pickupLat\": 10.7769,\n  \"pickupLng\": 106.7009,\n  \"dropoffLat\": 10.7798,\n  \"dropoffLng\": 106.699,\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"estimatedDurationMinutes\": 15\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "0cd702b9-7687-4cf6-9320-6e8138c810fa",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('estimateId', result.estimateId || result.id || '');",
+                    "pm.collectionVariables.set('quoteId', result.quoteId || result.estimateId || result.id || '');",
+                    "pm.collectionVariables.set('quotePayloadHash', result.quotePayloadHash || '');",
+                    "pm.collectionVariables.set('quoteHashAlgorithm', result.quoteHashAlgorithm || 'SHA-256');",
+                    "pm.collectionVariables.set('quoteExpiresAt', result.expiresAt || '');",
+                    "pm.collectionVariables.set('estimatedFare', result.totalFare || '');",
+                    "pm.collectionVariables.set('quoteCurrency', result.currency || 'VND');",
+                    "pm.test('estimate created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                    "pm.test('estimateId captured', () => pm.expect(pm.collectionVariables.get('estimateId')).to.not.be.empty);",
+                    "pm.test('quotePayloadHash captured', () => pm.expect(pm.collectionVariables.get('quotePayloadHash')).to.not.be.empty);"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "f6fad400-2712-4501-9e35-742776baa819",
+            "name": "5.1 Create Booking For Reject",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "bookings"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Saigon Central Post Office\",\n  \"customerNote\": \"Reject rematch boundary flow\",\n  \"pickupCoordinates\": {\n    \"lat\": 10.7769,\n    \"lng\": 106.7009\n  },\n  \"dropoffCoordinates\": {\n    \"lat\": 10.7798,\n    \"lng\": 106.699\n  },\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"promoCode\": \"REJECT\",\n  \"quoteToken\": \"{{quoteToken}}\",\n  \"estimateId\": \"{{estimateId}}\",\n  \"quoteId\": \"{{quoteId}}\",\n  \"quotePayloadHash\": \"{{quotePayloadHash}}\",\n  \"quoteHashAlgorithm\": \"{{quoteHashAlgorithm}}\",\n  \"quoteExpiresAt\": \"{{quoteExpiresAt}}\",\n  \"idempotencyKey\": \"{{rejectIdempotencyKey}}\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "03623f74-8d02-4669-b25a-ca1289673c9e",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('rejectBookingId', result.id || result.bookingId || result.rideId || '');",
+                    "pm.test('reject booking created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "d1e4cc81-056b-425d-9a40-5b561676e397",
+            "name": "5.2 Poll Driver Current Ride After Reject Assignment",
+            "request": {
+              "description": {
+                "content": "Run after a short wait. Expected rideId == {{rejectBookingId}} if this driver was assigned.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "current-ride"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "324a98e3-51a2-45b1-bab1-fd0ac5a5464f",
+            "name": "5.3 Driver Reject Ride -> driver.rejected",
+            "request": {
+              "description": {
+                "content": "Driver Service publishes driver.rejected. Booking consumes it and moves ASSIGNED -> MATCHING. Matching Service consumes driver.rejected, excludes the rejected driver, and rematches from its cached ride.created snapshot.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "rides",
+                  "{{rejectBookingId}}",
+                  "reject"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "POST",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "c3e94849-997e-4d81-ade5-c442cac345e0",
+            "name": "5.4 Poll Booking Active After Reject",
+            "request": {
+              "description": {
+                "content": "Expected status MATCHING if no other driver is available, or ASSIGNED if another driver was found.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "bookings",
+                  "customer",
+                  "{{customerUserId}}",
+                  "active"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          }
+        ],
+        "event": []
+      },
+      {
+        "id": "a6b4a7b5-857a-4684-afec-89e83757f38a",
+        "name": "6. Complete Flow",
+        "item": [
+          {
+            "id": "55518d09-4c1e-4684-b6e9-cafea4d59b95",
+            "name": "6.0 Estimate Fare For Complete",
+            "request": {
+              "description": {
+                "content": "Lay quote moi tu Pricing-Service. Test script luu estimateId, quoteId, quotePayloadHash, quoteHashAlgorithm, expiresAt va totalFare vao collection variables de request tao booking dung ngay sau do.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "pricing",
+                  "estimate"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"pickupLat\": 10.7769,\n  \"pickupLng\": 106.7009,\n  \"dropoffLat\": 10.7721,\n  \"dropoffLng\": 106.6983,\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"estimatedDurationMinutes\": 15\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "c66a4a62-b33b-4640-bd3c-a49b04873d80",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('estimateId', result.estimateId || result.id || '');",
+                    "pm.collectionVariables.set('quoteId', result.quoteId || result.estimateId || result.id || '');",
+                    "pm.collectionVariables.set('quotePayloadHash', result.quotePayloadHash || '');",
+                    "pm.collectionVariables.set('quoteHashAlgorithm', result.quoteHashAlgorithm || 'SHA-256');",
+                    "pm.collectionVariables.set('quoteExpiresAt', result.expiresAt || '');",
+                    "pm.collectionVariables.set('estimatedFare', result.totalFare || '');",
+                    "pm.collectionVariables.set('quoteCurrency', result.currency || 'VND');",
+                    "pm.test('estimate created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                    "pm.test('estimateId captured', () => pm.expect(pm.collectionVariables.get('estimateId')).to.not.be.empty);",
+                    "pm.test('quotePayloadHash captured', () => pm.expect(pm.collectionVariables.get('quotePayloadHash')).to.not.be.empty);"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "42706409-836c-4019-8932-c0b441edb0c5",
+            "name": "6.1 Create Booking For Complete",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "bookings"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Ben Thanh Market\",\n  \"customerNote\": \"Complete boundary flow\",\n  \"pickupCoordinates\": {\n    \"lat\": 10.7769,\n    \"lng\": 106.7009\n  },\n  \"dropoffCoordinates\": {\n    \"lat\": 10.7721,\n    \"lng\": 106.6983\n  },\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"promoCode\": \"COMPLETE\",\n  \"quoteToken\": \"{{quoteToken}}\",\n  \"estimateId\": \"{{estimateId}}\",\n  \"quoteId\": \"{{quoteId}}\",\n  \"quotePayloadHash\": \"{{quotePayloadHash}}\",\n  \"quoteHashAlgorithm\": \"{{quoteHashAlgorithm}}\",\n  \"quoteExpiresAt\": \"{{quoteExpiresAt}}\",\n  \"idempotencyKey\": \"{{completeIdempotencyKey}}\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "b3207370-f3f2-4f8f-9ec6-192316b76d2d",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('completeBookingId', result.id || result.bookingId || result.rideId || '');",
+                    "pm.test('complete booking created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "e5bac339-8193-4750-9675-09b09571a124",
+            "name": "6.2 Driver Accept Complete Booking",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "rides",
+                  "{{completeBookingId}}",
+                  "accept"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "POST",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "9c2c2c1c-db14-4154-83ec-03a347247052",
+            "name": "6.3 Ride Service Arrive -> ride.arrived",
+            "request": {
+              "description": {
+                "content": "Ride Service validates the JWT driver is assigned to this ride, updates ACCEPTED -> PICKUP, and publishes ride.arrived.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "rides",
+                  "{{completeBookingId}}",
+                  "arrive"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "POST",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "63a78007-c8eb-4560-8fff-d0e29706d06c",
+            "name": "6.4 Ride Service Start -> ride.started",
+            "request": {
+              "description": {
+                "content": "Ride Service validates the JWT driver is assigned to this ride, updates PICKUP -> IN_PROGRESS, and publishes ride.started.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "rides",
+                  "{{completeBookingId}}",
+                  "start"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "POST",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "e275569a-1057-4c6f-81c6-f967c5a237cb",
+            "name": "6.5 Ride Service Complete -> ride.completed",
+            "request": {
+              "description": {
+                "content": "Ride Service validates the JWT driver is assigned to this ride, updates IN_PROGRESS -> COMPLETED, and publishes ride.completed. Booking consumes ride.completed and updates COMPLETED.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "rides",
+                  "{{completeBookingId}}",
+                  "complete"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"finalFare\": {{estimatedFare}},\n  \"paymentMethod\": \"CASH\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "e29a3f11-3c70-4c00-822a-f5e62833be44",
+            "name": "6.6 Poll Booking Active Or History After Complete",
+            "request": {
+              "description": {
+                "content": "Expected completed booking appears in history with status COMPLETED. Payment/settlement state is verified through Payment Service, not BookingStatus.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "bookings",
+                  "customer",
+                  "{{customerUserId}}"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [
+                  {
+                    "key": "page",
+                    "value": "0"
+                  },
+                  {
+                    "key": "size",
+                    "value": "5"
+                  }
+                ],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          }
+        ],
+        "event": []
+      },
+      {
+        "id": "e2f1fd01-696d-4ed6-aada-184c64b6fd25",
+        "name": "7. E2E Cash Booking Payment Flow",
+        "item": [
+          {
+            "id": "86b7c35a-6d6a-44f9-bfdb-2484cc31b4d5",
+            "name": "7.1 Register Customer",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "auth",
+                  "register"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"fullName\": \"Boundary Flow Customer\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"phoneNumber\": \"0901000001\",\n  \"avatarUrl\": \"https://example.com/customer.png\",\n  \"role\": \"USER\",\n  \"deviceId\": \"boundary-customer\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "fecb902d-a240-407a-8114-fc4d47d3c768",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('customerAccessToken', result.accessToken || pm.collectionVariables.get('customerAccessToken') || '');",
+                    "pm.collectionVariables.set('customerUserId', result.user?.userId || result.user?.id || result.userId || pm.collectionVariables.get('customerUserId') || '');",
+                    "pm.test('customer register ok/conflict', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 409]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "ada844dd-bd6a-4e3b-9e98-a1a59fc11b0d",
+            "name": "7.2 Login Customer",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "auth",
+                  "login"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"deviceId\": \"boundary-customer\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "12eaa74a-c509-4c45-9d0c-b213a6b85e9c",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('customerAccessToken', result.accessToken || '');",
+                    "pm.collectionVariables.set('customerUserId', result.user?.userId || result.user?.id || result.userId || '');",
+                    "pm.test('customer logged in', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "743202e8-b736-49bb-83c8-38aaceaf0a89",
+            "name": "7.3 Register Driver",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "auth",
+                  "register"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"fullName\": \"Boundary Flow Driver\",\n  \"email\": \"{{driverEmail}}\",\n  \"password\": \"{{driverPassword}}\",\n  \"phoneNumber\": \"0902000002\",\n  \"avatarUrl\": \"https://example.com/driver.png\",\n  \"role\": \"DRIVER\",\n  \"deviceId\": \"boundary-driver\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "f6ba24aa-44da-4dc5-97af-6e0aa0f56cd1",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('driverAccessToken', result.accessToken || pm.collectionVariables.get('driverAccessToken') || '');",
+                    "pm.collectionVariables.set('driverUserId', result.user?.userId || result.user?.id || result.userId || pm.collectionVariables.get('driverUserId') || '');",
+                    "pm.test('driver register ok/conflict', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 409]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "0b2c0d6e-2e3e-445d-9ec1-866ab80bb1a2",
+            "name": "7.4 Login Driver",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "auth",
+                  "login"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"email\": \"{{driverEmail}}\",\n  \"password\": \"{{driverPassword}}\",\n  \"deviceId\": \"boundary-driver\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "0142701f-a2ad-4aeb-b712-88eb4abe57dc",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('driverAccessToken', result.accessToken || '');",
+                    "pm.collectionVariables.set('driverUserId', result.user?.userId || result.user?.id || result.userId || '');",
+                    "pm.test('driver logged in', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "2e4b294c-9732-499d-b51a-c96147ed32a1",
+            "name": "7.5 Upsert Driver Profile",
+            "request": {
+              "description": {
+                "content": "Ensures the driver has profile/KYC data and vehicleType before going online.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "profile"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "PUT",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"fullName\": \"Boundary Flow Driver\",\n  \"email\": \"{{driverEmail}}\",\n  \"phoneNumber\": \"0902000002\",\n  \"avatarUrl\": \"https://example.com/driver.png\",\n  \"licenseNumber\": \"GPLX-BOUNDARY-001\",\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"vehiclePlate\": \"51A-99999\",\n  \"vehicleModel\": \"Toyota Vios\",\n  \"vehicleColor\": \"White\",\n  \"serviceArea\": \"Ho Chi Minh City\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "e05f410e-a528-470d-ae11-b366293b8bb4",
+            "name": "7.6 Set Driver ONLINE -> Redis AVAILABLE",
+            "request": {
+              "description": {
+                "content": "Ensures Matching can pick this driver for the E2E booking.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "availability"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "PATCH",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"availabilityStatus\": \"ONLINE\",\n  \"currentLatitude\": 10.7769,\n  \"currentLongitude\": 106.7009\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "81e7f608-b38c-4398-ba65-89fe0982a93d",
+            "name": "7.7 Push Driver GPS To Ride Redis GEO",
+            "request": {
+              "description": {
+                "content": "Ensures Matching sees driver location near the pickup point.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "rides",
+                  "location"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"driverId\": \"{{driverUserId}}\",\n  \"lat\": 10.7769,\n  \"lng\": 106.7009\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "16d5acb0-ee0b-477d-aa63-824991ecb97c",
+            "name": "7.7 Estimate Fare For CASH Booking",
+            "request": {
+              "description": {
+                "content": "Lay quote moi tu Pricing-Service. Test script luu estimateId, quoteId, quotePayloadHash, quoteHashAlgorithm, expiresAt va totalFare vao collection variables de request tao booking dung ngay sau do.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "pricing",
+                  "estimate"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"pickupLat\": 10.7769,\n  \"pickupLng\": 106.7009,\n  \"dropoffLat\": 10.7721,\n  \"dropoffLng\": 106.6983,\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"estimatedDurationMinutes\": 15\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "1e4701b9-1dea-46e0-a7e1-e24f0f69e240",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('estimateId', result.estimateId || result.id || '');",
+                    "pm.collectionVariables.set('quoteId', result.quoteId || result.estimateId || result.id || '');",
+                    "pm.collectionVariables.set('quotePayloadHash', result.quotePayloadHash || '');",
+                    "pm.collectionVariables.set('quoteHashAlgorithm', result.quoteHashAlgorithm || 'SHA-256');",
+                    "pm.collectionVariables.set('quoteExpiresAt', result.expiresAt || '');",
+                    "pm.collectionVariables.set('estimatedFare', result.totalFare || '');",
+                    "pm.collectionVariables.set('quoteCurrency', result.currency || 'VND');",
+                    "pm.test('estimate created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                    "pm.test('estimateId captured', () => pm.expect(pm.collectionVariables.get('estimateId')).to.not.be.empty);",
+                    "pm.test('quotePayloadHash captured', () => pm.expect(pm.collectionVariables.get('quotePayloadHash')).to.not.be.empty);"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "fb6dcec5-7f9c-4988-bd6c-04985ef1f7b1",
+            "name": "7.8 Create Booking (CASH)",
+            "request": {
+              "description": {
+                "content": "Creates a CASH booking for the full E2E payment flow. Wait 2-5 seconds after this request so Matching can assign the driver asynchronously.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "bookings"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Ben Thanh Market\",\n  \"customerNote\": \"E2E Cash payment flow\",\n  \"pickupCoordinates\": {\n    \"lat\": 10.7769,\n    \"lng\": 106.7009\n  },\n  \"dropoffCoordinates\": {\n    \"lat\": 10.7721,\n    \"lng\": 106.6983\n  },\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"paymentMethod\": \"CASH\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"promoCode\": \"E2E_CASH\",\n  \"quoteToken\": \"{{quoteToken}}\",\n  \"estimateId\": \"{{estimateId}}\",\n  \"quoteId\": \"{{quoteId}}\",\n  \"quotePayloadHash\": \"{{quotePayloadHash}}\",\n  \"quoteHashAlgorithm\": \"{{quoteHashAlgorithm}}\",\n  \"quoteExpiresAt\": \"{{quoteExpiresAt}}\",\n  \"idempotencyKey\": \"{{e2eCashIdempotencyKey}}\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "c8b836d3-61ab-4989-b275-25370ead8800",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('e2eCashBookingId', result.id || result.bookingId || result.rideId || '');",
+                    "pm.collectionVariables.set('e2eCashAssignedDriverId', result.assignedDriverId || result.driverId || '');",
+                    "pm.test('CASH booking created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                    "pm.test('CASH booking id captured', () => pm.expect(pm.collectionVariables.get('e2eCashBookingId')).to.not.be.empty);",
+                    "pm.test('booking initially MATCHING/CREATED', () => pm.expect(['MATCHING','CREATED']).to.include(result.status));",
+                    "pm.test('7.8 assigned driver is current logged-in driver', () => { const assignedDriverId = pm.collectionVariables.get('e2eCashAssignedDriverId'); if (assignedDriverId) pm.expect(assignedDriverId).to.eql(pm.collectionVariables.get('driverUserId')); });"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "b0c99b2d-dd89-4437-b226-c668e7554264",
+            "name": "7.9 Poll Driver Current Ride After Assignment",
+            "request": {
+              "description": {
+                "content": "Expected immediately after Matching assignment: current ride points at the E2E booking for the same driver token used by this collection. If booking.assignedDriverId differs from driverUserId, Matching selected another online driver from Redis; set other drivers offline/clear stale Redis statuses or use that assigned driver token. Assignment TTL is 30 seconds.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "current-ride"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "1934715f-55f5-455a-807f-aec2b9b8cce9",
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('7.9 current ride poll returns ok/not-found while async', () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));",
+                    "pm.test('7.9 booking was assigned to this logged-in driver', () => { const assignedDriverId = pm.collectionVariables.get('e2eCashAssignedDriverId'); if (assignedDriverId) pm.expect(assignedDriverId).to.eql(pm.collectionVariables.get('driverUserId')); });",
+                    "if (pm.response.code === 200) {",
+                    "  const body = pm.response.json();",
+                    "  const result = body.result || body.data || body;",
+                    "  const rideId = result.rideId || result.bookingId || result.id || '';",
+                    "  pm.test('7.9 driver has assigned ride before timeout', () => pm.expect(rideId, 'rideId from driver current-ride').to.not.be.empty);",
+                    "  pm.test('7.9 current ride matches booking', () => pm.expect(rideId).to.eql(pm.collectionVariables.get('e2eCashBookingId')));",
+                    "}"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "6023eb61-de8f-4f63-98e3-6a8579c64d9a",
+            "name": "7.10 Driver Accept Assignment -> ride.accepted",
+            "request": {
+              "description": {
+                "content": "Driver Service accepts the assigned job through the assignment command and publishes ride.accepted. Ride Service consumes ride.accepted and owns the ASSIGNED -> ACCEPTED ride-state transition before arrive/start/complete. Booking also consumes the event. Wait 1-3 seconds before ride lifecycle requests.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "rides",
+                  "assignment"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"rideId\": \"{{e2eCashBookingId}}\",\n  \"action\": \"ACCEPT\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "c181d056-1410-430e-bec8-b839aa408d7b",
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('7.10 booking assigned driver matches current driver', () => { const assignedDriverId = pm.collectionVariables.get('e2eCashAssignedDriverId'); if (assignedDriverId) pm.expect(assignedDriverId).to.eql(pm.collectionVariables.get('driverUserId')); });",
+                    "pm.test('7.10 booking id exists before accept', () => pm.expect(pm.collectionVariables.get('e2eCashBookingId')).to.not.be.empty);",
+                    "pm.test('7.10 accept accepted by driver-service', () => pm.expect(pm.response.code).to.be.oneOf([200, 202, 204]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "64769846-22fc-4474-a6d1-3d0b0acc11dd",
+            "name": "7.11 Ride Service Arrive -> ride.arrived",
+            "request": {
+              "description": {
+                "content": "Ride Service validates assigned driver, updates ACCEPTED -> PICKUP, and publishes ride.arrived.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "rides",
+                  "{{e2eCashBookingId}}",
+                  "arrive"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "POST",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "93de3b01-c3fa-4f56-bf04-a0e9f2834486",
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('7.11 arrive ok', () => pm.expect(pm.response.code).to.be.oneOf([200, 202]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "a0666936-a987-4c45-bfe7-5c7157156869",
+            "name": "7.12 Ride Service Start -> ride.started",
+            "request": {
+              "description": {
+                "content": "Ride Service validates assigned driver, updates PICKUP -> IN_PROGRESS, and publishes ride.started.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "rides",
+                  "{{e2eCashBookingId}}",
+                  "start"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "POST",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "66ef3bd2-24ae-47cd-8b8f-a5cad5edf891",
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('7.11 start ok', () => pm.expect(pm.response.code).to.be.oneOf([200, 202]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "eb032c22-840e-4489-b40d-d1213c179785",
+            "name": "7.13 Ride Service Complete -> ride.completed",
+            "request": {
+              "description": {
+                "content": "Ride Service validates assigned driver, updates IN_PROGRESS -> COMPLETED, and publishes ride.completed. Wait 2-5 seconds afterward for Booking and Payment consumers.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "rides",
+                  "{{e2eCashBookingId}}",
+                  "complete"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"finalFare\": {{estimatedFare}},\n  \"paymentMethod\": \"CASH\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "ff3633fd-39d3-42b0-b044-2c4bd814288c",
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('7.11 complete ok', () => pm.expect(pm.response.code).to.be.oneOf([200, 202]));",
+                    "const result = pm.response.json();",
+                    "pm.test('ride completed status returned when present', () => { if (result.status) pm.expect(result.status).to.eql('COMPLETED'); });"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "841578ff-77c7-4f4c-9d77-4ada3a073a08",
+            "name": "7.14 Verify CASH Payment Transaction SUCCESS",
+            "request": {
+              "description": {
+                "content": "Expected after ride.completed: payment-service records CASH payment and publishes payment.completed.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "payments",
+                  "booking",
+                  "{{e2eCashBookingId}}"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "d581a0fb-c210-4379-8955-1c674d53ee00",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('e2eCashPaymentTxnId', result.transactionId || '');",
+                    "pm.test('CASH payment lookup ok', () => pm.expect(pm.response.code).to.eql(200));",
+                    "pm.test('CASH payment transaction id captured', () => pm.expect(pm.collectionVariables.get('e2eCashPaymentTxnId')).to.not.be.empty);",
+                    "pm.test('CASH payment method', () => pm.expect(result.paymentMethod).to.eql('CASH'));",
+                    "pm.test('CASH payment success', () => pm.expect(result.status).to.eql('SUCCESS'));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "966f7019-b341-4d73-b0c0-9bb85a43b3b6",
+            "name": "7.15 Verify Booking History Final State",
+            "request": {
+              "description": {
+                "content": "Expected completed booking appears in customer history with status COMPLETED. CASH payment success is verified separately through Payment Service after ride.completed.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "bookings",
+                  "customer",
+                  "{{customerUserId}}"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [
+                  {
+                    "key": "page",
+                    "value": "0"
+                  },
+                  {
+                    "key": "size",
+                    "value": "10"
+                  }
+                ],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "47d807fc-9b31-4c05-b802-b830ead85598",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const bookingId = pm.collectionVariables.get('e2eCashBookingId');",
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "const list = Array.isArray(result) ? result : (result.content || result.data || result.items || []);",
+                    "const booking = list.find(b => (b.id || b.bookingId || b.rideId) === bookingId);",
+                    "pm.test('7.15 booking appears in history', () => pm.expect(booking, 'booking in history').to.exist);",
+                    "if (booking) {",
+                    "  pm.test('7.15 booking payment method is CASH', () => pm.expect(booking.paymentMethod).to.eql('CASH'));",
+                    "  pm.test('7.15 booking final status is COMPLETED', () => pm.expect(booking.status).to.eql('COMPLETED'));",
+                    "}"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "449d5b38-f425-41b2-b2cd-d4e0bb3feba0",
+            "name": "7.16 Verify Driver Current Ride Released",
+            "request": {
+              "description": {
+                "content": "Expected after ride.completed consumer: no active current ride for the driver. If Kafka is still processing, wait and retry.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "current-ride"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "b461e89e-e830-467a-84a2-54798a91c783",
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('7.16 driver current ride released or still processing', () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));",
+                    "if (pm.response.code === 200) {",
+                    "  const body = pm.response.json();",
+                    "  const result = body.result || body.data || body;",
+                    "  const rideId = result.rideId || result.bookingId || result.id || '';",
+                    "  pm.test('7.16 current ride empty when cleanup finished', () => pm.expect(rideId || '').to.be.oneOf(['', null]));",
+                    "}"
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "event": []
+      },
+      {
+        "id": "4983c59b-d243-488b-aef9-9d5c19b81c1c",
+        "name": "8. E2E VNPay Booking Payment Flow",
+        "item": [
+          {
+            "id": "395dfcab-549a-40c6-b474-3387891fba16",
+            "name": "8.1 Register Customer",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "auth",
+                  "register"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"fullName\": \"Boundary Flow Customer\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"phoneNumber\": \"0901000001\",\n  \"avatarUrl\": \"https://example.com/customer.png\",\n  \"role\": \"CUSTOMER\",\n  \"deviceId\": \"boundary-customer\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "9f21e710-697b-4f47-b8d4-3bff8818da5e",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('customerAccessToken', result.accessToken || pm.collectionVariables.get('customerAccessToken') || '');",
+                    "pm.collectionVariables.set('customerUserId', result.user?.userId || result.user?.id || result.userId || pm.collectionVariables.get('customerUserId') || '');",
+                    "pm.test('customer register ok/conflict', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 409]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "9d093f26-2a51-4999-911a-1d86ff513401",
+            "name": "8.2 Login Customer",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "auth",
+                  "login"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"deviceId\": \"boundary-customer\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "80ada9a6-2815-4674-bc0c-e570aca2b351",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('customerAccessToken', result.accessToken || '');",
+                    "pm.collectionVariables.set('customerUserId', result.user?.userId || result.user?.id || result.userId || '');",
+                    "pm.test('customer logged in', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "1b966f98-caa1-44dc-9e04-f922eb8eee86",
+            "name": "8.3 Register Driver",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "auth",
+                  "register"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"fullName\": \"Boundary Flow Driver\",\n  \"email\": \"{{driverEmail}}\",\n  \"password\": \"{{driverPassword}}\",\n  \"phoneNumber\": \"0902000002\",\n  \"avatarUrl\": \"https://example.com/driver.png\",\n  \"role\": \"DRIVER\",\n  \"deviceId\": \"boundary-driver\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "a82c6b22-95ae-4fd6-91b5-cd221151782e",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('driverAccessToken', result.accessToken || pm.collectionVariables.get('driverAccessToken') || '');",
+                    "pm.collectionVariables.set('driverUserId', result.user?.userId || result.user?.id || result.userId || pm.collectionVariables.get('driverUserId') || '');",
+                    "pm.test('driver register ok/conflict', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 409]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "59457406-53c4-432d-a010-04dc4a30a364",
+            "name": "8.4 Login Driver",
+            "request": {
+              "url": {
+                "path": [
+                  "api",
+                  "auth",
+                  "login"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"email\": \"{{driverEmail}}\",\n  \"password\": \"{{driverPassword}}\",\n  \"deviceId\": \"boundary-driver\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "3b727591-f2b6-4fe9-9140-056c78662531",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('driverAccessToken', result.accessToken || '');",
+                    "pm.collectionVariables.set('driverUserId', result.user?.userId || result.user?.id || result.userId || '');",
+                    "pm.test('driver logged in', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "b7a6f7fa-fc7e-492f-a861-e88880716c7a",
+            "name": "8.5 Upsert Driver Profile",
+            "request": {
+              "description": {
+                "content": "Ensures the driver has profile/KYC data and vehicleType before going online.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "profile"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "PUT",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"fullName\": \"Boundary Flow Driver\",\n  \"email\": \"{{driverEmail}}\",\n  \"phoneNumber\": \"0902000002\",\n  \"avatarUrl\": \"https://example.com/driver.png\",\n  \"licenseNumber\": \"GPLX-BOUNDARY-001\",\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"vehiclePlate\": \"51A-99999\",\n  \"vehicleModel\": \"Toyota Vios\",\n  \"vehicleColor\": \"White\",\n  \"serviceArea\": \"Ho Chi Minh City\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "859de1ce-af55-4dfc-b069-41b89f53b198",
+            "name": "8.6 Set Driver ONLINE -> Redis AVAILABLE",
+            "request": {
+              "description": {
+                "content": "Ensures Matching can pick this driver for the E2E booking.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "availability"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "PATCH",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"availabilityStatus\": \"ONLINE\",\n  \"currentLatitude\": 10.7769,\n  \"currentLongitude\": 106.7009\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "ccb9f888-4b7c-4850-82eb-c5472c749a98",
+            "name": "8.7 Push Driver GPS To Ride Redis GEO",
+            "request": {
+              "description": {
+                "content": "Ensures Matching sees driver location near the pickup point.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "rides",
+                  "location"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"driverId\": \"{{driverUserId}}\",\n  \"lat\": 10.7769,\n  \"lng\": 106.7009\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "noauth",
+                "noauth": []
+              }
+            },
+            "response": [],
+            "event": []
+          },
+          {
+            "id": "2fe38130-38d3-4cfc-8a5b-f517c6f7fbe1",
+            "name": "8.7 Estimate Fare For VNPAY Booking",
+            "request": {
+              "description": {
+                "content": "Lay quote moi tu Pricing-Service. Test script luu estimateId, quoteId, quotePayloadHash, quoteHashAlgorithm, expiresAt va totalFare vao collection variables de request tao booking dung ngay sau do.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "pricing",
+                  "estimate"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"pickupLat\": 10.7769,\n  \"pickupLng\": 106.7009,\n  \"dropoffLat\": 10.7765,\n  \"dropoffLng\": 106.7039,\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"estimatedDurationMinutes\": 15\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "c0432b5a-0798-49a9-9b8b-ce03ae35325c",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('estimateId', result.estimateId || result.id || '');",
+                    "pm.collectionVariables.set('quoteId', result.quoteId || result.estimateId || result.id || '');",
+                    "pm.collectionVariables.set('quotePayloadHash', result.quotePayloadHash || '');",
+                    "pm.collectionVariables.set('quoteHashAlgorithm', result.quoteHashAlgorithm || 'SHA-256');",
+                    "pm.collectionVariables.set('quoteExpiresAt', result.expiresAt || '');",
+                    "pm.collectionVariables.set('estimatedFare', result.totalFare || '');",
+                    "pm.collectionVariables.set('quoteCurrency', result.currency || 'VND');",
+                    "pm.test('estimate created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                    "pm.test('estimateId captured', () => pm.expect(pm.collectionVariables.get('estimateId')).to.not.be.empty);",
+                    "pm.test('quotePayloadHash captured', () => pm.expect(pm.collectionVariables.get('quotePayloadHash')).to.not.be.empty);"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "6cdf1e5f-ea21-46c5-ba2b-6510ec0c9625",
+            "name": "8.8 Create Booking (VNPAY)",
+            "request": {
+              "description": {
+                "content": "Creates a VNPAY prepaid booking. Expected async: Booking CREATED -> PENDING_PAYMENT, then publishes payment.requested. Payment Service consumes payment.requested and creates the VNPay transaction. Matching must not start until payment.completed is published.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "bookings"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"pickupLocation\": \"Landmark 81, Binh Thanh, Ho Chi Minh City\",\n  \"dropoffLocation\": \"Saigon Opera House\",\n  \"customerNote\": \"E2E VNPay payment flow\",\n  \"pickupCoordinates\": {\n    \"lat\": 10.7769,\n    \"lng\": 106.7009\n  },\n  \"dropoffCoordinates\": {\n    \"lat\": 10.7765,\n    \"lng\": 106.7039\n  },\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"paymentMethod\": \"VNPAY\",\n  \"estimatedFare\": {{estimatedFare}},\n  \"promoCode\": \"E2E_VNPAY\",\n  \"quoteToken\": \"{{quoteToken}}\",\n  \"estimateId\": \"{{estimateId}}\",\n  \"quoteId\": \"{{quoteId}}\",\n  \"quotePayloadHash\": \"{{quotePayloadHash}}\",\n  \"quoteHashAlgorithm\": \"{{quoteHashAlgorithm}}\",\n  \"quoteExpiresAt\": \"{{quoteExpiresAt}}\",\n  \"idempotencyKey\": \"{{e2eVnpayIdempotencyKey}}\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "9fb0bc78-50ae-423b-990d-f9513ae1b496",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('e2eVnpayBookingId', result.id || result.bookingId || result.rideId || '');",
+                    "pm.collectionVariables.set('e2eVnpayAssignedDriverId', result.assignedDriverId || result.driverId || '');",
+                    "pm.test('VNPAY booking created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                    "pm.test('VNPAY booking id captured', () => pm.expect(pm.collectionVariables.get('e2eVnpayBookingId')).to.not.be.empty);",
+                    "pm.test('booking initially waits for online payment', () => pm.expect(['PENDING_PAYMENT','CREATED']).to.include(result.status));",
+                    "pm.test('8.8 no driver assigned before online payment success', () => pm.expect(pm.collectionVariables.get('e2eVnpayAssignedDriverId')).to.be.oneOf(['', null, undefined]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "7d84dc1b-871c-46a1-97dd-7136253d05b3",
+            "name": "8.9 Verify VNPAY Pre-Trip Payment Transaction",
+            "request": {
+              "description": {
+                "content": "Run 2-5 seconds after 8.8. Expected: Payment Service consumed payment.requested and created a PRE_TRIP VNPAY transaction. If status is PENDING, open the captured payUrl in a browser/sandbox and complete payment before running the driver assignment steps. After valid VNPay return/IPN, Payment Service publishes payment.completed, Booking moves PENDING_PAYMENT -> MATCHING, then publishes ride.created.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "payments",
+                  "booking",
+                  "{{e2eVnpayBookingId}}"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "aaf6b4a2-cf76-4700-b8b9-55622b9c619b",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('e2eVnpayPaymentTxnId', result.transactionId || pm.collectionVariables.get('e2eVnpayPaymentTxnId') || '');",
+                    "pm.collectionVariables.set('e2eVnpayPayUrl', result.payUrl || pm.collectionVariables.get('e2eVnpayPayUrl') || '');",
+                    "pm.test('8.9 payment lookup ok', () => pm.expect(pm.response.code).to.eql(200));",
+                    "pm.test('8.9 payment transaction id captured', () => pm.expect(pm.collectionVariables.get('e2eVnpayPaymentTxnId')).to.not.be.empty);",
+                    "pm.test('8.9 payment method is VNPAY', () => pm.expect(result.paymentMethod).to.eql('VNPAY'));",
+                    "pm.test('8.9 pre-trip payment is pending or already success', () => pm.expect([\"PENDING\",\"SUCCESS\"]).to.include(result.status));",
+                    "pm.test('8.9 payUrl captured when pending', () => { if (result.status === 'PENDING') pm.expect(pm.collectionVariables.get('e2eVnpayPayUrl')).to.not.be.empty; });"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "a196acfa-d971-4849-8a82-e8d100cbb8a0",
+            "name": "8.10 Poll Driver Current Ride After Payment Success",
+            "request": {
+              "description": {
+                "content": "Run only after VNPay payment is completed and Booking has consumed payment.completed. Expected: payment.completed -> Booking MATCHING -> ride.created -> Matching assignment. Current ride should point at the E2E booking for the same driver token used by this collection. If booking.assignedDriverId differs from driverUserId, Matching selected another online driver from Redis; set other drivers offline/clear stale Redis statuses or use that assigned driver token. Assignment TTL is 30 seconds.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "current-ride"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "0387ac54-8c45-44d0-9a5e-16d047f91aae",
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('8.10 current ride poll returns ok/not-found while async', () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));",
+                    "pm.test('8.10 booking was assigned to this logged-in driver', () => { const assignedDriverId = pm.collectionVariables.get('e2eVnpayAssignedDriverId'); if (assignedDriverId) pm.expect(assignedDriverId).to.eql(pm.collectionVariables.get('driverUserId')); });",
+                    "if (pm.response.code === 200) {",
+                    "  const body = pm.response.json();",
+                    "  const result = body.result || body.data || body;",
+                    "  const rideId = result.rideId || result.bookingId || result.id || '';",
+                    "  pm.collectionVariables.set('e2eVnpayAssignedDriverId', result.assignedDriverId || result.driverId || pm.collectionVariables.get('driverUserId') || '');",
+                    "  pm.test('8.10 driver has assigned ride before timeout', () => pm.expect(rideId, 'rideId from driver current-ride').to.not.be.empty);",
+                    "  pm.test('8.10 current ride matches booking', () => pm.expect(rideId).to.eql(pm.collectionVariables.get('e2eVnpayBookingId')));",
+                    "}"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "c4195dc5-6b8f-4175-99ec-d341e9825102",
+            "name": "8.10 Driver Accept Assignment -> ride.accepted",
+            "request": {
+              "description": {
+                "content": "Driver Service accepts the assigned job through the assignment command and publishes ride.accepted. Ride Service consumes ride.accepted and owns the ASSIGNED -> ACCEPTED ride-state transition before arrive/start/complete. Booking also consumes the event. Wait 1-3 seconds before ride lifecycle requests.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "rides",
+                  "assignment"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"rideId\": \"{{e2eVnpayBookingId}}\",\n  \"action\": \"ACCEPT\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "b77053a8-9e71-4a49-8cfe-c6c77df00624",
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('8.10 booking assigned driver matches current driver', () => { const assignedDriverId = pm.collectionVariables.get('e2eVnpayAssignedDriverId'); if (assignedDriverId) pm.expect(assignedDriverId).to.eql(pm.collectionVariables.get('driverUserId')); });",
+                    "pm.test('8.10 booking id exists before accept', () => pm.expect(pm.collectionVariables.get('e2eVnpayBookingId')).to.not.be.empty);",
+                    "pm.test('8.10 accept accepted by driver-service', () => pm.expect(pm.response.code).to.be.oneOf([200, 202, 204]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "21a7003d-9e06-4753-9459-d4a60b9363c3",
+            "name": "8.11 Ride Service Arrive -> ride.arrived",
+            "request": {
+              "description": {
+                "content": "Ride Service validates assigned driver, updates ACCEPTED -> PICKUP, and publishes ride.arrived.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "rides",
+                  "{{e2eVnpayBookingId}}",
+                  "arrive"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "POST",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "55007a84-456b-47bf-983b-1712f5498cf8",
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('8.11 arrive ok', () => pm.expect(pm.response.code).to.be.oneOf([200, 202]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "80f4339e-8983-4d77-807e-bcfa77c219cb",
+            "name": "8.12 Ride Service Start -> ride.started",
+            "request": {
+              "description": {
+                "content": "Ride Service validates assigned driver, updates PICKUP -> IN_PROGRESS, and publishes ride.started.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "rides",
+                  "{{e2eVnpayBookingId}}",
+                  "start"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "POST",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "60006970-e6ce-4eb0-94eb-f26e7ec60e94",
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('8.11 start ok', () => pm.expect(pm.response.code).to.be.oneOf([200, 202]));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "e2eb4363-02da-452e-b976-6a559144f9f5",
+            "name": "8.13 Ride Service Complete -> ride.completed",
+            "request": {
+              "description": {
+                "content": "Ride Service validates assigned driver, updates IN_PROGRESS -> COMPLETED, and publishes ride.completed. Wait 2-5 seconds afterward for Booking and Payment consumers.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "rides",
+                  "{{e2eVnpayBookingId}}",
+                  "complete"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "method": "POST",
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"finalFare\": {{estimatedFare}},\n  \"paymentMethod\": \"VNPAY\"\n}",
+                "options": {
+                  "raw": {
+                    "language": "json"
+                  }
+                }
+              },
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "ce731d44-5ac3-4c8a-aca4-82d966f44856",
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('8.11 complete ok', () => pm.expect(pm.response.code).to.be.oneOf([200, 202]));",
+                    "const result = pm.response.json();",
+                    "pm.test('ride completed status returned when present', () => { if (result.status) pm.expect(result.status).to.eql('COMPLETED'); });"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "ea73105b-4997-47c5-b1eb-d093567cff1a",
+            "name": "8.14 Verify VNPAY Payment Transaction After Ride Completed",
+            "request": {
+              "description": {
+                "content": "Expected after the prepaid VNPay flow: transaction already exists from payment.requested and should be SUCCESS before/after ride.completed. ride.completed should not charge the customer again; it only lets Payment Service settle driver earning.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "payments",
+                  "booking",
+                  "{{e2eVnpayBookingId}}"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "7f40e37f-d1f8-47e8-a327-66e6f97361bd",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "pm.collectionVariables.set('e2eVnpayPaymentTxnId', result.transactionId || pm.collectionVariables.get('e2eVnpayPaymentTxnId') || '');",
+                    "pm.collectionVariables.set('e2eVnpayPayUrl', result.payUrl || pm.collectionVariables.get('e2eVnpayPayUrl') || '');",
+                    "pm.test('VNPAY payment lookup ok', () => pm.expect(pm.response.code).to.eql(200));",
+                    "pm.test('VNPAY payment transaction id captured', () => pm.expect(pm.collectionVariables.get('e2eVnpayPaymentTxnId')).to.not.be.empty);",
+                    "pm.test('VNPAY payment method', () => pm.expect(result.paymentMethod).to.eql('VNPAY'));",
+                    "pm.test('VNPAY payment success before settlement', () => pm.expect(result.status).to.eql('SUCCESS'));",
+                    "pm.test('VNPAY payUrl was captured during pre-trip step when gateway returned one', () => pm.expect(pm.collectionVariables.get('e2eVnpayPayUrl')).to.be.a('string'));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "67043ad6-0a59-4140-acd3-cef41005cce8",
+            "name": "8.15 Verify Booking History Final State",
+            "request": {
+              "description": {
+                "content": "Expected completed booking appears in customer history with status COMPLETED. VNPay payment success and driver settlement are owned by Payment Service.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "v1",
+                  "bookings",
+                  "customer",
+                  "{{customerUserId}}"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [
+                  {
+                    "key": "page",
+                    "value": "0"
+                  },
+                  {
+                    "key": "size",
+                    "value": "10"
+                  }
+                ],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{customerAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "ef72a6f4-7028-4ae5-983e-1f0eccf3ecf1",
+                  "type": "text/javascript",
+                  "exec": [
+                    "const bookingId = pm.collectionVariables.get('e2eVnpayBookingId');",
+                    "const body = pm.response.json();",
+                    "const result = body.result || body.data || body;",
+                    "const list = Array.isArray(result) ? result : (result.content || result.data || result.items || []);",
+                    "const booking = list.find(b => (b.id || b.bookingId || b.rideId) === bookingId);",
+                    "pm.test('8.15 booking appears in history', () => pm.expect(booking, 'booking in history').to.exist);",
+                    "if (booking) {",
+                    "  pm.test('8.15 booking payment method is VNPAY', () => pm.expect(booking.paymentMethod).to.eql('VNPAY'));",
+                    "  pm.test('8.15 booking final status is COMPLETED', () => pm.expect(booking.status).to.eql('COMPLETED'));",
+                    "}"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "id": "32b918e3-1c7e-4b4c-9c62-5c6f8605b980",
+            "name": "8.16 Verify Driver Current Ride Released",
+            "request": {
+              "description": {
+                "content": "Expected after ride.completed consumer: no active current ride for the driver. If Kafka is still processing, wait and retry.",
+                "type": "text/plain"
+              },
+              "url": {
+                "path": [
+                  "api",
+                  "drivers",
+                  "me",
+                  "current-ride"
+                ],
+                "host": [
+                  "{{apiGatewayUrl}}"
+                ],
+                "query": [],
+                "variable": []
+              },
+              "method": "GET",
+              "auth": {
+                "type": "bearer",
+                "bearer": [
+                  {
+                    "type": "string",
+                    "value": "{{driverAccessToken}}",
+                    "key": "token"
+                  }
+                ]
+              }
+            },
+            "response": [],
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "id": "3f3bc37a-37d1-4d16-bb0e-a9f8713ca44c",
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('8.16 driver current ride released or still processing', () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));",
+                    "if (pm.response.code === 200) {",
+                    "  const body = pm.response.json();",
+                    "  const result = body.result || body.data || body;",
+                    "  const rideId = result.rideId || result.bookingId || result.id || '';",
+                    "  pm.test('8.16 current ride empty when cleanup finished', () => pm.expect(rideId || '').to.be.oneOf(['', null]));",
+                    "}"
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "event": []
+      }
+    ],
+    "event": [
+      {
+        "listen": "prerequest",
+        "script": {
+          "id": "d762a07a-91a6-487e-94b9-70b84ec026a3",
+          "type": "text/javascript",
+          "exec": [
+            "const nonce = Date.now();",
+            "if (!pm.collectionVariables.get('customerEmail')) pm.collectionVariables.set('customerEmail', `boundary.customer.${nonce}@cab.local`);",
+            "if (!pm.collectionVariables.get('driverEmail')) pm.collectionVariables.set('driverEmail', `boundary.driver.${nonce}@cab.local`);",
+            "if (!pm.collectionVariables.get('customerPassword')) pm.collectionVariables.set('customerPassword', 'P@ssw0rd123');",
+            "if (!pm.collectionVariables.get('driverPassword')) pm.collectionVariables.set('driverPassword', 'P@ssw0rd123');",
+            "if (!pm.collectionVariables.get('quoteToken')) pm.collectionVariables.set('quoteToken', 'manual-quote-token');",
+            "if (!pm.collectionVariables.get('estimatedFare')) pm.collectionVariables.set('estimatedFare', '45000');",
+            "if (!pm.collectionVariables.get('vehicleType')) pm.collectionVariables.set('vehicleType', 'CAR4');",
+            "if (!pm.collectionVariables.get('acceptIdempotencyKey')) pm.collectionVariables.set('acceptIdempotencyKey', `accept-${nonce}`);",
+            "if (!pm.collectionVariables.get('cancelIdempotencyKey')) pm.collectionVariables.set('cancelIdempotencyKey', `cancel-${nonce}`);",
+            "if (!pm.collectionVariables.get('rejectIdempotencyKey')) pm.collectionVariables.set('rejectIdempotencyKey', `reject-${nonce}`);",
+            "if (!pm.collectionVariables.get('completeIdempotencyKey')) pm.collectionVariables.set('completeIdempotencyKey', `complete-${nonce}`);",
+            "if (!pm.collectionVariables.get('e2eCashIdempotencyKey')) pm.collectionVariables.set('e2eCashIdempotencyKey', `e2e-cash-${nonce}`);",
+            "if (!pm.collectionVariables.get('e2eVnpayIdempotencyKey')) pm.collectionVariables.set('e2eVnpayIdempotencyKey', `e2e-vnpay-${nonce}`);"
+          ],
+          "_lastExecutionId": "b94232c8-33a1-449d-8247-5a8152a382e9"
+        }
+      }
+    ],
+    "variable": [
+      {
+        "type": "string",
+        "value": "http://localhost:8080",
+        "key": "apiGatewayUrl"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "customerEmail"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "driverEmail"
+      },
+      {
+        "type": "string",
+        "value": "P@ssw0rd123",
+        "key": "customerPassword"
+      },
+      {
+        "type": "string",
+        "value": "P@ssw0rd123",
+        "key": "driverPassword"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "customerAccessToken"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "driverAccessToken"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "customerUserId"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "driverUserId"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "acceptBookingId"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "rejectBookingId"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "completeBookingId"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "assignedRideId"
+      },
+      {
+        "type": "string",
+        "value": "manual-quote-token",
+        "key": "quoteToken"
+      },
+      {
+        "type": "string",
+        "value": "45000",
+        "key": "estimatedFare"
+      },
+      {
+        "type": "string",
+        "value": "CAR4",
+        "key": "vehicleType"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "acceptIdempotencyKey"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "cancelIdempotencyKey"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "rejectIdempotencyKey"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "completeIdempotencyKey"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "e2eCashBookingId"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "e2eVnpayBookingId"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "e2eCashPaymentTxnId"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "e2eVnpayPaymentTxnId"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "e2eVnpayPayUrl"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "e2eCashIdempotencyKey"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "e2eVnpayIdempotencyKey"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "e2eCashAssignedDriverId"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "e2eVnpayAssignedDriverId"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "estimateId"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "quoteId"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "quotePayloadHash"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "quoteHashAlgorithm"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "quoteExpiresAt"
+      },
+      {
+        "type": "string",
+        "value": "",
+        "key": "quoteCurrency"
+      }
+    ],
+    "info": {
+      "_postman_id": "cab-boundary-main-flows",
+      "name": "CAB Boundary Main Flows",
+      "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+      "description": {
+        "content": "Main E2E flows for the refactored boundaries: Booking publishes ride.created for matching, and online prepaid bookings publish payment.requested first. Payment Service consumes payment.requested for PRE_TRIP online payment and ride.completed for POST_TRIP cash/settlement. Driver Service only publishes driver.accepted/driver.rejected, Ride Service owns trip lifecycle and publishes ride.arrived/ride.started/ride.completed. Run folders top to bottom. For Kafka async steps, run poll requests after a short wait.",
+        "type": "text/plain"
+      }
+    }
+  },
+  "environment": {
+    "_": {
+      "postman_variable_scope": "environment",
+      "postman_exported_at": "2026-05-22T16:50:00.000Z",
+      "postman_exported_using": "Postman/10.0.0"
+    },
+    "id": "ec503d33-bfbf-4189-969e-24ffcf42de2d",
+    "name": "Cab Booking - Dev Local",
+    "values": [
+      {
+        "type": "any",
+        "value": "http://localhost:8080",
+        "key": "apiGatewayUrl"
+      },
+      {
+        "description": {
+          "content": "DEPRECATED: Use apiGatewayUrl. Set to gateway port so existing collections work through gateway.",
+          "type": "text/plain"
+        },
+        "type": "any",
+        "value": "http://localhost:8080",
+        "key": "baseUrl"
+      },
+      {
+        "description": {
+          "content": "Legacy alias for apiGatewayUrl",
+          "type": "text/plain"
+        },
+        "type": "any",
+        "value": "http://localhost:8080",
+        "key": "gatewayUrl"
+      },
+      {
+        "type": "any",
+        "value": "",
+        "key": "authToken"
+      },
+      {
+        "type": "any",
+        "value": "",
+        "key": "access_token"
+      },
+      {
+        "type": "any",
+        "value": "",
+        "key": "customer_token"
+      },
+      {
+        "type": "any",
+        "value": "",
+        "key": "driver_token"
+      },
+      {
+        "type": "any",
+        "value": "",
+        "key": "admin_token"
+      },
+      {
+        "type": "any",
+        "value": "",
+        "key": "bookingId"
+      },
+      {
+        "type": "any",
+        "value": "",
+        "key": "rideId"
+      },
+      {
+        "type": "any",
+        "value": "",
+        "key": "customerId"
+      },
+      {
+        "type": "any",
+        "value": "",
+        "key": "driverId"
+      },
+      {
+        "type": "any",
+        "value": "",
+        "key": "adminId"
+      }
+    ]
+  },
+  "globals": {
+    "id": "4b2c7e95-d0d5-40e7-a5fe-5d75a0f11b01",
+    "values": []
+  },
+  "run": {
+    "stats": {
+      "iterations": {
+        "total": 1,
+        "pending": 0,
+        "failed": 0
+      },
+      "items": {
+        "total": 4,
+        "pending": 0,
+        "failed": 0
+      },
+      "scripts": {
+        "total": 5,
+        "pending": 0,
+        "failed": 1
+      },
+      "prerequests": {
+        "total": 4,
+        "pending": 0,
+        "failed": 0
+      },
+      "requests": {
+        "total": 4,
+        "pending": 0,
+        "failed": 0
+      },
+      "tests": {
+        "total": 4,
+        "pending": 0,
+        "failed": 0
+      },
+      "assertions": {
+        "total": 0,
+        "pending": 0,
+        "failed": 0
+      },
+      "testScripts": {
+        "total": 1,
+        "pending": 0,
+        "failed": 1
+      },
+      "prerequestScripts": {
+        "total": 4,
+        "pending": 0,
+        "failed": 0
+      }
+    },
+    "timings": {
+      "responseAverage": 22.25,
+      "responseMin": 15,
+      "responseMax": 43,
+      "responseSd": 11.986972094736853,
+      "dnsAverage": 0,
+      "dnsMin": 0,
+      "dnsMax": 0,
+      "dnsSd": 0,
+      "firstByteAverage": 0,
+      "firstByteMin": 0,
+      "firstByteMax": 0,
+      "firstByteSd": 0,
+      "started": 1779598083905,
+      "completed": 1779598085536
+    },
+    "executions": [
+      {
+        "cursor": {
+          "position": 0,
+          "iteration": 0,
+          "length": 4,
+          "cycles": 1,
+          "empty": false,
+          "eof": false,
+          "bof": true,
+          "cr": false,
+          "ref": "990c355b-532d-4e12-805f-b494b6621672",
+          "httpRequestId": "55319cd7-cd39-42e9-bbfd-6836001a8cde"
+        },
+        "item": {
+          "id": "7f95cb68-2e62-4e8a-a831-a255e75bed51",
+          "name": "2.1 Upsert Driver Profile",
+          "request": {
+            "description": {
+              "content": "Driver Service owns driver profile. vehicleType must be one of BIKE, CAR4, CAR7.",
+              "type": "text/plain"
+            },
+            "url": {
+              "path": [
+                "api",
+                "drivers",
+                "me",
+                "profile"
+              ],
+              "host": [
+                "{{apiGatewayUrl}}"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "method": "PUT",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Boundary Flow Driver\",\n  \"email\": \"{{driverEmail}}\",\n  \"phoneNumber\": \"0902000002\",\n  \"avatarUrl\": \"https://example.com/driver.png\",\n  \"licenseNumber\": \"GPLX-BOUNDARY-001\",\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"vehiclePlate\": \"51A-99999\",\n  \"vehicleModel\": \"Toyota Vios\",\n  \"vehicleColor\": \"White\",\n  \"serviceArea\": \"Ho Chi Minh City\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "type": "string",
+                  "value": "{{driverAccessToken}}",
+                  "key": "token"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": []
+        },
+        "request": {
+          "description": {
+            "content": "Driver Service owns driver profile. vehicleType must be one of BIKE, CAR4, CAR7.",
+            "type": "text/plain"
+          },
+          "url": {
+            "protocol": "http",
+            "port": "8080",
+            "path": [
+              "api",
+              "drivers",
+              "me",
+              "profile"
+            ],
+            "host": [
+              "localhost"
+            ],
+            "query": [],
+            "variable": []
+          },
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "key": "User-Agent",
+              "value": "PostmanRuntime/7.39.1",
+              "system": true
+            },
+            {
+              "key": "Accept",
+              "value": "*/*",
+              "system": true
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache",
+              "system": true
+            },
+            {
+              "key": "Postman-Token",
+              "value": "c0973cdb-e7b5-4ecc-98fc-ba41b7d7a32e",
+              "system": true
+            },
+            {
+              "key": "Host",
+              "value": "localhost:8080",
+              "system": true
+            },
+            {
+              "key": "Accept-Encoding",
+              "value": "gzip, deflate, br",
+              "system": true
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive",
+              "system": true
+            },
+            {
+              "key": "Content-Length",
+              "value": "367",
+              "system": true
+            }
+          ],
+          "method": "PUT",
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"fullName\": \"Boundary Flow Driver\",\n  \"email\": \"boundary.driver.1779598084237@cab.local\",\n  \"phoneNumber\": \"0902000002\",\n  \"avatarUrl\": \"https://example.com/driver.png\",\n  \"licenseNumber\": \"GPLX-BOUNDARY-001\",\n  \"vehicleType\": \"CAR4\",\n  \"vehiclePlate\": \"51A-99999\",\n  \"vehicleModel\": \"Toyota Vios\",\n  \"vehicleColor\": \"White\",\n  \"serviceArea\": \"Ho Chi Minh City\"\n}",
+            "options": {
+              "raw": {
+                "language": "json"
+              }
+            }
+          },
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "type": "string",
+                "value": "",
+                "key": "token"
+              }
+            ]
+          }
+        },
+        "response": {
+          "id": "a7fe785c-0a91-4f0b-bcf0-764650b7d995",
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "X-RateLimit-Remaining",
+              "value": "999"
+            },
+            {
+              "key": "X-RateLimit-Limit",
+              "value": "1000"
+            },
+            {
+              "key": "Vary",
+              "value": "Origin"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Method"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Headers"
+            },
+            {
+              "key": "WWW-Authenticate",
+              "value": "Bearer"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, max-age=0, must-revalidate"
+            },
+            {
+              "key": "Pragma",
+              "value": "no-cache"
+            },
+            {
+              "key": "Expires",
+              "value": "0"
+            },
+            {
+              "key": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "key": "X-Frame-Options",
+              "value": "DENY"
+            },
+            {
+              "key": "X-XSS-Protection",
+              "value": "0"
+            },
+            {
+              "key": "Referrer-Policy",
+              "value": "no-referrer"
+            },
+            {
+              "key": "content-length",
+              "value": "0"
+            }
+          ],
+          "stream": {
+            "type": "Buffer",
+            "data": []
+          },
+          "cookie": [],
+          "responseTime": 43,
+          "responseSize": 0
+        },
+        "id": "7f95cb68-2e62-4e8a-a831-a255e75bed51"
+      },
+      {
+        "cursor": {
+          "ref": "ea8cc1a9-2801-43e0-9fe6-65c26a2542e5",
+          "length": 4,
+          "cycles": 1,
+          "position": 1,
+          "iteration": 0,
+          "httpRequestId": "13794cce-f9b4-44b4-923e-5e08250e710c"
+        },
+        "item": {
+          "id": "1cab6289-14d8-4b5a-a3d3-f1a742ed326f",
+          "name": "2.2 Set Driver ONLINE -> Redis driver:status AVAILABLE",
+          "request": {
+            "description": {
+              "content": "Expected side effect: Driver Service writes driver:status:{{driverUserId}} = AVAILABLE. Matching also requires driver vehicle metadata: driver:vehicleType:{{driverUserId}} = {{vehicleType}}.",
+              "type": "text/plain"
+            },
+            "url": {
+              "path": [
+                "api",
+                "drivers",
+                "me",
+                "availability"
+              ],
+              "host": [
+                "{{apiGatewayUrl}}"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "method": "PATCH",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"availabilityStatus\": \"ONLINE\",\n  \"currentLatitude\": 10.7769,\n  \"currentLongitude\": 106.7009\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "type": "string",
+                  "value": "{{driverAccessToken}}",
+                  "key": "token"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": []
+        },
+        "request": {
+          "description": {
+            "content": "Expected side effect: Driver Service writes driver:status: = AVAILABLE. Matching also requires driver vehicle metadata: driver:vehicleType: = CAR4.",
+            "type": "text/plain"
+          },
+          "url": {
+            "protocol": "http",
+            "port": "8080",
+            "path": [
+              "api",
+              "drivers",
+              "me",
+              "availability"
+            ],
+            "host": [
+              "localhost"
+            ],
+            "query": [],
+            "variable": []
+          },
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "key": "User-Agent",
+              "value": "PostmanRuntime/7.39.1",
+              "system": true
+            },
+            {
+              "key": "Accept",
+              "value": "*/*",
+              "system": true
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache",
+              "system": true
+            },
+            {
+              "key": "Postman-Token",
+              "value": "4492d65d-95fe-4d80-ab43-2b25de26c4f7",
+              "system": true
+            },
+            {
+              "key": "Host",
+              "value": "localhost:8080",
+              "system": true
+            },
+            {
+              "key": "Accept-Encoding",
+              "value": "gzip, deflate, br",
+              "system": true
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive",
+              "system": true
+            },
+            {
+              "key": "Content-Length",
+              "value": "98",
+              "system": true
+            }
+          ],
+          "method": "PATCH",
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"availabilityStatus\": \"ONLINE\",\n  \"currentLatitude\": 10.7769,\n  \"currentLongitude\": 106.7009\n}",
+            "options": {
+              "raw": {
+                "language": "json"
+              }
+            }
+          },
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "type": "string",
+                "value": "",
+                "key": "token"
+              }
+            ]
+          }
+        },
+        "response": {
+          "id": "90cd0038-aabc-43fe-affe-5d3ef8f3b7d2",
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "X-RateLimit-Remaining",
+              "value": "998"
+            },
+            {
+              "key": "X-RateLimit-Limit",
+              "value": "1000"
+            },
+            {
+              "key": "Vary",
+              "value": "Origin"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Method"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Headers"
+            },
+            {
+              "key": "WWW-Authenticate",
+              "value": "Bearer"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, max-age=0, must-revalidate"
+            },
+            {
+              "key": "Pragma",
+              "value": "no-cache"
+            },
+            {
+              "key": "Expires",
+              "value": "0"
+            },
+            {
+              "key": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "key": "X-Frame-Options",
+              "value": "DENY"
+            },
+            {
+              "key": "X-XSS-Protection",
+              "value": "0"
+            },
+            {
+              "key": "Referrer-Policy",
+              "value": "no-referrer"
+            },
+            {
+              "key": "content-length",
+              "value": "0"
+            }
+          ],
+          "stream": {
+            "type": "Buffer",
+            "data": []
+          },
+          "cookie": [],
+          "responseTime": 15,
+          "responseSize": 0
+        },
+        "id": "1cab6289-14d8-4b5a-a3d3-f1a742ed326f"
+      },
+      {
+        "cursor": {
+          "ref": "3a9783f7-a38d-416b-8b22-fbc92fcdd512",
+          "length": 4,
+          "cycles": 1,
+          "position": 2,
+          "iteration": 0,
+          "httpRequestId": "ae2202e2-c7c5-4eef-bf17-92dbcdfa2420"
+        },
+        "item": {
+          "id": "c646462f-065f-4adf-a106-7bd30cde1600",
+          "name": "2.3 Push Driver GPS To Ride Redis GEO",
+          "request": {
+            "description": {
+              "content": "Ride Service owns driver:locations. Expected Redis: GEOPOS driver:locations {{driverUserId}}.",
+              "type": "text/plain"
+            },
+            "url": {
+              "path": [
+                "api",
+                "v1",
+                "rides",
+                "location"
+              ],
+              "host": [
+                "{{apiGatewayUrl}}"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driverId\": \"{{driverUserId}}\",\n  \"lat\": 10.7769,\n  \"lng\": 106.7009\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth",
+              "noauth": []
+            }
+          },
+          "response": [],
+          "event": []
+        },
+        "request": {
+          "description": {
+            "content": "Ride Service owns driver:locations. Expected Redis: GEOPOS driver:locations .",
+            "type": "text/plain"
+          },
+          "url": {
+            "protocol": "http",
+            "port": "8080",
+            "path": [
+              "api",
+              "v1",
+              "rides",
+              "location"
+            ],
+            "host": [
+              "localhost"
+            ],
+            "query": [],
+            "variable": []
+          },
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "key": "User-Agent",
+              "value": "PostmanRuntime/7.39.1",
+              "system": true
+            },
+            {
+              "key": "Accept",
+              "value": "*/*",
+              "system": true
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache",
+              "system": true
+            },
+            {
+              "key": "Postman-Token",
+              "value": "6b93cb23-70e6-4f25-a728-6a3bb7cf3d24",
+              "system": true
+            },
+            {
+              "key": "Host",
+              "value": "localhost:8080",
+              "system": true
+            },
+            {
+              "key": "Accept-Encoding",
+              "value": "gzip, deflate, br",
+              "system": true
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive",
+              "system": true
+            },
+            {
+              "key": "Content-Length",
+              "value": "57",
+              "system": true
+            }
+          ],
+          "method": "POST",
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"driverId\": \"\",\n  \"lat\": 10.7769,\n  \"lng\": 106.7009\n}",
+            "options": {
+              "raw": {
+                "language": "json"
+              }
+            }
+          },
+          "auth": {
+            "type": "noauth",
+            "noauth": []
+          }
+        },
+        "response": {
+          "id": "d4849b6b-832b-41b0-83a5-d9698dc75132",
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "X-RateLimit-Remaining",
+              "value": "999"
+            },
+            {
+              "key": "X-RateLimit-Limit",
+              "value": "1000"
+            },
+            {
+              "key": "Vary",
+              "value": "Origin"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Method"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Headers"
+            },
+            {
+              "key": "WWW-Authenticate",
+              "value": "Bearer"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, max-age=0, must-revalidate"
+            },
+            {
+              "key": "Pragma",
+              "value": "no-cache"
+            },
+            {
+              "key": "Expires",
+              "value": "0"
+            },
+            {
+              "key": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "key": "X-Frame-Options",
+              "value": "DENY"
+            },
+            {
+              "key": "X-XSS-Protection",
+              "value": "0"
+            },
+            {
+              "key": "Referrer-Policy",
+              "value": "no-referrer"
+            },
+            {
+              "key": "content-length",
+              "value": "0"
+            }
+          ],
+          "stream": {
+            "type": "Buffer",
+            "data": []
+          },
+          "cookie": [],
+          "responseTime": 16,
+          "responseSize": 0
+        },
+        "id": "c646462f-065f-4adf-a106-7bd30cde1600"
+      },
+      {
+        "cursor": {
+          "ref": "05f82b2a-66db-49e2-a1e2-7ec633894991",
+          "length": 4,
+          "cycles": 1,
+          "position": 3,
+          "iteration": 0,
+          "httpRequestId": "0bfb111a-1e18-4867-88ad-61fbcf8db6f9"
+        },
+        "item": {
+          "id": "ad98d176-4095-4309-98dc-b883b4af6d3d",
+          "name": "2.4 Poll Driver Current Ride",
+          "request": {
+            "url": {
+              "path": [
+                "api",
+                "drivers",
+                "me",
+                "current-ride"
+              ],
+              "host": [
+                "{{apiGatewayUrl}}"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "type": "string",
+                  "value": "{{driverAccessToken}}",
+                  "key": "token"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "9e45c5dd-0f9a-4bcd-b334-46e54585e2da",
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || body.data || body;",
+                  "if (result.rideId) pm.collectionVariables.set('assignedRideId', result.rideId);",
+                  "pm.test('current ride fetched', () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));"
+                ],
+                "_lastExecutionId": "68098674-b557-49f0-a9f0-719b6e382292"
+              }
+            }
+          ]
+        },
+        "request": {
+          "url": {
+            "protocol": "http",
+            "port": "8080",
+            "path": [
+              "api",
+              "drivers",
+              "me",
+              "current-ride"
+            ],
+            "host": [
+              "localhost"
+            ],
+            "query": [],
+            "variable": []
+          },
+          "header": [
+            {
+              "key": "User-Agent",
+              "value": "PostmanRuntime/7.39.1",
+              "system": true
+            },
+            {
+              "key": "Accept",
+              "value": "*/*",
+              "system": true
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache",
+              "system": true
+            },
+            {
+              "key": "Postman-Token",
+              "value": "e7192dcd-7ef2-4502-8f78-bc25b2b3b480",
+              "system": true
+            },
+            {
+              "key": "Host",
+              "value": "localhost:8080",
+              "system": true
+            },
+            {
+              "key": "Accept-Encoding",
+              "value": "gzip, deflate, br",
+              "system": true
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive",
+              "system": true
+            }
+          ],
+          "method": "GET",
+          "auth": {
+            "type": "bearer",
+            "bearer": [
+              {
+                "type": "string",
+                "value": "",
+                "key": "token"
+              }
+            ]
+          }
+        },
+        "response": {
+          "id": "135b8011-1dfe-4c79-989e-a620c7fe1248",
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "X-RateLimit-Remaining",
+              "value": "998"
+            },
+            {
+              "key": "X-RateLimit-Limit",
+              "value": "1000"
+            },
+            {
+              "key": "Vary",
+              "value": "Origin"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Method"
+            },
+            {
+              "key": "Vary",
+              "value": "Access-Control-Request-Headers"
+            },
+            {
+              "key": "WWW-Authenticate",
+              "value": "Bearer"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "no-cache, no-store, max-age=0, must-revalidate"
+            },
+            {
+              "key": "Pragma",
+              "value": "no-cache"
+            },
+            {
+              "key": "Expires",
+              "value": "0"
+            },
+            {
+              "key": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "key": "X-Frame-Options",
+              "value": "DENY"
+            },
+            {
+              "key": "X-XSS-Protection",
+              "value": "0"
+            },
+            {
+              "key": "Referrer-Policy",
+              "value": "no-referrer"
+            },
+            {
+              "key": "content-length",
+              "value": "0"
+            }
+          ],
+          "stream": {
+            "type": "Buffer",
+            "data": []
+          },
+          "cookie": [],
+          "responseTime": 15,
+          "responseSize": 0
+        },
+        "id": "ad98d176-4095-4309-98dc-b883b4af6d3d",
+        "testScript": [
+          {
+            "error": {
+              "type": "Error",
+              "name": "JSONError",
+              "message": "No data, empty input at 1:1\n\n^",
+              "checksum": "dd12d8ea84467ec693558d8bb4288cb9",
+              "id": "82fcd087-e83e-4567-a00e-d22b9ab60f31",
+              "timestamp": 1779598085519,
+              "stacktrace": []
+            }
+          }
+        ]
+      }
+    ],
+    "transfers": {
+      "responseTotal": 0
+    },
+    "failures": [
+      {
+        "error": {
+          "type": "Error",
+          "name": "JSONError",
+          "message": "No data, empty input at 1:1\n\n^",
+          "checksum": "dd12d8ea84467ec693558d8bb4288cb9",
+          "id": "82fcd087-e83e-4567-a00e-d22b9ab60f31",
+          "timestamp": 1779598085519,
+          "stacktrace": []
+        },
+        "at": "test-script",
+        "source": {
+          "id": "ad98d176-4095-4309-98dc-b883b4af6d3d",
+          "name": "2.4 Poll Driver Current Ride",
+          "request": {
+            "url": {
+              "path": [
+                "api",
+                "drivers",
+                "me",
+                "current-ride"
+              ],
+              "host": [
+                "{{apiGatewayUrl}}"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "type": "string",
+                  "value": "{{driverAccessToken}}",
+                  "key": "token"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "9e45c5dd-0f9a-4bcd-b334-46e54585e2da",
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const result = body.result || body.data || body;",
+                  "if (result.rideId) pm.collectionVariables.set('assignedRideId', result.rideId);",
+                  "pm.test('current ride fetched', () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));"
+                ],
+                "_lastExecutionId": "68098674-b557-49f0-a9f0-719b6e382292"
+              }
+            }
+          ]
+        },
+        "parent": {
+          "id": "301753f5-138c-4ef9-b4b3-037d3ac038c4",
+          "name": "2. Prepare Driver Status And GPS",
+          "item": [
+            {
+              "id": "7f95cb68-2e62-4e8a-a831-a255e75bed51",
+              "name": "2.1 Upsert Driver Profile",
+              "request": {
+                "description": {
+                  "content": "Driver Service owns driver profile. vehicleType must be one of BIKE, CAR4, CAR7.",
+                  "type": "text/plain"
+                },
+                "url": {
+                  "path": [
+                    "api",
+                    "drivers",
+                    "me",
+                    "profile"
+                  ],
+                  "host": [
+                    "{{apiGatewayUrl}}"
+                  ],
+                  "query": [],
+                  "variable": []
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "method": "PUT",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"fullName\": \"Boundary Flow Driver\",\n  \"email\": \"{{driverEmail}}\",\n  \"phoneNumber\": \"0902000002\",\n  \"avatarUrl\": \"https://example.com/driver.png\",\n  \"licenseNumber\": \"GPLX-BOUNDARY-001\",\n  \"vehicleType\": \"{{vehicleType}}\",\n  \"vehiclePlate\": \"51A-99999\",\n  \"vehicleModel\": \"Toyota Vios\",\n  \"vehicleColor\": \"White\",\n  \"serviceArea\": \"Ho Chi Minh City\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "type": "string",
+                      "value": "{{driverAccessToken}}",
+                      "key": "token"
+                    }
+                  ]
+                }
+              },
+              "response": [],
+              "event": []
+            },
+            {
+              "id": "1cab6289-14d8-4b5a-a3d3-f1a742ed326f",
+              "name": "2.2 Set Driver ONLINE -> Redis driver:status AVAILABLE",
+              "request": {
+                "description": {
+                  "content": "Expected side effect: Driver Service writes driver:status:{{driverUserId}} = AVAILABLE. Matching also requires driver vehicle metadata: driver:vehicleType:{{driverUserId}} = {{vehicleType}}.",
+                  "type": "text/plain"
+                },
+                "url": {
+                  "path": [
+                    "api",
+                    "drivers",
+                    "me",
+                    "availability"
+                  ],
+                  "host": [
+                    "{{apiGatewayUrl}}"
+                  ],
+                  "query": [],
+                  "variable": []
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "method": "PATCH",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"availabilityStatus\": \"ONLINE\",\n  \"currentLatitude\": 10.7769,\n  \"currentLongitude\": 106.7009\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "type": "string",
+                      "value": "{{driverAccessToken}}",
+                      "key": "token"
+                    }
+                  ]
+                }
+              },
+              "response": [],
+              "event": []
+            },
+            {
+              "id": "c646462f-065f-4adf-a106-7bd30cde1600",
+              "name": "2.3 Push Driver GPS To Ride Redis GEO",
+              "request": {
+                "description": {
+                  "content": "Ride Service owns driver:locations. Expected Redis: GEOPOS driver:locations {{driverUserId}}.",
+                  "type": "text/plain"
+                },
+                "url": {
+                  "path": [
+                    "api",
+                    "v1",
+                    "rides",
+                    "location"
+                  ],
+                  "host": [
+                    "{{apiGatewayUrl}}"
+                  ],
+                  "query": [],
+                  "variable": []
+                },
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "method": "POST",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"driverId\": \"{{driverUserId}}\",\n  \"lat\": 10.7769,\n  \"lng\": 106.7009\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "auth": {
+                  "type": "noauth",
+                  "noauth": []
+                }
+              },
+              "response": [],
+              "event": []
+            },
+            {
+              "id": "ad98d176-4095-4309-98dc-b883b4af6d3d",
+              "name": "2.4 Poll Driver Current Ride",
+              "request": {
+                "url": {
+                  "path": [
+                    "api",
+                    "drivers",
+                    "me",
+                    "current-ride"
+                  ],
+                  "host": [
+                    "{{apiGatewayUrl}}"
+                  ],
+                  "query": [],
+                  "variable": []
+                },
+                "method": "GET",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "type": "string",
+                      "value": "{{driverAccessToken}}",
+                      "key": "token"
+                    }
+                  ]
+                }
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "id": "9e45c5dd-0f9a-4bcd-b334-46e54585e2da",
+                    "type": "text/javascript",
+                    "exec": [
+                      "const body = pm.response.json();",
+                      "const result = body.result || body.data || body;",
+                      "if (result.rideId) pm.collectionVariables.set('assignedRideId', result.rideId);",
+                      "pm.test('current ride fetched', () => pm.expect(pm.response.code).to.be.oneOf([200, 404]));"
+                    ],
+                    "_lastExecutionId": "68098674-b557-49f0-a9f0-719b6e382292"
+                  }
+                }
+              ]
+            }
+          ],
+          "event": []
+        },
+        "cursor": {
+          "ref": "05f82b2a-66db-49e2-a1e2-7ec633894991",
+          "length": 4,
+          "cycles": 1,
+          "position": 3,
+          "iteration": 0,
+          "httpRequestId": "0bfb111a-1e18-4867-88ad-61fbcf8db6f9",
+          "scriptId": "9e45c5dd-0f9a-4bcd-b334-46e54585e2da"
+        }
+      }
+    ],
+    "error": null
+  }
+}

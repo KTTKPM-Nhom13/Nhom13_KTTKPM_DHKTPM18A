@@ -13,6 +13,7 @@ import iuh.fit.driverservice.dto.response.DriverStatusCheckResponse;
 import iuh.fit.driverservice.entity.DriverAvailabilityStatus;
 import iuh.fit.driverservice.entity.DriverProfile;
 import iuh.fit.driverservice.entity.DriverVerificationStatus;
+import iuh.fit.driverservice.repository.DriverEarningRepository;
 import iuh.fit.driverservice.repository.DriverProfileRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class DriverProfileService {
 
     DriverProfileRepository driverProfileRepository;
     DriverStatusService driverStatusService;
+    DriverEarningRepository driverEarningRepository;
 
     @Transactional
     public DriverProfileResponse getProfile(String externalUserId) {
@@ -109,12 +111,16 @@ public class DriverProfileService {
     @Transactional(readOnly = true)
     public DriverEarningsSummaryResponse getEarningsSummary(String externalUserId) {
         DriverProfile profile = getOrCreateProfileEntity(externalUserId);
+        BigDecimal totalGrossAmount = driverEarningRepository.sumGrossAmountByDriverId(externalUserId);
+        BigDecimal totalDriverAmount = driverEarningRepository.sumDriverAmountByDriverId(externalUserId);
         return DriverEarningsSummaryResponse.builder()
                 .externalUserId(profile.getExternalUserId())
                 .availabilityStatus(profile.getAvailabilityStatus().name())
                 .totalCompletedRides(profile.getTotalCompletedRides())
                 .averageRating(profile.getAverageRating())
                 .totalEarnings(profile.getTotalEarnings())
+                .totalGrossAmount(totalGrossAmount)
+                .totalDriverAmount(totalDriverAmount)
                 .currentRideActive(profile.getCurrentRideId() != null)
                 .lastOnlineAt(profile.getLastOnlineAt())
                 .build();
