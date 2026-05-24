@@ -82,7 +82,16 @@ public class BookingController {
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {
         BookingResponse booking = bookingService.getBookingById(id);
-        requireSameUser(jwt, booking.getCustomerId());
+        if (jwt != null && jwt.getSubject() != null) {
+            String subject = jwt.getSubject();
+            boolean isCustomer = subject.equals(booking.getCustomerId());
+            boolean isDriver = subject.equals(booking.getAssignedDriverId());
+            if (!isCustomer && !isDriver) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only access your own bookings or bookings assigned to you");
+            }
+        } else {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
         return ApiResponse.success("Fetched booking successfully", booking);
     }
 
