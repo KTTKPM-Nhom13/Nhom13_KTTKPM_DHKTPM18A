@@ -43,4 +43,5 @@ def handle_ai_chat(request: ChatRequest, user_info: dict = Depends(verify_and_ge
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8099))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    reload_opt = os.getenv("RELOAD", "false").lower() == "true"
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=reload_opt)
