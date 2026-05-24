@@ -101,7 +101,11 @@ public class BookingLifecycleEventListener {
         }
     }
 
-    @KafkaListener(topics = "ride.cancelled", groupId = "booking-service-group")
+    @KafkaListener(
+            topics = "ride.cancelled",
+            groupId = "booking-service-group",
+            containerFactory = "rideCancelledKafkaListenerContainerFactory"
+    )
         @Transactional
         public void handleRideCancelled(String message) {
             log.info("[ride.cancelled] message={}", message);
