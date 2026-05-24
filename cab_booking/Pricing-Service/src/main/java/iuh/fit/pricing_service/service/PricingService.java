@@ -58,6 +58,7 @@ public class PricingService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final MongoTemplate mongoTemplate;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
+    private final PromoCodeService promoCodeService;
     private final RetryRegistry retryRegistry;
     private final RateLimiterRegistry rateLimiterRegistry;
     private final PricingMetrics pricingMetrics;
@@ -89,7 +90,7 @@ public class PricingService {
 
         WeatherContext weather = getWeatherContext(pickupZone, request.getPickupLat(), request.getPickupLng());
         BigDecimal surgeMultiplier = computeCurrentSurgeMultiplier(pickupZone, weather.badWeather());
-        FareBreakdown fareBreakdown = calculateFare(vehicleType, route.distanceKm(), route.durationMinutes(), surgeMultiplier);
+        FareBreakdown fareBreakdown = calculateFare(vehicleType, route.distanceKm(), route.durationMinutes(), surgeMultiplier, request.getPromoCode());
 
         String estimateId = UUID.randomUUID().toString();
         String quotePayloadHash = buildQuotePayloadHash(
@@ -116,6 +117,7 @@ public class PricingService {
                 .airportFee(fareBreakdown.airportFee())
                 .tollFee(fareBreakdown.tollFee())
                 .discountAmount(fareBreakdown.discountAmount())
+                .promoCode(request.getPromoCode())
                 .surgeMultiplier(surgeMultiplier.setScale(2, RoundingMode.HALF_UP))
                 .totalFare(fareBreakdown.totalFare())
                 .currency(pricingConfig.getCalculation().getCurrency())
@@ -167,6 +169,11 @@ public class PricingService {
             pricingMetrics.recordConfirmFailure("expired");
             throw new PricingException("Fare estimate has expired: " + estimateId, "ESTIMATE_EXPIRED");
         }
+
+        if (confirmed.getPromoCode() != null && !confirmed.getPromoCode().isBlank()) {
+            promoCodeService.incrementUsedCount(confirmed.getPromoCode());
+        }
+
         if (presentedQuoteHash != null && !presentedQuoteHash.isBlank()
                 && !presentedQuoteHash.equalsIgnoreCase(confirmed.getQuotePayloadHash())) {
             pricingMetrics.recordConfirmFailure("quote_hash_mismatch");
@@ -183,7 +190,7 @@ public class PricingService {
                                           String vehicleType, double distance, int duration) {
         String normalizedVehicleType = normalizeVehicleType(vehicleType);
         BigDecimal surgeMultiplier = surgePricingService.getSurgeMultiplier(pickupZone);
-        FareBreakdown fareBreakdown = calculateFare(normalizedVehicleType, distance, duration, surgeMultiplier);
+        FareBreakdown fareBreakdown = calculateFare(normalizedVehicleType, distance, duration, surgeMultiplier, null);
 
         FareEstimate fare = FareEstimate.builder()
                 .id(UUID.randomUUID().toString())
@@ -481,7 +488,7 @@ public class PricingService {
         }
     }
 
-    private FareBreakdown calculateFare(String vehicleType, double distance, int duration, BigDecimal surgeMultiplier) {
+    private FareBreakdown calculateFare(String vehicleType, double distance, int duration, BigDecimal surgeMultiplier, String promoCode) {
         PricingConfigProperties.VehicleConfig vehicleConfig = getVehicleConfig(vehicleType);
 
         BigDecimal baseFare = vehicleConfig.getBaseFare();
@@ -491,7 +498,6 @@ public class PricingService {
         BigDecimal zoneFee = BigDecimal.ZERO;
         BigDecimal airportFee = pricingConfig.getCalculation().getAirportFee();
         BigDecimal tollFee = pricingConfig.getCalculation().getTollFee();
-        BigDecimal discountAmount = BigDecimal.ZERO;
 
         BigDecimal subtotal = baseFare
                 .add(distanceFare)
@@ -500,7 +506,11 @@ public class PricingService {
                 .add(zoneFee)
                 .add(airportFee)
                 .add(tollFee);
-        BigDecimal totalFare = subtotal.multiply(surgeMultiplier)
+        
+        BigDecimal subtotalWithSurge = subtotal.multiply(surgeMultiplier);
+        BigDecimal discountAmount = promoCodeService.validateAndCalculateDiscount(promoCode, subtotalWithSurge);
+
+        BigDecimal totalFare = subtotalWithSurge
                 .subtract(discountAmount)
                 .max(pricingConfig.getCalculation().getMinimumFare())
                 .setScale(2, RoundingMode.HALF_UP);

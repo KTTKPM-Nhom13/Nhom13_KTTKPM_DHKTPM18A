@@ -40,7 +40,7 @@ spring:
           min-idle: 1
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -112,7 +112,7 @@ resilience4j:
 
 app:
   security:
-    public-endpoints: /internal/**,/actuator/**,/swagger-ui/**,/v3/api-docs/**,/api/payments/momo/**,/api/payments/zalopay/**,/api/payments/vnpay/**
+    public-endpoints: /internal/**,/actuator/**,/swagger-ui/**,/v3/api-docs/**,/api/v1/payments/momo/**,/api/v1/payments/zalopay/**,/api/v1/payments/vnpay/**,/api/v1/payments/sepay/**
   payment:
     gateway:
       base-url: http://localhost:8088/internal/gateway
@@ -148,7 +148,7 @@ momo:
   partner-code: ${MOMO_PARTNER_CODE:MOMOLRJZ20181206}
   access-key: ${MOMO_ACCESS_KEY:MTCKt9W3eU1m39TW}
   secret-key: ${MOMO_SECRET_KEY:SetA5RDnLHvt51AULf51DyauxUo3kDU6}
-  notify-url: ${MOMO_NOTIFY_URL:https://example.com/api/payments/momo/ipn}
+  notify-url: ${MOMO_NOTIFY_URL:https://example.com/api/v1/payments/momo/ipn}
   return-url: ${MOMO_RETURN_URL:https://example.com/payment-result}
   lang: ${MOMO_LANG:vi}
   partner-name: CAB Booking
@@ -160,7 +160,7 @@ zalopay:
   app-id: ${ZALOPAY_APP_ID:2553}
   key1: ${ZALOPAY_KEY1:PcY4iZIKFCIdgZvA6ueMcMHHUbRLYjPL}
   key2: ${ZALOPAY_KEY2:kLtgPl8HHhfvMuDHPwKfgfsY4Ydm9eIz}
-  callback-url: ${ZALOPAY_CALLBACK_URL:https://example.com/api/payments/zalopay/callback}
+  callback-url: ${ZALOPAY_CALLBACK_URL:https://example.com/api/v1/payments/zalopay/callback}
   redirect-url: ${ZALOPAY_REDIRECT_URL:https://example.com/payment-result}
   bank-code: ${ZALOPAY_BANK_CODE:}
   expire-duration-seconds: ${ZALOPAY_EXPIRE_DURATION_SECONDS:900}
@@ -169,8 +169,9 @@ vnpay:
   payment-url: ${VNPAY_PAYMENT_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
   tmn-code: ${VNPAY_TMN_CODE:TL1HKBCX}
   hash-secret: ${VNPAY_HASH_SECRET:A6GA3NSBPW7ZE1P3R1KRZKESNELHRTY3}
-  return-url: ${VNPAY_RETURN_URL:https://scratch-heaving-create.ngrok-free.dev/api/payments/vnpay/return}
-  ipn-url: ${VNPAY_IPN_URL:https://scratch-heaving-create.ngrok-free.dev/api/payments/vnpay/ipn}
+  return-url: ${VNPAY_RETURN_URL:https://scratch-heaving-create.ngrok-free.dev/api/v1/payments/vnpay/return}
+  ipn-url: ${VNPAY_IPN_URL:https://scratch-heaving-create.ngrok-free.dev/api/v1/payments/vnpay/ipn}
+  mobile-return-url: ${VNPAY_MOBILE_RETURN_URL:cabbookingmobile://payment}
   version: ${VNPAY_VERSION:2.1.0}
   command: ${VNPAY_COMMAND:pay}
   curr-code: ${VNPAY_CURR_CODE:VND}
@@ -179,3 +180,14 @@ vnpay:
   bank-code: ${VNPAY_BANK_CODE:NCB}
   default-ip-address: ${VNPAY_DEFAULT_IP_ADDRESS:127.0.0.1}
   expire-minutes: ${VNPAY_EXPIRE_MINUTES:15}
+
+sepay:
+  qr-base-url: ${SEPAY_QR_BASE_URL:https://qr.sepay.vn/img}
+  account-number: ${SEPAY_ACCOUNT_NUMBER:}
+  bank-code: ${SEPAY_BANK_CODE:}
+  description-prefix: ${SEPAY_DESCRIPTION_PREFIX:}
+  webhook-api-key: ${SEPAY_WEBHOOK_API_KEY:}
+  webhook-secret: ${SEPAY_WEBHOOK_SECRET:}
+  verify-api-key: ${SEPAY_VERIFY_API_KEY:false}
+  verify-hmac: ${SEPAY_VERIFY_HMAC:false}
+  timestamp-tolerance-seconds: ${SEPAY_TIMESTAMP_TOLERANCE_SECONDS:300}

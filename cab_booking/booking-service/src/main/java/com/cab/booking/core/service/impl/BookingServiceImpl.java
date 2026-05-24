@@ -109,6 +109,7 @@ public class BookingServiceImpl implements BookingService {
                 .vehicleType(vehicleType)
                 .paymentMethod(request.getPaymentMethod())
                 .estimatedFare(verifiedFare)
+                .discountAmount(request.getDiscountAmount())
                 .promoCode(request.getPromoCode())
                 .quoteToken(request.getQuoteToken())
                 .estimateId(request.getEstimateId())

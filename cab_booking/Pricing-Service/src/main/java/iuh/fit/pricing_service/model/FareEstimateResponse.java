@@ -42,6 +42,8 @@ public class FareEstimateResponse {
 
     private BigDecimal discountAmount;
 
+    private String promoCode;
+
     private BigDecimal surgeMultiplier;
 
     private BigDecimal totalFare;
@@ -84,6 +86,7 @@ public class FareEstimateResponse {
                 .airportFee(estimate.getAirportFee())
                 .tollFee(estimate.getTollFee())
                 .discountAmount(estimate.getDiscountAmount())
+                .promoCode(estimate.getPromoCode())
                 .surgeMultiplier(estimate.getSurgeMultiplier())
                 .totalFare(estimate.getTotalFare())
                 .currency(estimate.getCurrency())

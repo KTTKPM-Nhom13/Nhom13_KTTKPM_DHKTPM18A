@@ -5,6 +5,8 @@ import iuh.fit.payment_service.dto.momo.MoMoIpnRequest;
 import iuh.fit.payment_service.dto.momo.MoMoIpnResult;
 import iuh.fit.payment_service.dto.request.ChargePaymentRequest;
 import iuh.fit.payment_service.dto.response.PaymentResponse;
+import iuh.fit.payment_service.dto.sepay.SePayWebhookResponse;
+import iuh.fit.payment_service.dto.sepay.SePayWebhookResult;
 import iuh.fit.payment_service.dto.vnpay.VnPayCallbackResult;
 import iuh.fit.payment_service.dto.vnpay.VnPayIpnResponse;
 import iuh.fit.payment_service.dto.zalopay.ZaloPayCallbackRequest;
@@ -12,6 +14,7 @@ import iuh.fit.payment_service.dto.zalopay.ZaloPayCallbackResponse;
 import iuh.fit.payment_service.dto.zalopay.ZaloPayCallbackResult;
 import iuh.fit.payment_service.service.MoMoPaymentService;
 import iuh.fit.payment_service.service.PaymentSagaService;
+import iuh.fit.payment_service.service.SePayPaymentService;
 import iuh.fit.payment_service.service.VnPayPaymentService;
 import iuh.fit.payment_service.service.ZaloPayPaymentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,10 +28,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/payments")
+@RequestMapping("/api/v1/payments")
 @RequiredArgsConstructor
 @FieldDefaults(level = lombok.AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
@@ -39,6 +45,7 @@ public class PaymentController {
     private final MoMoPaymentService moMoPaymentService;
     private final ZaloPayPaymentService zaloPayPaymentService;
     private final VnPayPaymentService vnPayPaymentService;
+    private final SePayPaymentService sePayPaymentService;
 
     @PostMapping("/charge")
     @Operation(
@@ -56,7 +63,7 @@ public class PaymentController {
             @Parameter(description = "Idempotency key to prevent duplicate charges")
             @RequestHeader(value = "X-Idempotency-Key", required = false) String headerIdempotencyKey
     ) {
-        log.info("[Controller] POST /api/payments/charge - bookingId={}, customerId={}, amount={}, headerIdemKey={}",
+        log.info("[Controller] POST /api/v1/payments/charge - bookingId={}, customerId={}, amount={}, headerIdemKey={}",
                 request.getBookingId(), request.getCustomerId(), request.getAmount(), headerIdempotencyKey);
 
         if (headerIdempotencyKey != null && !headerIdempotencyKey.isBlank()
@@ -99,7 +106,7 @@ public class PaymentController {
             @Parameter(description = "Transaction ID", example = "txn_abc123def456")
             @PathVariable String transactionId
     ) {
-        log.info("[Controller] GET /api/payments/txn/{}", transactionId);
+        log.info("[Controller] GET /api/v1/payments/txn/{}", transactionId);
         PaymentResponse response = paymentSagaService.getPaymentByTransactionId(transactionId);
         return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
                 .message("Payment retrieved successfully")
@@ -117,7 +124,7 @@ public class PaymentController {
             @Parameter(description = "Booking ID", example = "b_123")
             @PathVariable String bookingId
     ) {
-        log.info("[Controller] GET /api/payments/booking/{}", bookingId);
+        log.info("[Controller] GET /api/v1/payments/booking/{}", bookingId);
         PaymentResponse response = paymentSagaService.getPaymentByBookingId(bookingId);
         return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
                 .message("Payment retrieved successfully")
@@ -137,7 +144,7 @@ public class PaymentController {
     public ResponseEntity<Void> handleMoMoIpn(
             @RequestBody MoMoIpnRequest ipnRequest
     ) {
-        log.info("[Controller] POST /api/payments/momo/ipn - orderId={}, resultCode={}, amount={}",
+        log.info("[Controller] POST /api/v1/payments/momo/ipn - orderId={}, resultCode={}, amount={}",
                 ipnRequest.getOrderId(), ipnRequest.getResultCode(), ipnRequest.getAmount());
 
         MoMoIpnResult result = moMoPaymentService.processIpn(ipnRequest);
@@ -157,7 +164,7 @@ public class PaymentController {
     public ResponseEntity<ZaloPayCallbackResponse> handleZaloPayCallback(
             @RequestBody ZaloPayCallbackRequest callbackRequest
     ) {
-        log.info("[Controller] POST /api/payments/zalopay/callback - type={}", callbackRequest.getType());
+        log.info("[Controller] POST /api/v1/payments/zalopay/callback - type={}", callbackRequest.getType());
 
         try {
             ZaloPayCallbackResult result = zaloPayPaymentService.processCallback(callbackRequest);
@@ -174,18 +181,45 @@ public class PaymentController {
             summary = "VNPay return URL",
             description = "Receives customer redirect parameters from VNPay after payment completion"
     )
-    public ResponseEntity<ApiResponse<PaymentResponse>> handleVnPayReturn(
+    public ResponseEntity<?> handleVnPayReturn(
             @RequestParam Map<String, String> params
     ) {
-        log.info("[Controller] GET /api/payments/vnpay/return - txnRef={}, responseCode={}",
+        log.info("[Controller] GET /api/v1/payments/vnpay/return - txnRef={}, responseCode={}",
                 params.get("vnp_TxnRef"), params.get("vnp_ResponseCode"));
 
         VnPayCallbackResult result = vnPayPaymentService.processCallback(params);
         PaymentResponse response = paymentSagaService.completePaymentFromVnPayCallback(result);
+
+        String mobileReturnUrl = vnPayPaymentService.getMobileReturnUrl();
+        if (mobileReturnUrl != null && !mobileReturnUrl.isBlank()) {
+            return ResponseEntity
+                    .status(302)
+                    .location(URI.create(buildMobilePaymentReturnUrl(mobileReturnUrl, result, response)))
+                    .build();
+        }
+
         return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
                 .message(result.isSuccess() ? "VNPay payment completed successfully" : "VNPay payment failed")
                 .result(response)
                 .build());
+    }
+
+    private String buildMobilePaymentReturnUrl(
+            String baseUrl,
+            VnPayCallbackResult result,
+            PaymentResponse response
+    ) {
+        String separator = baseUrl.contains("?") ? "&" : "?";
+        String status = result.isSuccess() ? "success" : "failed";
+        return baseUrl + separator
+                + "status=" + encode(status)
+                + "&transactionId=" + encode(response.getTransactionId())
+                + "&bookingId=" + encode(response.getBookingId())
+                + "&message=" + encode(result.getMessage());
+    }
+
+    private String encode(String value) {
+        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
     }
 
     @GetMapping("/vnpay/ipn")
@@ -196,7 +230,7 @@ public class PaymentController {
     public ResponseEntity<VnPayIpnResponse> handleVnPayIpn(
             @RequestParam Map<String, String> params
     ) {
-        log.info("[Controller] GET /api/payments/vnpay/ipn - txnRef={}, responseCode={}",
+        log.info("[Controller] GET /api/v1/payments/vnpay/ipn - txnRef={}, responseCode={}",
                 params.get("vnp_TxnRef"), params.get("vnp_ResponseCode"));
 
         try {
@@ -210,5 +244,24 @@ public class PaymentController {
             log.error("[Controller] VNPay IPN processing failed: {}", e.getMessage(), e);
             return ResponseEntity.ok(VnPayIpnResponse.invalid(e.getMessage()));
         }
+    }
+
+    @PostMapping("/sepay/webhook")
+    @Operation(
+            summary = "SePay webhook",
+            description = "Receives inbound bank transfer notifications from SePay for VietQR payments"
+    )
+    public ResponseEntity<SePayWebhookResponse> handleSePayWebhook(
+            @RequestBody String rawBody,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestHeader(value = "X-SePay-Signature", required = false) String signature,
+            @RequestHeader(value = "X-SePay-Timestamp", required = false) String timestamp
+    ) {
+        log.info("[Controller] POST /api/v1/payments/sepay/webhook");
+
+        SePayWebhookResult result = sePayPaymentService.processWebhook(rawBody, authorization, signature, timestamp);
+        paymentSagaService.completePaymentFromSePayWebhook(result);
+
+        return ResponseEntity.ok(new SePayWebhookResponse(true));
     }
 }

@@ -31,6 +31,7 @@ public class BookingResponse {
     private String vehicleType;
     private String paymentMethod;
     private BigDecimal estimatedFare;
+    private BigDecimal discountAmount;
     private String promoCode;
     private String estimateId;
     private String quoteId;
@@ -57,6 +58,7 @@ public class BookingResponse {
                 .vehicleType(booking.getVehicleType() == null ? null : booking.getVehicleType().name())
                 .paymentMethod(booking.getPaymentMethod())
                 .estimatedFare(booking.getEstimatedFare())
+                .discountAmount(booking.getDiscountAmount())
                 .promoCode(booking.getPromoCode())
                 .estimateId(booking.getEstimateId())
                 .quoteId(booking.getQuoteId())

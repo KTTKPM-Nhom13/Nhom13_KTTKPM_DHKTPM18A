@@ -49,19 +49,20 @@ services:
       - MOMO_PARTNER_CODE=${MOMO_PARTNER_CODE:-MOMOLRJZ20181206}
       - MOMO_ACCESS_KEY=${MOMO_ACCESS_KEY:-MTCKt9W3eU1m39TW}
       - MOMO_SECRET_KEY=${MOMO_SECRET_KEY:-SetA5RDnLHvt51AULf51DyauxUo3kDU6}
-      - MOMO_NOTIFY_URL=${MOMO_NOTIFY_URL:-http://localhost:8080/api/payments/momo/ipn}
+      - MOMO_NOTIFY_URL=${MOMO_NOTIFY_URL:-http://localhost:8080/api/v1/payments/momo/ipn}
       - MOMO_RETURN_URL=${MOMO_RETURN_URL:-http://localhost:3000/payment-result}
       - ZALOPAY_ENDPOINT=${ZALOPAY_ENDPOINT:-https://sb-openapi.zalopay.vn/v2}
       - ZALOPAY_APP_ID=${ZALOPAY_APP_ID:-2553}
       - ZALOPAY_KEY1=${ZALOPAY_KEY1:-PcY4iZIKFCIdgZvA6ueMcMHHUbRLYjPL}
       - ZALOPAY_KEY2=${ZALOPAY_KEY2:-kLtgPl8HHhfvMuDHPwKfgfsY4Ydm9eIz}
-      - ZALOPAY_CALLBACK_URL=${ZALOPAY_CALLBACK_URL:-http://localhost:8080/api/payments/zalopay/callback}
+      - ZALOPAY_CALLBACK_URL=${ZALOPAY_CALLBACK_URL:-http://localhost:8080/api/v1/payments/zalopay/callback}
       - ZALOPAY_REDIRECT_URL=${ZALOPAY_REDIRECT_URL:-http://localhost:3000/payment-result}
       - VNPAY_PAYMENT_URL=${VNPAY_PAYMENT_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
       - VNPAY_TMN_CODE=${VNPAY_TMN_CODE:-TL1HKBCX}
       - VNPAY_HASH_SECRET=${VNPAY_HASH_SECRET:-A6GA3NSBPW7ZE1P3R1KRZKESNELHRTY3}
-      - VNPAY_RETURN_URL=${VNPAY_RETURN_URL:-https://scratch-heaving-create.ngrok-free.dev/api/payments/vnpay/return}
-      - VNPAY_IPN_URL=${VNPAY_IPN_URL:-https://scratch-heaving-create.ngrok-free.dev/api/payments/vnpay/ipn}
+      - VNPAY_RETURN_URL=${VNPAY_RETURN_URL:-https://scratch-heaving-create.ngrok-free.dev/api/v1/payments/vnpay/return}
+      - VNPAY_IPN_URL=${VNPAY_IPN_URL:-https://scratch-heaving-create.ngrok-free.dev/api/v1/payments/vnpay/ipn}
+      - VNPAY_MOBILE_RETURN_URL=${VNPAY_MOBILE_RETURN_URL:-cabbookingmobile://payment}
       - VNPAY_BANK_CODE=${VNPAY_BANK_CODE:-NCB}
     volumes:
       - maven-cache:/root/.m2

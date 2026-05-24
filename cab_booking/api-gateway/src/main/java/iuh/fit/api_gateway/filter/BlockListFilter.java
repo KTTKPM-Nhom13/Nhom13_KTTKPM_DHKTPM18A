@@ -32,7 +32,8 @@ public class BlockListFilter implements GlobalFilter, Ordered {
         return ReactiveSecurityContextHolder.getContext()
                 .map(SecurityContext::getAuthentication)
                 .flatMap(auth -> {
-                    if (auth != null && auth.getPrincipal() instanceof Jwt jwt) {
+                    if (auth != null && auth.getPrincipal() instanceof Jwt) {
+                        Jwt jwt = (Jwt) auth.getPrincipal();
                         String userId = jwt.getSubject();
                         
                         // Check if it's an exception path that should be allowed even if blocked

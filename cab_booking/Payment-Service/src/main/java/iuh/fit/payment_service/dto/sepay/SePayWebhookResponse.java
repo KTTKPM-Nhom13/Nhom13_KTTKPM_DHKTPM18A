@@ -1,0 +1,13 @@
+package iuh.fit.payment_service.dto.sepay;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class SePayWebhookResponse {
+
+    private boolean success;
+}

@@ -1,6 +1,6 @@
 momo:
   environment: dev
-  notifyUrl: ${MOMO_NOTIFY_URL:https://example.com/api/payments/momo/ipn}
+  notifyUrl: ${MOMO_NOTIFY_URL:https://example.com/api/v1/payments/momo/ipn}
   returnUrl: ${MOMO_RETURN_URL:https://example.com/payment-result}
   lang: vi
   partnerName: CAB Booking
@@ -8,13 +8,24 @@ momo:
 
 zalopay:
   endpoint: ${ZALOPAY_ENDPOINT:https://sb-openapi.zalopay.vn/v2}
-  callbackUrl: ${ZALOPAY_CALLBACK_URL:https://example.com/api/payments/zalopay/callback}
+  callbackUrl: ${ZALOPAY_CALLBACK_URL:https://example.com/api/v1/payments/zalopay/callback}
   redirectUrl: ${ZALOPAY_REDIRECT_URL:https://example.com/payment-result}
 
 vnpay:
   paymentUrl: ${VNPAY_PAYMENT_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
   tmnCode: ${VNPAY_TMN_CODE:TL1HKBCX}
   hashSecret: ${VNPAY_HASH_SECRET:A6GA3NSBPW7ZE1P3R1KRZKESNELHRTY3}
-  returnUrl: ${VNPAY_RETURN_URL:https://scratch-heaving-create.ngrok-free.dev/api/payments/vnpay/return}
-  ipnUrl: ${VNPAY_IPN_URL:https://scratch-heaving-create.ngrok-free.dev/api/payments/vnpay/ipn}
+  returnUrl: ${VNPAY_RETURN_URL:https://scratch-heaving-create.ngrok-free.dev/api/v1/payments/vnpay/return}
+  ipnUrl: ${VNPAY_IPN_URL:https://scratch-heaving-create.ngrok-free.dev/api/v1/payments/vnpay/ipn}
+  mobileReturnUrl: ${VNPAY_MOBILE_RETURN_URL:cabbookingmobile://payment}
   bankCode: ${VNPAY_BANK_CODE:NCB}
+
+sepay:
+  qrBaseUrl: ${SEPAY_QR_BASE_URL:https://qr.sepay.vn/img}
+  accountNumber: ${SEPAY_ACCOUNT_NUMBER:}
+  bankCode: ${SEPAY_BANK_CODE:}
+  descriptionPrefix: ${SEPAY_DESCRIPTION_PREFIX:}
+  webhookApiKey: ${SEPAY_WEBHOOK_API_KEY:}
+  webhookSecret: ${SEPAY_WEBHOOK_SECRET:}
+  verifyApiKey: ${SEPAY_VERIFY_API_KEY:false}
+  verifyHmac: ${SEPAY_VERIFY_HMAC:false}

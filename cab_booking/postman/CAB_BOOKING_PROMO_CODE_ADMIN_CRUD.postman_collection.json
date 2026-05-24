@@ -1,0 +1,186 @@
+{
+	"info": {
+		"_postman_id": "4b6c3e21-9d2d-4f09-a7d9-c2d7f98c27de",
+		"name": "CAB_BOOKING_PROMO_CODE_ADMIN_CRUD",
+		"description": "Collection for testing Promo Code CRUD operations for Admin via Pricing Service",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Admin Create Promo Code (Fixed)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"code\": \"WELCOME50\",\n  \"description\": \"Giảm ngay 50k cho khách hàng mới\",\n  \"discountType\": \"FIXED\",\n  \"discountValue\": 50000,\n  \"minimumBookingAmount\": 100000,\n  \"expiryDate\": \"2026-12-31T23:59:59\",\n  \"usageLimit\": 100,\n  \"active\": true\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/v1/admin/promo-codes",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"admin",
+						"promo-codes"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "2. Admin Create Promo Code (Percentage)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"code\": \"SUMMER20\",\n  \"description\": \"Giảm giá mùa hè 20%\",\n  \"discountType\": \"PERCENTAGE\",\n  \"discountValue\": 20,\n  \"maxDiscountAmount\": 30000,\n  \"minimumBookingAmount\": 50000,\n  \"expiryDate\": \"2026-08-31T23:59:59\",\n  \"usageLimit\": 500,\n  \"active\": true\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/v1/admin/promo-codes",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"admin",
+						"promo-codes"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "3. Admin Get All Promo Codes",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/api/v1/admin/promo-codes",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"admin",
+						"promo-codes"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "4. Admin Update Promo Code",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"code\": \"SUMMER20\",\n  \"description\": \"Giảm giá mùa hè 30% (Đã cập nhật)\",\n  \"discountType\": \"PERCENTAGE\",\n  \"discountValue\": 30,\n  \"maxDiscountAmount\": 50000,\n  \"minimumBookingAmount\": 50000,\n  \"expiryDate\": \"2026-09-30T23:59:59\",\n  \"usageLimit\": 1000,\n  \"active\": true\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/v1/admin/promo-codes/{{promo_id}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"admin",
+						"promo-codes",
+						"{{promo_id}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "5. Admin Delete Promo Code",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/api/v1/admin/promo-codes/{{promo_id}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"admin",
+						"promo-codes",
+						"{{promo_id}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "6. Test Fare Estimate with Promo Code",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"pickupLat\": 10.7769,\n  \"pickupLng\": 106.7009,\n  \"dropoffLat\": 10.7798,\n  \"dropoffLng\": 106.699,\n  \"vehicleType\": \"CAR4\",\n  \"promoCode\": \"WELCOME50\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/v1/pricing/estimate",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"v1",
+						"pricing",
+						"estimate"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "promo_id",
+			"value": "paste_id_here_after_get_all"
+		}
+	]
+}

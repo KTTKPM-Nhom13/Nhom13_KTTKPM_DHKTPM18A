@@ -228,7 +228,7 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{pricing_base_url}}/api/pricing/estimate?pickupLat=10.8221&pickupLng=106.6885&dropoffLat=10.8188&dropoffLng=106.6619&vehicleType=ECONOMY&estimatedDurationMinutes=18",
+          "raw": "{{pricing_base_url}}/api/v1/pricing/estimate?pickupLat=10.8221&pickupLng=106.6885&dropoffLat=10.8188&dropoffLng=106.6619&vehicleType=ECONOMY&estimatedDurationMinutes=18",
           "host": [
             "{{pricing_base_url}}"
           ],

@@ -104,7 +104,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Boundary Flow Customer\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"phoneNumber\": \"0901000001\",\n  \"avatarUrl\": \"https://example.com/customer.png\",\n  \"role\": \"CUSTOMER\",\n  \"deviceId\": \"boundary-customer\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
+              "raw": "{\n  \"fullName\": \"Boundary Flow Customer\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"phoneNumber\": \"0901000001\",\n  \"avatarUrl\": \"https://example.com/customer.png\",\n  \"role\": \"USER\",\n  \"deviceId\": \"boundary-customer\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -419,7 +419,7 @@
                 }
               }
             },
-            "url": "{{apiGatewayUrl}}/api/pricing/estimate",
+            "url": "{{apiGatewayUrl}}/api/v1/pricing/estimate",
             "description": "Lay quote moi tu Pricing-Service. Test script luu estimateId, quoteId, quotePayloadHash, quoteHashAlgorithm, expiresAt va totalFare vao collection variables de request tao booking dung ngay sau do."
           },
           "response": []
@@ -693,7 +693,7 @@
                 }
               }
             },
-            "url": "{{apiGatewayUrl}}/api/pricing/estimate",
+            "url": "{{apiGatewayUrl}}/api/v1/pricing/estimate",
             "description": "Lay quote moi tu Pricing-Service. Test script luu estimateId, quoteId, quotePayloadHash, quoteHashAlgorithm, expiresAt va totalFare vao collection variables de request tao booking dung ngay sau do."
           },
           "response": []
@@ -857,7 +857,7 @@
                 }
               }
             },
-            "url": "{{apiGatewayUrl}}/api/pricing/estimate",
+            "url": "{{apiGatewayUrl}}/api/v1/pricing/estimate",
             "description": "Lay quote moi tu Pricing-Service. Test script luu estimateId, quoteId, quotePayloadHash, quoteHashAlgorithm, expiresAt va totalFare vao collection variables de request tao booking dung ngay sau do."
           },
           "response": []
@@ -1051,7 +1051,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Boundary Flow Customer\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"phoneNumber\": \"0901000001\",\n  \"avatarUrl\": \"https://example.com/customer.png\",\n  \"role\": \"CUSTOMER\",\n  \"deviceId\": \"boundary-customer\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
+              "raw": "{\n  \"fullName\": \"Boundary Flow Customer\",\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\",\n  \"phoneNumber\": \"0901000001\",\n  \"avatarUrl\": \"https://example.com/customer.png\",\n  \"role\": \"USER\",\n  \"deviceId\": \"boundary-customer\",\n  \"platform\": \"WEB\",\n  \"userAgent\": \"Postman Boundary Flow\",\n  \"appVersion\": \"1.0.0\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1324,7 +1324,7 @@
                 }
               }
             },
-            "url": "{{apiGatewayUrl}}/api/pricing/estimate",
+            "url": "{{apiGatewayUrl}}/api/v1/pricing/estimate",
             "description": "Lay quote moi tu Pricing-Service. Test script luu estimateId, quoteId, quotePayloadHash, quoteHashAlgorithm, expiresAt va totalFare vao collection variables de request tao booking dung ngay sau do."
           },
           "response": []
@@ -1585,7 +1585,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{apiGatewayUrl}}/api/payments/booking/{{e2eCashBookingId}}",
+            "url": "{{apiGatewayUrl}}/api/v1/payments/booking/{{e2eCashBookingId}}",
             "description": "Expected after ride.completed: payment-service records CASH payment and publishes payment.completed."
           },
           "event": [
@@ -1989,7 +1989,7 @@
                 }
               }
             },
-            "url": "{{apiGatewayUrl}}/api/pricing/estimate",
+            "url": "{{apiGatewayUrl}}/api/v1/pricing/estimate",
             "description": "Lay quote moi tu Pricing-Service. Test script luu estimateId, quoteId, quotePayloadHash, quoteHashAlgorithm, expiresAt va totalFare vao collection variables de request tao booking dung ngay sau do."
           },
           "response": []
@@ -2060,7 +2060,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{apiGatewayUrl}}/api/payments/booking/{{e2eVnpayBookingId}}",
+            "url": "{{apiGatewayUrl}}/api/v1/payments/booking/{{e2eVnpayBookingId}}",
             "description": "Run 2-5 seconds after 8.8. Expected: Payment Service consumed payment.requested and created a PRE_TRIP VNPAY transaction. If status is PENDING, open the captured payUrl in a browser/sandbox and complete payment before running the driver assignment steps. After valid VNPay return/IPN, Payment Service publishes payment.completed, Booking moves PENDING_PAYMENT -> MATCHING, then publishes ride.created."
           },
           "event": [
@@ -2289,7 +2289,7 @@
             },
             "method": "GET",
             "header": [],
-            "url": "{{apiGatewayUrl}}/api/payments/booking/{{e2eVnpayBookingId}}",
+            "url": "{{apiGatewayUrl}}/api/v1/payments/booking/{{e2eVnpayBookingId}}",
             "description": "Expected after the prepaid VNPay flow: transaction already exists from payment.requested and should be SUCCESS before/after ride.completed. ride.completed should not charge the customer again; it only lets Payment Service settle driver earning."
           },
           "event": [
