@@ -393,10 +393,21 @@ public class DriverRideCommandService {
     }
 
     private BigDecimal coordinate(Map<String, Double> coordinates, String key) {
-        if (coordinates == null || coordinates.get(key) == null) {
+        if (coordinates == null) {
             return null;
         }
-        return BigDecimal.valueOf(coordinates.get(key));
+        Object value = coordinates.get(key);
+        if (value == null) {
+            if ("lat".equalsIgnoreCase(key)) {
+                value = coordinates.get("latitude");
+            } else if ("lng".equalsIgnoreCase(key)) {
+                value = coordinates.get("longitude");
+            }
+        }
+        if (value instanceof Number) {
+            return BigDecimal.valueOf(((Number) value).doubleValue());
+        }
+        return null;
     }
 
     private void put(Map<String, String> target, String key, Object value) {
@@ -410,7 +421,7 @@ public class DriverRideCommandService {
             return LocalDateTime.now();
         }
         try {
-            return LocalDateTime.ofInstant(Instant.parse(timestamp.trim()), ZoneOffset.UTC);
+            return LocalDateTime.ofInstant(Instant.parse(timestamp.trim()), java.time.ZoneId.systemDefault());
         } catch (DateTimeParseException ex) {
             log.warn("Invalid ride.assigned timestamp, using current time | timestamp={}", timestamp);
             return LocalDateTime.now();

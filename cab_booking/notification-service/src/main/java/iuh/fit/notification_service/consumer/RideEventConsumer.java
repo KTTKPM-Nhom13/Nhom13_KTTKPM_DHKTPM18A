@@ -54,12 +54,12 @@ public class RideEventConsumer {
                     
                     String viReason = reason;
                     String lowerReason = reason.toLowerCase();
-                    if (lowerReason.contains("customer requested cancellation") || lowerReason.contains("customer requested") || lowerReason.contains("khách hàng")) {
+                    if (lowerReason.contains("customer requested cancellation") || lowerReason.contains("customer requested") || lowerReason.contains("khách hàng") || lowerReason.contains("customer_cancelled")) {
                         viReason = "Khách hàng yêu cầu hủy";
-                    } else if (lowerReason.contains("driver canceled") || lowerReason.contains("driver rejected") || lowerReason.contains("tài xế")) {
-                        viReason = "Tài xế đã hủy chuyến đi";
                     } else if (lowerReason.contains("not specified") || reason.trim().isEmpty()) {
                         viReason = "Không xác định";
+                    } else {
+                        viReason = "Tài xế đã hủy chuyến đi";
                     }
                     
                     notificationMessage = "Chuyến đi của bạn đã bị hủy. Lý do: " + viReason;
