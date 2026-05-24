@@ -62,4 +62,17 @@ public class KafkaConfig {
         factory.setConsumerFactory(paymentStringConsumerFactory());
         return factory;
     }
+
+    @Bean
+    public ConsumerFactory<String, String> rideCancelledStringConsumerFactory() {
+        return paymentStringConsumerFactory();
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, String> rideCancelledKafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, String> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(rideCancelledStringConsumerFactory());
+        return factory;
+    }
 }
