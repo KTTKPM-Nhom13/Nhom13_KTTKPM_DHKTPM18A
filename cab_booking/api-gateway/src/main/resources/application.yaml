@@ -98,6 +98,11 @@ spring:
           predicates:
             - Path=/api/v1/ai-agent/**
 
+        - id: notification-socket
+          uri: ws://notification-service:9093
+          predicates:
+            - Path=/socket.io/**
+
 
       # ── Mặc định khi bị 429: trả JSON thay vì body rỗng ────────
       default-filters:

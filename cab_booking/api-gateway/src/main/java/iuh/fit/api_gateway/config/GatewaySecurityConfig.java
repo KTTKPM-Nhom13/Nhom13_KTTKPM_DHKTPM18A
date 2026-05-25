@@ -41,6 +41,7 @@ public class GatewaySecurityConfig {
             "/api/payments/zalopay/**",
             "/api/payments/vnpay/**",
             "/api/payments/sepay/**",
+            "/socket.io/**"
             // "/pricing/**"
     };
 
