@@ -38,6 +38,8 @@ def handle_ai_chat(request: ChatRequest, user_info: dict = Depends(verify_and_ge
     try:
         reply = run_agent_session(request.message, user_info)
         return {"reply": reply}
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi xử lý AI Agent: {str(e)}")
 
