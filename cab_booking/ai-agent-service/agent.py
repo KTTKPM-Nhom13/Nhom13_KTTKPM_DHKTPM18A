@@ -148,7 +148,7 @@ def _get_driver_local_reply(message: str, auth_token: str) -> str | None:
 
 # --- DEFINING TOOLS (FUNCTIONS) FOR LLM ---
 
-def calculate_fare(pickup_lat: float, pickup_lng: float, dropoff_lat: float, dropoff_lng: float, vehicle_type: str, auth_token: str) -> dict:
+def calculate_fare(pickup_lat: float, pickup_lng: float, dropoff_lat: float, dropoff_lng: float, vehicle_type: str, auth_token: str = "") -> dict:
     """
     Tính toán cước phí ước tính cho chuyến xe.
     pickup_lat: Vĩ độ điểm đón
@@ -166,7 +166,7 @@ def calculate_fare(pickup_lat: float, pickup_lng: float, dropoff_lat: float, dro
     }
     return _api_post("/api/v1/pricing/estimate", payload, auth_token)
 
-def create_booking(pickup_location: str, dropoff_location: str, estimated_fare: float, vehicle_type: str, payment_method: str, quote_token: str, auth_token: str) -> dict:
+def create_booking(pickup_location: str, dropoff_location: str, estimated_fare: float, vehicle_type: str, payment_method: str, quote_token: str, auth_token: str = "") -> dict:
     """
     Tạo một cuốc xe mới sau khi khách hàng đã đồng ý mức giá vé và loại xe.
     pickup_location: Tên địa chỉ điểm đón
@@ -186,14 +186,14 @@ def create_booking(pickup_location: str, dropoff_location: str, estimated_fare: 
     }
     return _api_post("/api/v1/bookings", payload, auth_token)
 
-def get_driver_profile(driver_id: str, auth_token: str) -> dict:
+def get_driver_profile(driver_id: str, auth_token: str = "") -> dict:
     """
     Lấy thông tin hồ sơ của tài xế.
     driver_id: Mã định danh tài xế
     """
     return _api_get(f"/api/drivers/{driver_id}/profile", auth_token, timeout=5)
 
-def check_driver_earnings_report(auth_token: str) -> dict:
+def check_driver_earnings_report(auth_token: str = "") -> dict:
     """
     Kiểm tra báo cáo thu nhập của tài xế đang đăng nhập.
     Dùng khi tài xế hỏi vì sao số cuốc hoàn thành tăng nhưng thu nhập chưa hiển thị đủ.
@@ -238,7 +238,7 @@ def check_driver_earnings_report(auth_token: str) -> dict:
         "operatorNote": "Nếu vừa hoàn thành cuốc, hãy chờ đồng bộ Kafka/payment vài giây rồi tải lại tab Thu nhập.",
     }
 
-def get_active_hotspots(auth_token: str) -> dict:
+def get_active_hotspots(auth_token: str = "") -> dict:
     """
     Lấy khu vực TP.HCM đang có nhu cầu cao để tài xế chủ động di chuyển.
     Ưu tiên dữ liệu surge thật; nếu chưa có metric thì trả về danh sách vận hành mặc định.
@@ -271,7 +271,7 @@ def get_active_hotspots(auth_token: str) -> dict:
         "safetyNote": "Chỉ xem khi xe đã dừng an toàn; không thao tác app khi đang lái.",
     }
 
-def get_system_dashboard_stats(auth_token: str) -> dict:
+def get_system_dashboard_stats(auth_token: str = "") -> dict:
     """
     Lấy chỉ số vận hành cho Admin từ các API hiện có.
     """
@@ -323,7 +323,7 @@ def get_system_dashboard_stats(auth_token: str) -> dict:
         "rawRevenue": revenue,
     }
 
-def get_high_canceled_routes(auth_token: str) -> dict:
+def get_high_canceled_routes(auth_token: str = "") -> dict:
     """
     Phân tích danh sách booking bị hủy gần đây để tìm tuyến/khung giờ hủy cao.
     """
