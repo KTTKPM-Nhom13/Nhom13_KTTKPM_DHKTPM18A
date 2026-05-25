@@ -15,21 +15,15 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class DriverLocationEvent {
 
-    /** ID của tài xế. */
     private String eventId;
-
     private String eventType;
-
     private String rideId;
-
+    private String bookingId;
     private String driverId;
-
-    /** Vĩ độ hiện tại. */
     private double lat;
-
-    /** Kinh độ hiện tại. */
     private double lng;
-
-    /** Thời điểm ghi nhận (epoch milliseconds) — phục vụ dedup & ordering phía consumer. */
-    private long timestamp;
+    private Double heading;
+    private Double speed;
+    /** ISO-8601 UTC timestamp, e.g. "2026-05-23T19:15:00Z". */
+    private String timestamp;
 }

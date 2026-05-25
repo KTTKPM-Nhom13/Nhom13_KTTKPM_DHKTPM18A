@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 @Slf4j
 public class SePayPaymentService {
 
-    private static final Pattern TRANSACTION_ID_PATTERN = Pattern.compile("TXN[A-Za-z0-9]{12}");
+    private static final Pattern TRANSACTION_ID_PATTERN = Pattern.compile("TXN(?!.*TXN)[A-Za-z0-9]{12}");
     private static final String TRANSFER_IN = "in";
 
     private final SePayProperties sePayProperties;
@@ -97,7 +97,12 @@ public class SePayPaymentService {
 
     private String buildQrUrl(GatewayChargeRequest request) {
         BigDecimal amount = request.getAmount().setScale(0, RoundingMode.DOWN);
-        String description = valueOrEmpty(sePayProperties.getDescriptionPrefix()) + request.getTransactionId();
+        String prefix = valueOrEmpty(sePayProperties.getDescriptionPrefix()).trim();
+        String txnId = request.getTransactionId();
+        String description = txnId;
+        if (!prefix.isEmpty() && !txnId.startsWith(prefix)) {
+            description = prefix + txnId;
+        }
 
         return UriComponentsBuilder.fromHttpUrl(sePayProperties.getQrBaseUrl())
                 .queryParam("acc", sePayProperties.getAccountNumber())

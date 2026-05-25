@@ -7,6 +7,7 @@ import com.cab.booking.core.service.BookingEventPublisher;
 import com.cab.booking.core.statemachine.BookingStateMachine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -24,14 +25,36 @@ public class BookingTimeoutScheduler {
     public static final String TIMEOUT_QUEUE_KEY = "booking:timeout:queue";
     private static final String BOOKING_CANCELLED_PREFIX = "booking:cancelled:";
 
+    @Value("${app.booking.timeout.matching-minutes:5}")
+    private long matchingTimeoutMinutes;
+
     private final RedisTemplate<String, Object> redisTemplate;
     private final BookingRepository bookingRepository;
     private final BookingStateMachine bookingStateMachine;
     private final BookingEventPublisher bookingEventPublisher;
 
-    @Scheduled(fixedRate = 10000) // Chạy mỗi 10 giây
+    @Scheduled(fixedRate = 10000) // Runs every 10 seconds
     @Transactional
     public void processBookingTimeouts() {
+        // 1. Process PENDING_PAYMENT timeouts (auto-cancel after 2 minutes)
+        try {
+            java.util.List<com.cab.booking.core.entity.Booking> pendingPaymentBookings = bookingRepository.findByStatus(BookingStatus.PENDING_PAYMENT);
+            if (pendingPaymentBookings != null && !pendingPaymentBookings.isEmpty()) {
+                java.time.LocalDateTime twoMinutesAgo = java.time.LocalDateTime.now().minusMinutes(2);
+                for (com.cab.booking.core.entity.Booking booking : pendingPaymentBookings) {
+                    if (booking.getCreatedAt() != null && booking.getCreatedAt().isBefore(twoMinutesAgo)) {
+                        bookingStateMachine.transitionTo(booking, BookingStatus.CANCELLED);
+                        bookingRepository.save(booking);
+                        bookingEventPublisher.publishRideCancelled(booking, "TIMEOUT_PENDING_PAYMENT_EXPIRED");
+                        log.info("🚫 Booking {} AUTO-CANCELLED due to unpaid VNPAY/CARD session (expired after 2 minutes in PENDING_PAYMENT)", booking.getId());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to process PENDING_PAYMENT timeouts: {}", e.getMessage());
+        }
+
+        // 2. Process MATCHING timeouts
         long now = Instant.now().toEpochMilli();
 
         // Lấy tất cả bookingId đã đến hạn timeout (score <= now)
@@ -62,7 +85,7 @@ public class BookingTimeoutScheduler {
 
                     bookingEventPublisher.publishBookingTimeout(event);
                     bookingEventPublisher.publishRideCancelled(booking, "TIMEOUT_NO_DRIVER_FOUND");
-                    log.info("🚫 Booking {} bị CANCELLED do timeout (Không tìm thấy tài xế sau 3 phút)", bookingId);
+                    log.info("🚫 Booking {} CANCELLED due to timeout (no driver found after {} minutes)", bookingId, matchingTimeoutMinutes);
                 }
             });
 

@@ -36,6 +36,7 @@ public class DriverProfileService {
     DriverProfileRepository driverProfileRepository;
     DriverStatusService driverStatusService;
     DriverEarningRepository driverEarningRepository;
+    DriverLocationService driverLocationService;
 
     @Transactional
     public DriverProfileResponse getProfile(String externalUserId) {
@@ -99,7 +100,53 @@ public class DriverProfileService {
 
         DriverProfile savedProfile = driverProfileRepository.save(profile);
         driverStatusService.writeDriverStatus(savedProfile);
+
+        // --- Availability GEO lifecycle (Phase 1) ---
+        manageAvailabilityGeo(savedProfile, availabilityStatus);
+
         return toAvailabilityResponse(savedProfile);
+    }
+
+    /**
+     * Heartbeat endpoint: ONLINE driver (without active ride) updates availability location.
+     * Redis-only — no PostgreSQL writes. Coordinates are flushed to PG on state transitions
+     * (ONLINE/OFFLINE/ride events). Heartbeat fires every 10-15s, so PG writes would be wasteful.
+     */
+    @Transactional(readOnly = true)
+    public DriverAvailabilityResponse updateLocation(String externalUserId,
+                                                      BigDecimal lat, BigDecimal lng) {
+        DriverProfile profile = getRequiredProfile(externalUserId);
+
+        if (profile.getAvailabilityStatus() != DriverAvailabilityStatus.ONLINE) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
+        if (profile.getCurrentRideId() != null) {
+            throw new AppException(ErrorCode.VALIDATION_ERROR);
+        }
+
+        // Redis GEO only — no PG write on heartbeat
+        driverLocationService.addToAvailableGeo(externalUserId,
+                lat.doubleValue(), lng.doubleValue());
+
+        return toAvailabilityResponse(profile);
+    }
+
+    /**
+     * Manage the driver:available:locations Redis GEO key based on availability transitions.
+     */
+    private void manageAvailabilityGeo(DriverProfile profile, DriverAvailabilityStatus newStatus) {
+        if (newStatus == DriverAvailabilityStatus.ONLINE
+                && profile.getCurrentRideId() == null
+                && profile.getCurrentLatitude() != null
+                && profile.getCurrentLongitude() != null) {
+            driverLocationService.addToAvailableGeo(
+                    profile.getExternalUserId(),
+                    profile.getCurrentLatitude().doubleValue(),
+                    profile.getCurrentLongitude().doubleValue());
+        } else if (newStatus == DriverAvailabilityStatus.OFFLINE
+                || newStatus == DriverAvailabilityStatus.ON_TRIP) {
+            driverLocationService.removeFromAvailableGeo(profile.getExternalUserId());
+        }
     }
 
     @Transactional(readOnly = true)

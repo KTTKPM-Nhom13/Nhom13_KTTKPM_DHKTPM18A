@@ -1,6 +1,5 @@
 package com.cab.ride.core.service;
 
-import com.cab.ride.core.dto.event.DriverLocationEvent;
 import com.cab.ride.core.dto.event.inbound.DriverAcceptedEvent;
 import com.cab.ride.core.dto.event.inbound.RideCancelledEvent;
 import com.cab.ride.core.dto.event.inbound.RideCreatedEvent;
@@ -14,10 +13,8 @@ import com.cab.ride.core.repository.RideRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.data.geo.Point;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -27,15 +24,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class RideService {
 
-    private static final String REDIS_GEO_KEY = "driver:locations";
-    private static final String KAFKA_LOCATION_TOPIC = "driver.location.updated";
     private static final String TOPIC_RIDE_ARRIVED = "ride.arrived";
     private static final String TOPIC_RIDE_STARTED = "ride.started";
     private static final String TOPIC_RIDE_COMPLETED = "ride.completed";
@@ -46,6 +40,7 @@ public class RideService {
     private final RideRepository rideRepository;
     private final RedisTemplate<String, Object> redisTemplate;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final RideLocationService rideLocationService;
 
     @Transactional
     public Ride createRideFromBooking(RideCreatedEvent event) {
@@ -183,6 +178,8 @@ public class RideService {
         RideStatus oldStatus = ride.getStatus();
         ride.setStatus(RideStatus.CANCELLED);
         rideRepository.save(ride);
+        // Cleanup ride tracking hash — ride is no longer active
+        rideLocationService.cleanupTrackingHash(rideId);
         log.info("[RideService] ride.cancelled handled | rideId={} | {} -> CANCELLED | reason={}",
                 rideId, oldStatus, event.getReason());
     }
@@ -268,6 +265,8 @@ public class RideService {
         RideStatus previousStatus = currentStatus(rideId);
         Ride saved = transitionRideLifecycle(rideId, driverId, RideStatus.COMPLETED, "POST /api/rides/{rideId}/complete");
         if (previousStatus != RideStatus.COMPLETED && saved.getStatus() == RideStatus.COMPLETED) {
+            // Cleanup ride tracking hash — ride is no longer active
+            rideLocationService.cleanupTrackingHash(rideId);
             BigDecimal finalFare = request == null || request.getFinalFare() == null
                     ? BigDecimal.ZERO
                     : request.getFinalFare();
@@ -295,42 +294,6 @@ public class RideService {
             publishOnce(TOPIC_RIDE_FINISHED, rideId, event);
         }
         return saved;
-    }
-
-    public void updateDriverLocation(String driverId, double lat, double lng) {
-        try {
-            Long added = redisTemplate.opsForGeo().add(REDIS_GEO_KEY, new Point(lng, lat), driverId);
-            log.debug("[RideService] Redis GEO updated: driverId={} | lat={} | lng={} | added={}",
-                    driverId, lat, lng, added);
-        } catch (Exception ex) {
-            log.error("[RideService] FAILED to write Redis GEO: driverId={} | error={}",
-                    driverId, ex.getMessage(), ex);
-        }
-
-        DriverLocationEvent event = DriverLocationEvent.builder()
-                .eventId(UUID.randomUUID().toString())
-                .eventType("DRIVER_LOCATION_UPDATED")
-                .rideId(activeRideIdForDriver(driverId))
-                .driverId(driverId)
-                .lat(lat)
-                .lng(lng)
-                .timestamp(System.currentTimeMillis())
-                .build();
-
-        CompletableFuture<SendResult<String, Object>> future =
-                kafkaTemplate.send(KAFKA_LOCATION_TOPIC, driverId, event);
-
-        future.whenComplete((result, ex) -> {
-            if (ex != null) {
-                log.error("[RideService] FAILED to send Kafka event: topic={} | driverId={} | error={}",
-                        KAFKA_LOCATION_TOPIC, driverId, ex.getMessage(), ex);
-            } else {
-                log.debug("[RideService] Kafka event sent: topic={} | driverId={} | partition={} | offset={}",
-                        KAFKA_LOCATION_TOPIC, driverId,
-                        result.getRecordMetadata().partition(),
-                        result.getRecordMetadata().offset());
-            }
-        });
     }
 
     /**
@@ -462,16 +425,6 @@ public class RideService {
 
     private Double coordinate(java.util.Map<String, Double> coordinates, String key, Double fallback) {
         return coordinates == null || coordinates.get(key) == null ? fallback : coordinates.get(key);
-    }
-
-    private String activeRideIdForDriver(String driverId) {
-        if (driverId == null || driverId.isBlank()) {
-            return null;
-        }
-        return rideRepository
-                .findFirstByDriverIdAndStatusNotIn(driverId, List.of(RideStatus.COMPLETED, RideStatus.PAID, RideStatus.CANCELLED))
-                .map(ride -> ride.getId().toString())
-                .orElse(null);
     }
 
     private String bookingId(Ride ride, String fallbackRideId) {

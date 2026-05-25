@@ -50,6 +50,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
     private static final String MATCHING_REQUEST_PREFIX = "matching:request:";
     private static final String MATCHING_FAILED_PREFIX = "matching:failed:";
     private static final String MATCHING_ATTEMPT_PREFIX = "matching:attempt:";
+    private static final String MATCHING_COOLDOWN_PREFIX = "matching:cooldown:";
     private static final String RIDE_REJECTED_DRIVERS_KEY_PATTERN = "ride:%s:rejected-drivers";
     private static final String BOOKING_CANCELLED_PREFIX = "booking:cancelled:";
 
@@ -290,6 +291,7 @@ public class AdminBookingServiceImpl implements AdminBookingService {
             redisTemplate.delete(MATCHING_REQUEST_PREFIX + rideId);
             redisTemplate.delete(MATCHING_FAILED_PREFIX + rideId);
             redisTemplate.delete(MATCHING_ATTEMPT_PREFIX + rideId);
+            redisTemplate.delete(MATCHING_COOLDOWN_PREFIX + rideId);
             redisTemplate.delete(String.format(RIDE_REJECTED_DRIVERS_KEY_PATTERN, rideId));
             redisTemplate.delete(BOOKING_CANCELLED_PREFIX + rideId);
             log.info("Cleared matching Redis state before admin retry | rideId={}", rideId);

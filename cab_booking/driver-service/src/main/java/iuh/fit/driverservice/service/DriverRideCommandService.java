@@ -51,6 +51,7 @@ public class DriverRideCommandService {
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final DriverStatusService driverStatusService;
     private final StringRedisTemplate stringRedisTemplate;
+    private final DriverLocationService driverLocationService;
 
     @Value("${driver.assignment.ttl-seconds:30}")
     private long assignmentTtlSeconds;
@@ -104,6 +105,8 @@ public class DriverRideCommandService {
         DriverProfile savedProfile = driverProfileRepository.save(profile);
         writePendingRide(savedProfile, event);
         driverStatusService.writeDriverStatus(savedProfile);
+        // NOTE: Do NOT remove from available GEO here. Driver is only ASSIGNED (pending).
+        // GEO removal happens on acceptRide() when driver actually ACCEPTS the ride.
         log.info("Current ride updated | rideId={} | bookingId={} | driverId={} | rideStatus={} | availability={}",
                 rideId, savedProfile.getCurrentBookingId(), driverId,
                 savedProfile.getCurrentRideStatus(), savedProfile.getAvailabilityStatus());
@@ -131,6 +134,8 @@ public class DriverRideCommandService {
         DriverProfile savedProfile = driverProfileRepository.save(profile);
         clearPendingRide(savedProfile.getExternalUserId());
         driverStatusService.writeDriverStatus(savedProfile);
+        // Remove from available GEO — driver accepted ride (ON_TRIP)
+        driverLocationService.removeFromAvailableGeo(savedProfile.getExternalUserId());
         publishDriverAccepted(savedProfile.getCurrentRideId(), savedProfile.getExternalUserId());
         return toCurrentRideResponse(savedProfile);
     }
@@ -144,6 +149,7 @@ public class DriverRideCommandService {
         DriverProfile savedProfile = driverProfileRepository.save(profile);
         clearPendingRide(savedProfile.getExternalUserId());
         driverStatusService.writeDriverStatus(savedProfile);
+        // NOTE: No need to re-add to available GEO — driver was never removed (only removed on ACCEPTED).
         publishDriverRejected(rideId, savedProfile.getExternalUserId(), "Driver rejected assignment");
         return toCurrentRideResponse(savedProfile);
     }
@@ -225,6 +231,8 @@ public class DriverRideCommandService {
         DriverProfile savedProfile = driverProfileRepository.save(profile);
         clearPendingRide(savedProfile.getExternalUserId());
         driverStatusService.writeDriverStatus(savedProfile);
+        // Add back to available GEO — ride completed, driver back to ONLINE
+        driverLocationService.addFromProfile(savedProfile);
         log.info("Ride completed locally | rideId={} | driverId={}", rideId, externalUserId);
         return toCurrentRideResponse(savedProfile);
     }
@@ -246,6 +254,8 @@ public class DriverRideCommandService {
         DriverProfile savedProfile = driverProfileRepository.save(profile);
         clearPendingRide(savedProfile.getExternalUserId());
         driverStatusService.writeDriverStatus(savedProfile);
+        // Add back to available GEO — ride completed/cancelled, driver back to ONLINE
+        driverLocationService.addFromProfile(savedProfile);
         log.info("Driver ride state cleaned | rideId={} | driverId={} | source={}",
                 rideId, savedProfile.getExternalUserId(), sourceTopic);
     }
@@ -269,6 +279,8 @@ public class DriverRideCommandService {
             DriverProfile savedProfile = driverProfileRepository.save(profile);
             clearPendingRide(savedProfile.getExternalUserId());
             driverStatusService.writeDriverStatus(savedProfile);
+            // Add back to available GEO — assignment timed out, driver back to ONLINE
+            driverLocationService.addFromProfile(savedProfile);
             log.info("Driver returned to ONLINE | rideId={} | driverId={}",
                     rideId, savedProfile.getExternalUserId());
         }
