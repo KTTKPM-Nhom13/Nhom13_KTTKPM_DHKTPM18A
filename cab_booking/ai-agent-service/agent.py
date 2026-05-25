@@ -1,4 +1,7 @@
 import os
+import logging
+import unicodedata
+from datetime import datetime, timedelta
 import requests
 import google.generativeai as genai
 from google.ai import generativelanguage as gil
@@ -7,6 +10,141 @@ from dotenv import load_dotenv
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 SPRING_GATEWAY_URL = os.getenv("SPRING_GATEWAY_URL", "http://localhost:8080")
+logger = logging.getLogger("cab_booking.ai_agent")
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+DEFAULT_GEMINI_MODELS = "gemini-2.5-flash,gemini-2.0-flash,gemini-2.5-flash-lite"
+GEMINI_MODEL_NAMES = [
+    model.strip()
+    for model in os.getenv("GEMINI_MODEL_NAMES", DEFAULT_GEMINI_MODELS).split(",")
+    if model.strip()
+]
+
+DRIVER_ROLES = {"ROLE_DRIVER", "DRIVER"}
+ADMIN_ROLES = {"ROLE_ADMIN", "ADMIN"}
+
+HCM_HOTSPOT_ZONES = [
+    {"zoneId": "Q1_CENTER", "name": "Quận 1 - Bến Thành/Nguyễn Huệ", "reason": "khách du lịch, văn phòng, trung tâm thương mại"},
+    {"zoneId": "TAN_SON_NHAT", "name": "Sân bay Tân Sơn Nhất", "reason": "nhu cầu đón/trả sân bay cao"},
+    {"zoneId": "BINH_THANH_LANDMARK", "name": "Bình Thạnh - Landmark 81", "reason": "khu căn hộ, văn phòng, giải trí"},
+    {"zoneId": "GO_VAP_IUH", "name": "Gò Vấp - IUH/Nguyễn Văn Bảo", "reason": "sinh viên, giờ tan học, khu dân cư"},
+    {"zoneId": "Q7_PHU_MY_HUNG", "name": "Quận 7 - Phú Mỹ Hưng/SECC", "reason": "văn phòng, sự kiện, nhà hàng"},
+]
+
+def _headers(auth_token: str) -> dict:
+    return {"Authorization": f"Bearer {auth_token}"}
+
+def _api_get(path: str, auth_token: str, timeout: int = 8, params: dict | None = None) -> dict:
+    url = f"{SPRING_GATEWAY_URL}{path}"
+    logger.info("AI Agent calling Spring API GET %s params=%s", path, params)
+    try:
+        response = requests.get(url, headers=_headers(auth_token), params=params, timeout=timeout)
+        logger.info("Spring API GET %s returned status=%s", path, response.status_code)
+        if 200 <= response.status_code < 300:
+            try:
+                return response.json()
+            except ValueError:
+                return {"raw": response.text}
+        logger.warning("Spring API GET %s failed status=%s body=%s", path, response.status_code, response.text[:500])
+        return {"error": f"Failed with status code {response.status_code}", "detail": response.text}
+    except requests.RequestException as exc:
+        logger.exception("Spring API GET %s connection failed", path)
+        return {"error": "Connection failed", "detail": str(exc)}
+
+def _api_post(path: str, payload: dict, auth_token: str, timeout: int = 10) -> dict:
+    url = f"{SPRING_GATEWAY_URL}{path}"
+    logger.info("AI Agent calling Spring API POST %s", path)
+    try:
+        response = requests.post(url, json=payload, headers=_headers(auth_token), timeout=timeout)
+        logger.info("Spring API POST %s returned status=%s", path, response.status_code)
+        if 200 <= response.status_code < 300:
+            try:
+                return response.json()
+            except ValueError:
+                return {"raw": response.text}
+        logger.warning("Spring API POST %s failed status=%s body=%s", path, response.status_code, response.text[:500])
+        return {"error": f"Failed with status code {response.status_code}", "detail": response.text}
+    except requests.RequestException as exc:
+        logger.exception("Spring API POST %s connection failed", path)
+        return {"error": "Connection failed", "detail": str(exc)}
+
+def _unwrap_result(payload: dict) -> dict:
+    if isinstance(payload, dict) and "result" in payload:
+        return payload.get("result") or {}
+    return payload
+
+def _has_any_role(user_info: dict, allowed_roles: set[str]) -> bool:
+    roles = user_info.get("roles") or [user_info.get("role")]
+    return any(role in allowed_roles for role in roles)
+
+def _looks_like_admin_request(message: str) -> bool:
+    normalized = message.lower()
+    admin_terms = [
+        "get_system_dashboard_stats",
+        "get_high_canceled_routes",
+        "dashboard hệ thống",
+        "dashboard he thong",
+        "quản trị",
+        "quan tri",
+        "admin dashboard",
+        "doanh thu tổng",
+        "doanh thu tong",
+        "tỷ lệ hủy",
+        "ty le huy",
+        "tuyến hủy",
+        "tuyen huy",
+        "số tài xế online",
+        "so tai xe online",
+    ]
+    return any(term in normalized for term in admin_terms)
+
+def _normalize_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFD", value.lower())
+    normalized = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+    return normalized.replace("đ", "d").strip()
+
+def _format_money(value) -> str:
+    try:
+        return f"{float(value):,.0f}đ".replace(",", ".")
+    except (TypeError, ValueError):
+        return "chưa có dữ liệu"
+
+def _format_driver_earnings_report(report: dict) -> str:
+    if report.get("error") or report.get("status") == "PARTIAL_OR_FAILED":
+        return (
+            "• Chưa lấy đủ dữ liệu thu nhập.\n"
+            "• Thử tải lại sau vài giây.\n"
+            "• Nếu vẫn lỗi: báo CSKH/kiểm tra payment event."
+        )
+    return (
+        f"• Cuốc hoàn thành: {report.get('totalCompletedRides', 'N/A')}\n"
+        f"• Thu nhập profile: {_format_money(report.get('totalEarnings'))}\n"
+        f"• Thực nhận: {_format_money(report.get('totalDriverAmount'))}\n"
+        f"• Ghi chú: {report.get('diagnosis', 'Đã kiểm tra Driver Service.')}"
+    )
+
+def _format_hotspots(payload: dict) -> str:
+    hotspots = payload.get("hotspots") or []
+    if not hotspots:
+        return "• Chưa có hotspot realtime.\n• Gợi ý: Quận 1, sân bay, Landmark 81.\n• Chỉ xem khi xe đã dừng."
+    lines = ["• Khu vực nên ưu tiên:"]
+    for item in hotspots[:3]:
+        lines.append(f"- {item.get('name', item.get('zoneId'))}")
+    lines.append("• Chỉ thao tác khi đã dừng xe.")
+    return "\n".join(lines)
+
+def _get_driver_local_reply(message: str, auth_token: str) -> str | None:
+    text = _normalize_text(message)
+    if any(k in text for k in ["thu nhap", "earning", "doanh thu", "tien", "so cuoc", "cuoc tang", "tien chua", "chua cap nhat"]):
+        return _format_driver_earnings_report(check_driver_earnings_report(auth_token))
+    if any(k in text for k in ["hotspot", "khu vuc", "dong khach", "nhieu khach", "di dau", "bat khach", "don khach"]):
+        return _format_hotspots(get_active_hotspots(auth_token))
+    if any(k in text for k in ["an toan", "dang lai", "lai xe", "nhan cuoc", "can luu y"]):
+        return "• Dừng xe trước khi thao tác.\n• Xác nhận điểm đón rõ ràng.\n• Không nhắn tin khi đang chạy."
+    if text in {"hi", "hello", "chao", "xin chao", "alo"}:
+        return "• Chào anh tài xế.\n• Tôi hỗ trợ: thu nhập, hotspot, an toàn.\n• Hỏi ngắn, tôi trả lời nhanh."
+    if any(k in text for k in ["admin", "quan tri", "phan quyen", "he thong"]):
+        return "• Không có quyền quản trị.\n• Tôi chỉ hỗ trợ tài xế.\n• Cần hỗ trợ: 1900 5678."
+    return None
 
 # --- DEFINING TOOLS (FUNCTIONS) FOR LLM ---
 
@@ -19,7 +157,6 @@ def calculate_fare(pickup_lat: float, pickup_lng: float, dropoff_lat: float, dro
     dropoff_lng: Kinh độ điểm đến
     vehicle_type: Loại xe (BIKE, CAR4, CAR7)
     """
-    headers = {"Authorization": f"Bearer {auth_token}"}
     payload = {
         "pickupLat": pickup_lat,
         "pickupLng": pickup_lng,
@@ -27,18 +164,7 @@ def calculate_fare(pickup_lat: float, pickup_lng: float, dropoff_lat: float, dro
         "dropoffLng": dropoff_lng,
         "vehicleType": vehicle_type
     }
-    try:
-        response = requests.post(
-            f"{SPRING_GATEWAY_URL}/api/v1/pricing/estimate",
-            json=payload,
-            headers=headers,
-            timeout=10
-        )
-        if response.status_code == 200:
-            return response.json()
-        return {"error": f"Failed with status code {response.status_code}", "detail": response.text}
-    except Exception as e:
-        return {"error": "Connection failed", "detail": str(e)}
+    return _api_post("/api/v1/pricing/estimate", payload, auth_token)
 
 def create_booking(pickup_location: str, dropoff_location: str, estimated_fare: float, vehicle_type: str, payment_method: str, quote_token: str, auth_token: str) -> dict:
     """
@@ -50,7 +176,6 @@ def create_booking(pickup_location: str, dropoff_location: str, estimated_fare: 
     payment_method: Phương thức thanh toán (CASH, MOMO, VNPAY)
     quote_token: Token báo giá nhận từ calculate_fare
     """
-    headers = {"Authorization": f"Bearer {auth_token}"}
     payload = {
         "pickupLocation": pickup_location,
         "dropoffLocation": dropoff_location,
@@ -59,61 +184,223 @@ def create_booking(pickup_location: str, dropoff_location: str, estimated_fare: 
         "estimatedFare": estimated_fare,
         "quoteToken": quote_token
     }
-    try:
-        response = requests.post(
-            f"{SPRING_GATEWAY_URL}/api/v1/bookings",
-            json=payload,
-            headers=headers,
-            timeout=10
-        )
-        if response.status_code == 200:
-            return response.json()
-        return {"error": f"Failed with status code {response.status_code}", "detail": response.text}
-    except Exception as e:
-        return {"error": "Connection failed", "detail": str(e)}
+    return _api_post("/api/v1/bookings", payload, auth_token)
 
 def get_driver_profile(driver_id: str, auth_token: str) -> dict:
     """
     Lấy thông tin hồ sơ của tài xế.
     driver_id: Mã định danh tài xế
     """
-    headers = {"Authorization": f"Bearer {auth_token}"}
-    try:
-        response = requests.get(
-            f"{SPRING_GATEWAY_URL}/api/drivers/{driver_id}/profile",
-            headers=headers,
-            timeout=5
-        )
-        if response.status_code == 200:
-            return response.json()
-        return {"error": f"Failed with status code {response.status_code}", "detail": response.text}
-    except Exception as e:
-        return {"error": "Connection failed", "detail": str(e)}
+    return _api_get(f"/api/drivers/{driver_id}/profile", auth_token, timeout=5)
+
+def check_driver_earnings_report(auth_token: str) -> dict:
+    """
+    Kiểm tra báo cáo thu nhập của tài xế đang đăng nhập.
+    Dùng khi tài xế hỏi vì sao số cuốc hoàn thành tăng nhưng thu nhập chưa hiển thị đủ.
+    """
+    profile_payload = _api_get("/api/drivers/me/profile", auth_token, timeout=6)
+    earnings_payload = _api_get("/api/drivers/me/earnings/summary", auth_token, timeout=8)
+    profile = _unwrap_result(profile_payload)
+    earnings = _unwrap_result(earnings_payload)
+    if profile_payload.get("error") or earnings_payload.get("error"):
+        return {
+            "status": "PARTIAL_OR_FAILED",
+            "profile": profile_payload,
+            "earnings": earnings_payload,
+            "diagnosis": "Không lấy đủ dữ liệu từ Driver Service. Hãy thử lại sau vài giây hoặc kiểm tra log driver-service/payment.completed.",
+        }
+
+    total_completed = earnings.get("totalCompletedRides", profile.get("totalCompletedRides"))
+    total_earnings = earnings.get("totalEarnings", profile.get("totalEarnings"))
+    total_driver_amount = earnings.get("totalDriverAmount")
+    current_ride_active = earnings.get("currentRideActive")
+    possible_delay = (
+        total_completed is not None
+        and total_driver_amount is not None
+        and str(total_driver_amount) in ["0", "0.0", "0.00"]
+        and int(total_completed or 0) > 0
+    )
+
+    return {
+        "status": "OK",
+        "totalCompletedRides": total_completed,
+        "totalEarnings": total_earnings,
+        "totalGrossAmount": earnings.get("totalGrossAmount"),
+        "totalDriverAmount": total_driver_amount,
+        "availabilityStatus": earnings.get("availabilityStatus", profile.get("availabilityStatus")),
+        "currentRideActive": current_ride_active,
+        "lastOnlineAt": earnings.get("lastOnlineAt", profile.get("lastOnlineAt")),
+        "diagnosis": (
+            "Số cuốc đã tăng nhưng tiền có thể chờ event payment.completed/ride.finished cập nhật bảng driver_earnings."
+            if possible_delay
+            else "Dữ liệu profile và earnings đã được đọc từ Driver Service."
+        ),
+        "operatorNote": "Nếu vừa hoàn thành cuốc, hãy chờ đồng bộ Kafka/payment vài giây rồi tải lại tab Thu nhập.",
+    }
+
+def get_active_hotspots(auth_token: str) -> dict:
+    """
+    Lấy khu vực TP.HCM đang có nhu cầu cao để tài xế chủ động di chuyển.
+    Ưu tiên dữ liệu surge thật; nếu chưa có metric thì trả về danh sách vận hành mặc định.
+    """
+    surge_payload = _api_get("/api/v1/pricing/surge/all", auth_token, timeout=8)
+    hotspots = []
+    if not surge_payload.get("error") and isinstance(surge_payload, dict):
+        for zone_id, multiplier in surge_payload.items():
+            try:
+                score = float(multiplier)
+            except (TypeError, ValueError):
+                continue
+            if score >= 1.05:
+                zone_meta = next((zone for zone in HCM_HOTSPOT_ZONES if zone["zoneId"] == zone_id), None)
+                hotspots.append({
+                    "zoneId": zone_id,
+                    "name": zone_meta["name"] if zone_meta else zone_id,
+                    "demandScore": score,
+                    "reason": "surge multiplier đang cao",
+                })
+    if not hotspots:
+        hotspots = [
+            {**zone, "demandScore": 1.0 + (idx * 0.05)}
+            for idx, zone in enumerate(HCM_HOTSPOT_ZONES[:5])
+        ]
+    return {
+        "status": "OK",
+        "city": "TP.HCM",
+        "hotspots": sorted(hotspots, key=lambda item: item.get("demandScore", 0), reverse=True)[:5],
+        "safetyNote": "Chỉ xem khi xe đã dừng an toàn; không thao tác app khi đang lái.",
+    }
+
+def get_system_dashboard_stats(auth_token: str) -> dict:
+    """
+    Lấy chỉ số vận hành cho Admin từ các API hiện có.
+    """
+    now = datetime.now()
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end = now.replace(hour=23, minute=59, second=59, microsecond=0)
+    dashboard = _api_get("/api/v1/admin/dashboard", auth_token, timeout=8)
+    revenue = _api_get(
+        "/api/v1/pricing/revenue/statistics",
+        auth_token,
+        timeout=10,
+        params={"startDate": start.isoformat(), "endDate": end.isoformat()},
+    )
+    drivers = _api_get("/api/admin/drivers/count", auth_token, timeout=6)
+    canceled = _api_get(
+        "/api/admin/bookings",
+        auth_token,
+        timeout=10,
+        params={
+            "status": "CANCELLED",
+            "createdFrom": start.isoformat(),
+            "createdTo": end.isoformat(),
+            "size": 1,
+        },
+    )
+    all_today = _api_get(
+        "/api/admin/bookings",
+        auth_token,
+        timeout=10,
+        params={"createdFrom": start.isoformat(), "createdTo": end.isoformat(), "size": 1},
+    )
+
+    dashboard_result = _unwrap_result(dashboard)
+    canceled_result = _unwrap_result(canceled)
+    all_today_result = _unwrap_result(all_today)
+    canceled_count = canceled_result.get("totalElements", 0) if isinstance(canceled_result, dict) else 0
+    total_bookings = all_today_result.get("totalElements", revenue.get("totalTrips", 0)) if isinstance(all_today_result, dict) else revenue.get("totalTrips", 0)
+    cancellation_rate = round((canceled_count / total_bookings) * 100, 2) if total_bookings else 0
+
+    return {
+        "status": "OK",
+        "window": {"start": start.isoformat(), "end": end.isoformat()},
+        "pricingDashboard": dashboard_result,
+        "todayTrips": revenue.get("totalTrips", total_bookings),
+        "todayRevenue": revenue.get("totalRevenue"),
+        "onlineDriversOrRegisteredDrivers": drivers,
+        "cancelledBookingsToday": canceled_count,
+        "cancellationRatePercent": cancellation_rate,
+        "rawRevenue": revenue,
+    }
+
+def get_high_canceled_routes(auth_token: str) -> dict:
+    """
+    Phân tích danh sách booking bị hủy gần đây để tìm tuyến/khung giờ hủy cao.
+    """
+    since = datetime.now() - timedelta(days=7)
+    payload = _api_get(
+        "/api/admin/bookings",
+        auth_token,
+        timeout=12,
+        params={"status": "CANCELLED", "createdFrom": since.isoformat(), "size": 100, "sort": "createdAt,desc"},
+    )
+    if payload.get("error"):
+        return payload
+    page = _unwrap_result(payload)
+    content = page.get("content", []) if isinstance(page, dict) else []
+    route_counts: dict[str, int] = {}
+    hour_counts: dict[str, int] = {}
+    for item in content:
+        pickup = item.get("pickupLocation") or item.get("pickupAddress") or item.get("pickupZone") or "UNKNOWN_PICKUP"
+        dropoff = item.get("dropoffLocation") or item.get("dropoffAddress") or item.get("dropoffZone") or "UNKNOWN_DROPOFF"
+        route_key = f"{pickup} -> {dropoff}"
+        route_counts[route_key] = route_counts.get(route_key, 0) + 1
+        created_at = item.get("createdAt") or ""
+        hour = created_at[11:13] if len(created_at) >= 13 else "UNKNOWN"
+        hour_counts[hour] = hour_counts.get(hour, 0) + 1
+    return {
+        "status": "OK",
+        "sampleSize": len(content),
+        "topCanceledRoutes": [
+            {"route": route, "cancelCount": count}
+            for route, count in sorted(route_counts.items(), key=lambda pair: pair[1], reverse=True)[:5]
+        ],
+        "topCanceledHours": [
+            {"hour": hour, "cancelCount": count}
+            for hour, count in sorted(hour_counts.items(), key=lambda pair: pair[1], reverse=True)[:5]
+        ],
+        "operatorNote": "Nếu pickup/dropoff là UNKNOWN, AdminBookingSummaryResponse chưa expose đủ địa chỉ; cần bổ sung DTO ở booking-service để phân tích tuyến chính xác hơn.",
+    }
 
 # Bảng ánh xạ các tool
 tools_map = {
     "calculate_fare": calculate_fare,
     "create_booking": create_booking,
-    "get_driver_profile": get_driver_profile
+    "get_driver_profile": get_driver_profile,
+    "check_driver_earnings_report": check_driver_earnings_report,
+    "get_active_hotspots": get_active_hotspots,
+    "get_system_dashboard_stats": get_system_dashboard_stats,
+    "get_high_canceled_routes": get_high_canceled_routes,
 }
 
 def run_agent_session(user_message: str, user_info: dict) -> str:
     role = user_info["role"]
     token = user_info["token"]
 
-    if role in ["ROLE_DRIVER", "DRIVER"]:
+    if _looks_like_admin_request(user_message) and not _has_any_role(user_info, ADMIN_ROLES):
+        logger.warning("Blocked non-admin AI request for admin capability. role=%s username=%s", role, user_info.get("username"))
+        raise PermissionError("Bạn không có quyền sử dụng công cụ quản trị hệ thống.")
+
+    if _has_any_role(user_info, DRIVER_ROLES):
         system_instruction = (
-            "Bạn là Trợ lý An toàn Lái xe CAB Booking dành cho Tài xế.\n"
-            "Hãy trả lời siêu ngắn gọn, đi thẳng vào vấn đề (dưới 2 câu) để tài xế tập trung lái xe an toàn.\n"
-            "Bạn có quyền truy cập công cụ get_driver_profile."
+            "Bạn là Trợ lý vận hành và an toàn dành riêng cho Tài xế Taxi CAB Booking.\n"
+            "Tài xế có thể đang lái xe hoặc đang dừng nhanh trên đường, vì vậy trả lời CỰC KỲ NGẮN GỌN.\n"
+            "Ưu tiên gạch đầu dòng, tối đa 3 ý, mỗi ý dưới 12 từ. Không viết đoạn văn dài.\n"
+            "Phạm vi tool DRIVER: `check_driver_earnings_report` để kiểm tra cuốc/thu nhập, `get_active_hotspots` để gợi ý khu vực TP.HCM có nhu cầu cao.\n"
+            "Không nhận thao tác quản trị, không xem dữ liệu khách hàng ngoài cuốc hiện tại. Luôn nhắc an toàn nếu câu hỏi liên quan thao tác khi đang chạy xe."
         )
-        active_tools = [get_driver_profile]
-    elif role in ["ROLE_ADMIN", "ADMIN"]:
+        active_tools = [check_driver_earnings_report, get_active_hotspots]
+        local_driver_reply = _get_driver_local_reply(user_message, token)
+        if local_driver_reply:
+            return local_driver_reply
+    elif _has_any_role(user_info, ADMIN_ROLES):
         system_instruction = (
-            "Bạn là Trợ lý Quản trị Admin Portal của CAB Booking.\n"
-            "Hãy hỗ trợ admin kiểm tra dữ liệu bằng ngôn ngữ tự nhiên lịch sự, bảo mật thông tin tối đa."
+            "Bạn là Trợ lý phân tích và giám sát hệ thống cao cấp dành cho Quản trị viên CAB Booking.\n"
+            "Bạn nhạy bén với số liệu, biết đọc dữ liệu thô từ API và tổng hợp thành báo cáo BI ngắn gọn.\n"
+            "Phạm vi tool ADMIN: `get_system_dashboard_stats` cho chỉ số vận hành realtime, `get_high_canceled_routes` cho tuyến/khung giờ hủy cao.\n"
+            "Khi trả lời, nêu số liệu chính, điểm bất thường, và hành động đề xuất. Không bịa số liệu nếu API không trả về."
         )
-        active_tools = []
+        active_tools = [get_system_dashboard_stats, get_high_canceled_routes]
     else: # ROLE_USER
         system_instruction = (
             "Bạn là trợ lý AI dành cho khách hàng CAB Booking.\n"
@@ -123,8 +410,8 @@ def run_agent_session(user_message: str, user_info: dict) -> str:
         )
         active_tools = [calculate_fare]
 
-    # Try standard model names in order
-    model_names = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-pro"]
+    # Try current Gemini API model names in order. Override with GEMINI_MODEL_NAMES if Google changes names again.
+    model_names = GEMINI_MODEL_NAMES
     response_text = None
 
     for m_name in model_names:
@@ -197,10 +484,17 @@ def run_agent_session(user_message: str, user_info: dict) -> str:
             return "🔒 Quyền truy cập bị từ chối! Bạn đang đăng nhập bằng tài khoản Khách hàng. Tôi chỉ có thể hỗ trợ các tính năng như tính toán cước phí và đặt chuyến đi. Bạn không có quyền thực hiện các thao tác quản lý dữ liệu hay thay đổi phân quyền hệ thống."
 
     # 2. ROLE-BASED RESPONSES
-    if role in ["ROLE_DRIVER", "DRIVER"]:
+    if _has_any_role(user_info, DRIVER_ROLES):
+        local_driver_reply = _get_driver_local_reply(user_message, token)
+        if local_driver_reply:
+            return local_driver_reply
         if "hồ sơ" in lower_msg or "profile" in lower_msg or "tài xế" in lower_msg:
-            return "Chào đối tác tài xế! Tôi đã kiểm tra hệ thống. Hồ sơ của bạn đang hoạt động bình thường, sẵn sàng nhận chuyến. Hãy bật ứng dụng tài xế lên và tập trung lái xe an toàn nhé! 🏍️"
-        return "Chào đối tác tài xế CAB Booking! Hãy lái xe cẩn thận và an toàn. Nếu cần hỗ trợ khẩn cấp trên đường đi, hãy gọi trực tiếp đến Hotline dành riêng cho đối tác: **1900 5678**."
+            return "• Hồ sơ: xem trong tab Tài khoản.\n• Thu nhập/cuốc: hỏi tôi “kiểm tra thu nhập”.\n• Không thao tác khi đang lái."
+        if "thu nhập" in lower_msg or "earnings" in lower_msg or "số cuốc" in lower_msg:
+            return "• Số cuốc có thể cập nhật trước tiền.\n• Thu nhập chờ event thanh toán đồng bộ.\n• Thử tải lại sau vài giây."
+        if "đi đâu" in lower_msg or "hotspot" in lower_msg or "khu vực" in lower_msg:
+            return "• Gợi ý: Quận 1, Tân Sơn Nhất, Landmark 81.\n• Chỉ xem khi xe đã dừng an toàn."
+        return "• Tôi hỗ trợ tài xế: thu nhập, hotspot, an toàn.\n• Cần khẩn cấp: gọi 1900 5678."
 
     # 3. USER GENERAL RESPONSES
     if "giá" in lower_msg or "cước" in lower_msg or "tiền" in lower_msg or "bảng giá" in lower_msg:

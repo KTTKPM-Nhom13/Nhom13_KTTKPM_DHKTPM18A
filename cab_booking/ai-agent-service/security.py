@@ -24,22 +24,32 @@ def verify_and_get_user(credentials: HTTPAuthorizationCredentials = Security(sec
         
         username = payload.get("sub")
         
-        # 1. Trích xuất vai trò từ claim direct 'role' hoặc 'scope' trước tiên (rất phổ biến ở JWT của Spring Boot)
-        role = payload.get("role") or payload.get("scope")
+        roles = []
+        direct_role = payload.get("role")
+        scope = payload.get("scope")
+        if direct_role:
+            roles.extend(direct_role if isinstance(direct_role, list) else str(direct_role).split())
+        if scope:
+            roles.extend(scope if isinstance(scope, list) else str(scope).split())
         
         # 2. Nếu không tìm thấy, kiểm tra danh sách authorities hoặc dùng giá trị mặc định
-        if not role:
+        if not roles:
             authorities = payload.get("authorities", [])
             print(f"DEBUG AUTHORITIES: {authorities}", flush=True)
             if isinstance(authorities, str):
                 authorities = [authorities]
-            role = authorities[0] if authorities else "ROLE_USER"
+            roles.extend(authorities)
+        roles = [str(role).strip() for role in roles if str(role).strip()]
+        if not roles:
+            roles = ["ROLE_USER"]
+        role = roles[0]
             
-        print(f"DEBUG SELECTED ROLE: {role}", flush=True)
+        print(f"DEBUG SELECTED ROLE: {role} | ROLES: {roles}", flush=True)
         
         return {
             "username": username,
             "role": role,
+            "roles": roles,
             "token": token
         }
     except jwt.ExpiredSignatureError:
