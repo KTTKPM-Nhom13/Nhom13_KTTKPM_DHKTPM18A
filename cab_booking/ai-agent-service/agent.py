@@ -17,7 +17,7 @@ def calculate_fare(pickup_lat: float, pickup_lng: float, dropoff_lat: float, dro
     pickup_lng: Kinh độ điểm đón
     dropoff_lat: Vĩ độ điểm đến
     dropoff_lng: Kinh độ điểm đến
-    vehicle_type: Loại xe (ECONOMY, COMFORT, PREMIUM, BIKE)
+    vehicle_type: Loại xe (BIKE, CAR4, CAR7)
     """
     headers = {"Authorization": f"Bearer {auth_token}"}
     payload = {
@@ -29,7 +29,7 @@ def calculate_fare(pickup_lat: float, pickup_lng: float, dropoff_lat: float, dro
     }
     try:
         response = requests.post(
-            f"{SPRING_GATEWAY_URL}/api/pricing/estimate",
+            f"{SPRING_GATEWAY_URL}/api/v1/pricing/estimate",
             json=payload,
             headers=headers,
             timeout=10
@@ -80,7 +80,7 @@ def get_driver_profile(driver_id: str, auth_token: str) -> dict:
     headers = {"Authorization": f"Bearer {auth_token}"}
     try:
         response = requests.get(
-            f"{SPRING_GATEWAY_URL}/api/drivers/{driver_id}",
+            f"{SPRING_GATEWAY_URL}/api/drivers/{driver_id}/profile",
             headers=headers,
             timeout=5
         )
@@ -116,11 +116,12 @@ def run_agent_session(user_message: str, user_info: dict) -> str:
         active_tools = []
     else: # ROLE_USER
         system_instruction = (
-            "Bạn là Trợ lý Ảo đặt xe CAB Booking thân thiện phục vụ Khách hàng.\n"
-            "Bạn có thể hỗ trợ khách hàng tìm đường, tính cước phí bằng công cụ `calculate_fare` và đặt xe bằng `create_booking` khi khách hàng đồng ý.\n"
-            "Nói chuyện lịch sự, ngắn gọn và hữu ích. Bạn chỉ có quyền thực hiện tra cứu giá và đặt xe. Tuyệt đối không tiết lộ thông tin mật khẩu hay dữ liệu quản trị."
+            "Bạn là trợ lý AI dành cho khách hàng CAB Booking.\n"
+            "Phạm vi của bạn chỉ gồm: chào hỏi, giải thích cách đặt xe, tra cứu/báo giá bằng công cụ `calculate_fare`, phương thức thanh toán, hotline hỗ trợ.\n"
+            "Bạn không được tạo booking trực tiếp, không gọi công cụ `create_booking`, không xác nhận đã đặt xe thành công. Khi khách muốn đặt xe, hãy yêu cầu họ nhập đúng mẫu: \"Đặt xe từ [địa chỉ đón] đến [địa chỉ đến]\" để ứng dụng mobile mở popup xác nhận.\n"
+            "Trả lời ngắn gọn, đúng ngữ cảnh. Tuyệt đối không tiết lộ mật khẩu, dữ liệu quản trị hoặc thao tác ngoài quyền khách hàng."
         )
-        active_tools = [calculate_fare, create_booking]
+        active_tools = [calculate_fare]
 
     # Try standard model names in order
     model_names = ["gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-pro"]
@@ -204,17 +205,13 @@ def run_agent_session(user_message: str, user_info: dict) -> str:
     # 3. USER GENERAL RESPONSES
     if "giá" in lower_msg or "cước" in lower_msg or "tiền" in lower_msg or "bảng giá" in lower_msg:
         return (
-            "Chào bạn! Cước phí của CAB Booking được tính cực kỳ tối ưu và minh bạch:\n\n"
-            "• 🏍️ **CAB Bike (Xe máy):** 10.000đ cho 2km đầu tiên, sau đó 4.000đ/km tiếp theo.\n"
-            "• 🚗 **CAB Car (Ô tô 4 chỗ):** 20.000đ cho 2km đầu tiên, sau đó 12.000đ/km tiếp theo.\n"
-            "• 🚙 **CAB Car Premium (7 chỗ):** 25.000đ cho 2km đầu tiên, sau đó 15.000đ/km tiếp theo.\n\n"
-            "Đặc biệt đang có khuyến mãi giảm 30.000đ (mã **CABNEW**) cho chuyến đi đầu tiên đó! Bạn có muốn đặt một chuyến xe trải nghiệm ngay không?"
+            "Giá cước chính xác sẽ được tính theo lộ trình thật khi có điểm đón, điểm đến và loại xe. "
+            "Bạn có thể nhắn: \"Tính giá từ [địa chỉ đón] đến [địa chỉ đến]\" hoặc \"Đặt xe từ [địa chỉ đón] đến [địa chỉ đến]\"."
         )
     elif "đặt xe" in lower_msg or "gọi xe" in lower_msg or "đi từ" in lower_msg or "đến" in lower_msg:
         return (
-            "Tuyệt vời! Tôi có thể giúp bạn đặt xe rảnh tay chỉ qua một tin nhắn. Hãy chat theo cú pháp:\n\n"
-            "👉 *\"Đặt xe máy từ Đại học Công nghiệp đến Landmark 81\"* hoặc *\"Đặt xe ô tô đến Sân bay Tân Sơn Nhất\"*\n\n"
-            "Tôi sẽ lập tức tìm đường, báo giá và hiển thị bảng xác nhận đặt xe trực tiếp trên màn hình của bạn! 🚖"
+            "Để đặt xe qua AI, hãy nhập đủ điểm đón và điểm đến theo mẫu: "
+            "\"Đặt xe từ [địa chỉ đón] đến [địa chỉ đến]\". Ứng dụng mobile sẽ mở popup để bạn kiểm tra giá, chọn xe và xác nhận."
         )
     elif any(k in lower_msg for k in ["liên hệ", "hỗ trợ", "hotline", "điện thoại", "tổng đài"]):
         return (
@@ -225,15 +222,11 @@ def run_agent_session(user_message: str, user_info: dict) -> str:
         )
     elif any(k in lower_msg for k in ["chào", "hello", "hi", "tên"]):
         return (
-            "Xin chào! Tôi là trợ lý ảo đặt xe thông minh CAB AI Agent của bạn. 🚖\n\n"
-            "Tôi được giới hạn quyền hạn chỉ để hỗ trợ bạn tìm đường, tính cước phí hành trình và đặt chuyến xe rảnh tay một cách an toàn nhất.\n"
-            "Thời tiết hôm nay rất đẹp! Bạn muốn tôi đặt chuyến xe đưa bạn đi đâu bây giờ? Hãy cho tôi biết điểm đón và điểm đến của bạn nhé! ☀️"
+            "Xin chào! Tôi có thể hỗ trợ bạn tra giá, hướng dẫn đặt xe, chọn phương thức thanh toán hoặc liên hệ hỗ trợ. "
+            "Nếu muốn đặt xe, hãy nhắn: \"Đặt xe từ [địa chỉ đón] đến [địa chỉ đến]\"."
         )
     else:
         return (
-            "Chào bạn! Tôi là trợ lý ảo đặt xe thông minh CAB AI Agent. Tôi có thể hỗ trợ bạn:\n\n"
-            "• 💰 Tính toán giá cước hành trình theo thời gian thực.\n"
-            "• 🏍️ Đặt xe máy/ô tô rảnh tay bằng tin nhắn nhanh chóng.\n"
-            "• 🎁 Áp dụng các mã giảm giá và tìm đường đi tối ưu nhất.\n\n"
-            "Hãy thử nhắn: *\"Đặt xe từ Đại học Công nghiệp đến Landmark 81\"* để trải nghiệm nhé! 🚖"
+            "Tôi chỉ hỗ trợ các tác vụ dành cho khách hàng: tra giá, hướng dẫn đặt xe, phương thức thanh toán và hotline. "
+            "Bạn có thể nhắn: \"Đặt xe từ [địa chỉ đón] đến [địa chỉ đến]\" để mở màn hình xác nhận chuyến đi."
         )
