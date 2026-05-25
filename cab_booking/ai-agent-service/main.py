@@ -1,7 +1,6 @@
 import os
 import uvicorn
 from fastapi import FastAPI, Depends, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from security import verify_and_get_user
 from agent import run_agent_session
@@ -10,15 +9,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI(title="CAB Booking AI Agent Service", version="1.0.0")
-
-# Enable CORS for local development
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 class ChatRequest(BaseModel):
     message: str
