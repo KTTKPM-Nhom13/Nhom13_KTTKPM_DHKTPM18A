@@ -82,7 +82,7 @@ spring:
             - Path=/api/v1/rides/**
 
         - id: pricing-service
-          uri: lb://pricing-service
+          uri: ${PRICING_SERVICE_URL:lb://pricing-service}
           predicates:
             - Path=/api/v1/pricing/**,/api/v1/admin/**
 
