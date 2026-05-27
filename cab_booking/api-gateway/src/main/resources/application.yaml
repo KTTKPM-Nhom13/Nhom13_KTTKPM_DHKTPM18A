@@ -64,7 +64,7 @@ spring:
 
         # Pricing Service via API Gateway/Eureka
         - id: pricing-service
-          uri: lb://pricing-service
+          uri: ${PRICING_SERVICE_URL:lb://pricing-service}
           predicates:
             - Path=/api/v1/pricing/**,/api/v1/admin/**
 

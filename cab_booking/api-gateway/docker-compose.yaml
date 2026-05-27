@@ -9,6 +9,7 @@ services:
     environment:
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
       - SPRING_APPLICATION_NAME=api-gateway
+      - PRICING_SERVICE_URL=${PRICING_SERVICE_URL:-lb://pricing-service}
     volumes:
       - maven-cache:/root/.m2
     networks:

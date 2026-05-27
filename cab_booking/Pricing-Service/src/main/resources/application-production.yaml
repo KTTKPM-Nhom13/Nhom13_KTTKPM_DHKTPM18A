@@ -1,0 +1,64 @@
+server:
+  port: 8087
+  shutdown: graceful
+
+spring:
+  application:
+    name: pricing-service
+
+  cloud:
+    config:
+      enabled: ${SPRING_CLOUD_CONFIG_ENABLED:false}
+
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/pricing_db}
+      auto-index-creation: true
+
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:redis123}
+      timeout: 2000ms
+
+eureka:
+  client:
+    enabled: ${EUREKA_CLIENT_ENABLED:false}
+    service-url:
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://localhost:8761/eureka}
+    fetch-registry: true
+    register-with-eureka: true
+
+app:
+  security:
+    public-endpoints: /actuator/**,/swagger-ui/**,/api-docs/**,/swagger-ui.html
+
+services:
+  eta:
+    url: ${ETA_SERVICE_URL:http://localhost:8088}
+    estimate-path: ${ETA_ESTIMATE_PATH:/internal/eta/estimate}
+
+mapbox:
+  api-key: ${MAPBOX_API_KEY:dummy_mapbox_key}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  health:
+    mongo:
+      enabled: true
+    redis:
+      enabled: true
+    circuitbreakers:
+      enabled: true
+
+logging:
+  level:
+    root: INFO
+    iuh.fit.pricing_service: INFO
+    org.springframework.data.mongodb: WARN
