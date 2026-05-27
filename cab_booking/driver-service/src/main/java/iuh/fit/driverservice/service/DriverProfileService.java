@@ -13,6 +13,7 @@ import iuh.fit.driverservice.dto.response.DriverStatusCheckResponse;
 import iuh.fit.driverservice.entity.DriverAvailabilityStatus;
 import iuh.fit.driverservice.entity.DriverProfile;
 import iuh.fit.driverservice.entity.DriverVerificationStatus;
+import iuh.fit.driverservice.entity.DriverRideStatus;
 import iuh.fit.driverservice.repository.DriverEarningRepository;
 import iuh.fit.driverservice.repository.DriverProfileRepository;
 import lombok.AccessLevel;
@@ -88,7 +89,30 @@ public class DriverProfileService {
             throw new AppException(ErrorCode.VALIDATION_ERROR);
         }
         if (availabilityStatus == DriverAvailabilityStatus.ONLINE && profile.getCurrentRideId() != null) {
-            throw new AppException(ErrorCode.VALIDATION_ERROR);
+            DriverRideStatus rideStatus = profile.getCurrentRideStatus();
+            if (rideStatus == DriverRideStatus.ACCEPTED
+                    || rideStatus == DriverRideStatus.ACCEPT_REQUESTED
+                    || rideStatus == DriverRideStatus.EN_ROUTE_PICKUP
+                    || rideStatus == DriverRideStatus.ARRIVED_PICKUP
+                    || rideStatus == DriverRideStatus.IN_PROGRESS) {
+                throw new AppException(ErrorCode.VALIDATION_ERROR);
+            } else {
+                // Self-healing: clear stale/non-active ride state so driver is not stuck
+                profile.setCurrentRideId(null);
+                profile.setCurrentBookingId(null);
+                profile.setCurrentRideCustomerId(null);
+                profile.setCurrentRideStatus(null);
+                profile.setCurrentRidePickup(null);
+                profile.setCurrentRideDestination(null);
+                profile.setCurrentRidePickupLat(null);
+                profile.setCurrentRidePickupLng(null);
+                profile.setCurrentRideDropoffLat(null);
+                profile.setCurrentRideDropoffLng(null);
+                profile.setCurrentRideVehicleType(null);
+                profile.setCurrentRidePaymentMethod(null);
+                profile.setCurrentRideEstimatedFare(null);
+                profile.setCurrentRideRequestedAt(null);
+            }
         }
 
         profile.setAvailabilityStatus(availabilityStatus);

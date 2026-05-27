@@ -89,6 +89,22 @@ public class BookingServiceImpl implements BookingService {
             }
         }
 
+        // BƯỚC 1.5: Kiểm tra xem khách hàng có chuyến đi nào đang hoạt động không để tránh đặt trùng lặp
+        java.util.List<com.cab.booking.core.enums.BookingStatus> activeStatuses = java.util.List.of(
+                com.cab.booking.core.enums.BookingStatus.MATCHING,
+                com.cab.booking.core.enums.BookingStatus.ASSIGNED,
+                com.cab.booking.core.enums.BookingStatus.ACCEPTED,
+                com.cab.booking.core.enums.BookingStatus.PICKUP,
+                com.cab.booking.core.enums.BookingStatus.IN_PROGRESS
+        );
+        Optional<Booking> activeBookingOpt = bookingRepository.findFirstByCustomerIdAndStatusIn(customerId, activeStatuses);
+        if (activeBookingOpt.isPresent()) {
+            log.warn("Customer {} already has an active booking: {}", customerId, activeBookingOpt.get().getId());
+            releaseIdempotencyLockAfterFailure(idempotencyRedisKey, idempotencyLockAcquired,
+                    new BookingException(com.cab.booking.common.ErrorCode.PASSENGER_HAS_ACTIVE_RIDE));
+            throw new BookingException(com.cab.booking.common.ErrorCode.PASSENGER_HAS_ACTIVE_RIDE);
+        }
+
         // BƯỚC 2: Verify fare
         PricingClient.PricingConfirmResponse confirmedQuote;
         try {

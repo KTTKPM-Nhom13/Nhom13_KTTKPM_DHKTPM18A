@@ -145,6 +145,8 @@ public class DriverRideCommandService {
         DriverProfile profile = getRequiredProfile(externalUserId);
         ensurePendingAssignment(profile, rideId);
 
+        // Driver manually rejected — counts toward their cancellation rate
+        incrementDriverCancellation(profile);
         clearCurrentRide(profile, DriverAvailabilityStatus.ONLINE);
         DriverProfile savedProfile = driverProfileRepository.save(profile);
         clearPendingRide(savedProfile.getExternalUserId());
@@ -275,6 +277,8 @@ public class DriverRideCommandService {
             log.info("Publishing ride.rejected | rideId={} | driverId={} | reason={}",
                     rideId, driverId, ASSIGNMENT_TIMEOUT_REASON);
 
+            // Assignment timed out — counts toward driver's cancellation rate
+            incrementDriverCancellation(profile);
             clearCurrentRide(profile, DriverAvailabilityStatus.ONLINE);
             DriverProfile savedProfile = driverProfileRepository.save(profile);
             clearPendingRide(savedProfile.getExternalUserId());
@@ -475,6 +479,29 @@ public class DriverRideCommandService {
                 .lat(lat)
                 .lng(lng)
                 .build();
+    }
+
+    /**
+     * Increments the driver's own cancellation count and recalculates the cancellation rate.
+     * This MUST only be called for driver-initiated cancellations (manual reject or assignment timeout).
+     * It must NOT be called when the customer cancels (ride.cancelled Kafka event).
+     */
+    private void incrementDriverCancellation(DriverProfile profile) {
+        int newTotal = (profile.getTotalDriverCancellations() == null ? 0 : profile.getTotalDriverCancellations()) + 1;
+        profile.setTotalDriverCancellations(newTotal);
+
+        // cancellation rate = driver cancellations / (completed rides + driver cancellations)
+        int completedRides = profile.getTotalCompletedRides() == null ? 0 : profile.getTotalCompletedRides();
+        int denominator = completedRides + newTotal;
+        if (denominator > 0) {
+            BigDecimal rate = new BigDecimal(newTotal)
+                    .divide(new BigDecimal(denominator), 4, java.math.RoundingMode.HALF_UP)
+                    .multiply(new BigDecimal(100))
+                    .setScale(2, java.math.RoundingMode.HALF_UP);
+            profile.setCancellationRate(rate);
+        }
+        log.info("Driver cancellation recorded | driverId={} | totalDriverCancellations={} | cancellationRate={}%",
+                profile.getExternalUserId(), newTotal, profile.getCancellationRate());
     }
 
     private void publishDriverAccepted(String rideId, String driverId) {
