@@ -91,6 +91,14 @@ public class DriverProfile extends BaseEntity {
     @Column(name = "total_earnings", precision = 18, scale = 2)
     BigDecimal totalEarnings = BigDecimal.ZERO;
 
+    // Only counts cancellations initiated by the driver (manual reject or assignment timeout)
+    // NOT incremented when the customer cancels the ride
+    @Column(name = "total_driver_cancellations", nullable = false)
+    Integer totalDriverCancellations = 0;
+
+    @Column(name = "cancellation_rate", precision = 5, scale = 2)
+    BigDecimal cancellationRate = BigDecimal.ZERO;
+
     @Column(name = "current_ride_id", length = 100)
     String currentRideId;
 
