@@ -47,4 +47,7 @@ public class UpsertDriverProfileRequest {
 
     @Size(max = 255)
     String serviceArea;
+
+    @Size(max = 100)
+    String externalUserId;
 }

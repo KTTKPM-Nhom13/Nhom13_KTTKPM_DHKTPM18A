@@ -66,7 +66,7 @@ public class DriverProfileService {
             profile.setServiceArea(request.getServiceArea().trim());
         }
 
-        if (profile.getVerificationStatus() != DriverVerificationStatus.APPROVED) {
+        if (isAdminCaller() && profile.getVerificationStatus() != DriverVerificationStatus.APPROVED) {
             profile.setVerificationStatus(DriverVerificationStatus.APPROVED);
             profile.setApprovedAt(LocalDateTime.now());
         }
@@ -308,6 +308,16 @@ public class DriverProfileService {
                 .currentLongitude(profile.getCurrentLongitude())
                 .lastOnlineAt(profile.getLastOnlineAt())
                 .build();
+    }
+
+    private boolean isAdminCaller() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getAuthorities() == null) {
+            return false;
+        }
+
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
     }
 
     private DriverCurrentRideResponse toCurrentRideResponse(DriverProfile profile) {
