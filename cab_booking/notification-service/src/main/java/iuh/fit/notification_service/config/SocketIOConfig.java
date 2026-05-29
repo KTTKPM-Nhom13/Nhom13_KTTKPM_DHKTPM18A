@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class SocketIOConfig {
 
-    @Value("${socket-server.host:localhost}")
+    @Value("${socket-server.host:0.0.0.0}")
     private String host;
 
     @Value("${socket-server.port:9093}")
