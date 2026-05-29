@@ -103,6 +103,16 @@ spring:
           predicates:
             - Path=/socket.io/**
 
+        # ── Ride Socket.IO (ride-service standalone Netty port 9095) ──
+        # Public:  wss://<gateway>/ride/socket.io/**
+        # Internal: ws://ride-service:9095/socket.io/**
+        # Auth handled by ride-service RideSocketAuthService (JWT in handshake)
+        - id: ride-socket
+          uri: ws://ride-service:9095
+          predicates:
+            - Path=/ride/socket.io/**
+          filters:
+            - RewritePath=/ride/socket.io(?<segment>/?.*), /socket.io${segment}
 
       # ── Mặc định khi bị 429: trả JSON thay vì body rỗng ────────
       default-filters:
