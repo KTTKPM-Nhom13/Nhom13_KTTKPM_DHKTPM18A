@@ -18,6 +18,9 @@ import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -45,12 +48,31 @@ public class DriverProfileController {
     }
 
     @PutMapping("/profile")
+        @PreAuthorize("hasAnyRole('DRIVER','ADMIN')")
     public ApiResponse<DriverProfileResponse> upsertProfile(@Valid @RequestBody UpsertDriverProfileRequest request) {
+                String targetUserId = resolveTargetUserId(request);
         return ApiResponse.<DriverProfileResponse>builder()
                 .message("Saved driver profile successfully")
-                .result(driverProfileService.upsertProfile(currentUserFacade.getCurrentUserId(), request))
+                                .result(driverProfileService.upsertProfile(targetUserId, request))
                 .build();
     }
+
+        private String resolveTargetUserId(UpsertDriverProfileRequest request) {
+                String currentUserId = currentUserFacade.getCurrentUserId();
+                if (request.getExternalUserId() == null || request.getExternalUserId().isBlank()) {
+                        return currentUserId;
+                }
+
+                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+                if (authentication == null || authentication.getAuthorities() == null) {
+                        return currentUserId;
+                }
+
+                boolean isAdmin = authentication.getAuthorities().stream()
+                                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+
+                return isAdmin ? request.getExternalUserId() : currentUserId;
+        }
 
     @PatchMapping("/availability")
     public ApiResponse<DriverAvailabilityResponse> updateAvailability(
