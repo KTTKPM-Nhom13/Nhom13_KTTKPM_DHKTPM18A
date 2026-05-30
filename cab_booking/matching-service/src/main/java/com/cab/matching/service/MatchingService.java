@@ -20,6 +20,7 @@ import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.domain.geo.GeoReference;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -69,6 +70,7 @@ public class MatchingService {
     private final RedisTemplate<String, String> redisTemplate;
     private final AiScoringResilienceClient aiScoringResilienceClient;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final TaskScheduler matchingTaskScheduler;
 
     private final Random random = new Random();
 
@@ -384,16 +386,21 @@ public class MatchingService {
                 Instant.now().toString()
         );
 
-        java.util.concurrent.CompletableFuture.delayedExecutor(RETRY_DELAY_SECONDS, TimeUnit.SECONDS).execute(() -> {
+        matchingTaskScheduler.schedule(() -> {
             if (isBookingCancelled(event.rideId()) || hasAssigned(event.rideId())) {
                 log.info("Skip scheduled retry for cancelled/assigned rideId={}", event.rideId());
                 return;
             }
-            kafkaTemplate.send(TOPIC_MATCHING_RETRY_REQUESTED, retryEvent.rideId(), retryEvent);
-            log.info("Scheduled matching retry requested | topic={} | rideId={} | attempt={} | radiusKm={} | delaySeconds={}",
-                    TOPIC_MATCHING_RETRY_REQUESTED, retryEvent.rideId(), retryEvent.matchingAttempt(),
-                    retryEvent.searchRadiusKm(), RETRY_DELAY_SECONDS);
-        });
+            try {
+                kafkaTemplate.send(TOPIC_MATCHING_RETRY_REQUESTED, retryEvent.rideId(), retryEvent);
+                log.info("Scheduled matching retry requested | topic={} | rideId={} | attempt={} | radiusKm={} | delaySeconds={}",
+                        TOPIC_MATCHING_RETRY_REQUESTED, retryEvent.rideId(), retryEvent.matchingAttempt(),
+                        retryEvent.searchRadiusKm(), RETRY_DELAY_SECONDS);
+            } catch (RuntimeException ex) {
+                log.error("Failed to publish scheduled matching retry | rideId={} | attempt={} | reason={}",
+                        retryEvent.rideId(), retryEvent.matchingAttempt(), ex.getMessage(), ex);
+            }
+        }, Instant.now().plusSeconds(RETRY_DELAY_SECONDS));
     }
 
     /**
@@ -408,7 +415,7 @@ public class MatchingService {
         redisTemplate.opsForValue().set(cooldownKey, "COOLING", COOLDOWN_SECONDS, TimeUnit.SECONDS);
         log.info("Set matching cooldown | rideId={} | cooldownSeconds={}", event.rideId(), COOLDOWN_SECONDS);
 
-        java.util.concurrent.CompletableFuture.delayedExecutor(COOLDOWN_SECONDS, TimeUnit.SECONDS).execute(() -> {
+        matchingTaskScheduler.schedule(() -> {
             // Clean up cooldown key (it will auto-expire, but delete early for clarity)
             redisTemplate.delete(cooldownKey);
 
@@ -421,6 +428,10 @@ public class MatchingService {
                 log.info("Skip cooldown retry — ride already assigned | rideId={}", event.rideId());
                 return;
             }
+
+            // Reset attempt counter so the new cycle's attempt=1 passes the latestAttempt guard
+            redisTemplate.delete(MATCHING_ATTEMPT_PREFIX + event.rideId());
+            log.info("Reset matching attempt counter for new retry cycle | rideId={}", event.rideId());
 
             // Build a fresh cycle retry event with attempt=1 and original radius
             String normalizedVehicleType;
@@ -453,10 +464,15 @@ public class MatchingService {
                     Instant.now().toString()
             );
 
-            kafkaTemplate.send(TOPIC_MATCHING_RETRY_REQUESTED, cycleRetryEvent.rideId(), cycleRetryEvent);
-            log.info("Scheduled new matching cycle after cooldown | topic={} | rideId={} | cooldownSeconds={}",
-                    TOPIC_MATCHING_RETRY_REQUESTED, cycleRetryEvent.rideId(), COOLDOWN_SECONDS);
-        });
+            try {
+                kafkaTemplate.send(TOPIC_MATCHING_RETRY_REQUESTED, cycleRetryEvent.rideId(), cycleRetryEvent);
+                log.info("Scheduled new matching cycle after cooldown | topic={} | rideId={} | cooldownSeconds={}",
+                        TOPIC_MATCHING_RETRY_REQUESTED, cycleRetryEvent.rideId(), COOLDOWN_SECONDS);
+            } catch (RuntimeException ex) {
+                log.error("Failed to publish cooldown retry cycle | rideId={} | reason={}",
+                        cycleRetryEvent.rideId(), ex.getMessage(), ex);
+            }
+        }, Instant.now().plusSeconds(COOLDOWN_SECONDS));
     }
 
     public void processRideCancelled(RideCancelledEvent event) {
