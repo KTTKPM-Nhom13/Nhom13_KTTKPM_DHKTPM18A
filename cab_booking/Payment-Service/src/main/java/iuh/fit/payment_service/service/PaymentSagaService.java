@@ -560,7 +560,7 @@ public class PaymentSagaService {
         if (amount == null) {
             return null;
         }
-        if ((paymentMethod == PaymentMethod.VNPAY || paymentMethod == PaymentMethod.SEPAY) && isVnd(currency)) {
+        if (isVnd(currency) && (paymentMethod == PaymentMethod.VNPAY || paymentMethod == PaymentMethod.SEPAY || paymentMethod == PaymentMethod.MOMO || paymentMethod == PaymentMethod.ZALOPAY)) {
             return amount.setScale(0, RoundingMode.DOWN);
         }
         return amount;
@@ -570,8 +570,7 @@ public class PaymentSagaService {
         if (callbackAmount == null) {
             return false;
         }
-        if ((transaction.getPaymentMethod() == PaymentMethod.VNPAY || transaction.getPaymentMethod() == PaymentMethod.SEPAY)
-                && isVnd(transaction.getCurrency())) {
+        if (isVnd(transaction.getCurrency()) && (transaction.getPaymentMethod() == PaymentMethod.VNPAY || transaction.getPaymentMethod() == PaymentMethod.SEPAY || transaction.getPaymentMethod() == PaymentMethod.MOMO || transaction.getPaymentMethod() == PaymentMethod.ZALOPAY)) {
             BigDecimal expected = transaction.getAmount().setScale(0, RoundingMode.DOWN);
             BigDecimal actual = callbackAmount.setScale(0, RoundingMode.DOWN);
             return expected.compareTo(actual) == 0;
@@ -627,7 +626,7 @@ public class PaymentSagaService {
             return;
         }
 
-        if (ipnResult.getAmount() == null || transaction.getAmount().compareTo(ipnResult.getAmount()) != 0) {
+        if (!amountMatches(transaction, ipnResult.getAmount())) {
             log.error("[Saga] MoMo IPN amount mismatch - txnId={}, expected={}, actual={}",
                     transaction.getTransactionId(), transaction.getAmount(), ipnResult.getAmount());
             throw new PaymentException(ErrorCode.VALIDATION_ERROR,
