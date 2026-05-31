@@ -14,6 +14,7 @@ import iuh.fit.driverservice.entity.DriverAvailabilityStatus;
 import iuh.fit.driverservice.entity.DriverProfile;
 import iuh.fit.driverservice.entity.DriverVerificationStatus;
 import iuh.fit.driverservice.entity.DriverRideStatus;
+import iuh.fit.driverservice.entity.AccountLifecycleStatus;
 import iuh.fit.driverservice.repository.DriverEarningRepository;
 import iuh.fit.driverservice.repository.DriverProfileRepository;
 import lombok.AccessLevel;
@@ -66,7 +67,7 @@ public class DriverProfileService {
             profile.setServiceArea(request.getServiceArea().trim());
         }
 
-        if (profile.getVerificationStatus() != DriverVerificationStatus.APPROVED) {
+        if (isAdminCaller() && profile.getVerificationStatus() != DriverVerificationStatus.APPROVED) {
             profile.setVerificationStatus(DriverVerificationStatus.APPROVED);
             profile.setApprovedAt(LocalDateTime.now());
         }
@@ -82,7 +83,8 @@ public class DriverProfileService {
         DriverAvailabilityStatus availabilityStatus = parseAvailabilityStatus(request.getAvailabilityStatus());
 
         if (availabilityStatus == DriverAvailabilityStatus.ONLINE
-                && profile.getVerificationStatus() != DriverVerificationStatus.APPROVED) {
+                && (profile.getVerificationStatus() != DriverVerificationStatus.APPROVED
+                || profile.getAccountStatus() == AccountLifecycleStatus.SUSPENDED)) {
             throw new AppException(ErrorCode.ACCOUNT_DISABLED);
         }
         if (availabilityStatus == DriverAvailabilityStatus.ON_TRIP && profile.getCurrentRideId() == null) {
@@ -308,6 +310,16 @@ public class DriverProfileService {
                 .currentLongitude(profile.getCurrentLongitude())
                 .lastOnlineAt(profile.getLastOnlineAt())
                 .build();
+    }
+
+    private boolean isAdminCaller() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getAuthorities() == null) {
+            return false;
+        }
+
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
     }
 
     private DriverCurrentRideResponse toCurrentRideResponse(DriverProfile profile) {

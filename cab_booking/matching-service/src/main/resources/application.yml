@@ -23,13 +23,7 @@ spring:
         security.protocol: PLAINTEXT
         metric.reporters: ""
         spring.json.add.type.headers: true
-        # MATCHING LÀ NGƯỜI PHÁT RA RIDE-ASSIGNED
-        # All Kafka domain events use typed DTO classes. No Map payloads.
-        spring.json.type.mapping: >
-          matching-retry-requested:com.cab.matching.core.dto.event.inbound.RideCreatedEvent,
-          ride-assigned:com.cab.matching.core.dto.event.outbound.RideAssignedEvent,
-          ride-cancelled:com.cab.matching.core.dto.event.outbound.RideCancelledEvent,
-          matching-failed:com.cab.matching.core.dto.event.outbound.MatchingFailedEvent
+        spring.json.type.mapping: matching-retry-requested:com.cab.matching.core.dto.event.inbound.RideCreatedEvent,ride-assigned:com.cab.matching.core.dto.event.outbound.RideAssignedEvent,ride-cancelled:com.cab.matching.core.dto.event.outbound.RideCancelledEvent,matching-failed:com.cab.matching.core.dto.event.outbound.MatchingFailedEvent
     consumer:
       group-id: matching-group
       auto-offset-reset: earliest
@@ -41,15 +35,7 @@ spring:
         spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
         spring.json.trusted.packages: "*"
         spring.json.use.type.headers: true
-        spring.json.type.mapping: >
-          ride.created:com.cab.matching.core.dto.event.inbound.RideCreatedEvent,
-          ride-created:com.cab.matching.core.dto.event.inbound.RideCreatedEvent,
-          matching.retry.requested:com.cab.matching.core.dto.event.inbound.RideCreatedEvent,
-          matching-retry-requested:com.cab.matching.core.dto.event.inbound.RideCreatedEvent,
-          ride-rejected:com.cab.matching.core.dto.event.inbound.DriverRejectedEvent,
-          ride.cancelled:com.cab.matching.core.dto.event.inbound.RideCancelledEvent,
-          ride-cancelled:com.cab.matching.core.dto.event.inbound.RideCancelledEvent,
-          com.cab.booking.core.dto.event.outbound.RideCancelledEvent:com.cab.matching.core.dto.event.inbound.RideCancelledEvent
+        spring.json.type.mapping: ride.created:com.cab.matching.core.dto.event.inbound.RideCreatedEvent,ride-created:com.cab.matching.core.dto.event.inbound.RideCreatedEvent,matching.retry.requested:com.cab.matching.core.dto.event.inbound.RideCreatedEvent,matching-retry-requested:com.cab.matching.core.dto.event.inbound.RideCreatedEvent,ride-rejected:com.cab.matching.core.dto.event.inbound.DriverRejectedEvent,ride.cancelled:com.cab.matching.core.dto.event.inbound.RideCancelledEvent,ride-cancelled:com.cab.matching.core.dto.event.inbound.RideCancelledEvent,com.cab.booking.core.dto.event.outbound.RideCancelledEvent:com.cab.matching.core.dto.event.inbound.RideCancelledEvent
 
   data:
     redis:
