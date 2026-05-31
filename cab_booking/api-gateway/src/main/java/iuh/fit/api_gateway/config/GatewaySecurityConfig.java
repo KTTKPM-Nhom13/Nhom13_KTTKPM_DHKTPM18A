@@ -41,7 +41,8 @@ public class GatewaySecurityConfig {
             "/api/payments/zalopay/**",
             "/api/payments/vnpay/**",
             "/api/payments/sepay/**",
-            "/socket.io/**"
+            "/socket.io/**",
+            "/ride/socket.io/**"   // Ride Socket.IO — auth handled by ride-service
             // "/pricing/**"
     };
 
