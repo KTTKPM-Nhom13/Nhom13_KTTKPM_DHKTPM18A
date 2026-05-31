@@ -14,6 +14,7 @@ import iuh.fit.driverservice.entity.DriverAvailabilityStatus;
 import iuh.fit.driverservice.entity.DriverProfile;
 import iuh.fit.driverservice.entity.DriverVerificationStatus;
 import iuh.fit.driverservice.entity.DriverRideStatus;
+import iuh.fit.driverservice.entity.AccountLifecycleStatus;
 import iuh.fit.driverservice.repository.DriverEarningRepository;
 import iuh.fit.driverservice.repository.DriverProfileRepository;
 import lombok.AccessLevel;
@@ -82,7 +83,8 @@ public class DriverProfileService {
         DriverAvailabilityStatus availabilityStatus = parseAvailabilityStatus(request.getAvailabilityStatus());
 
         if (availabilityStatus == DriverAvailabilityStatus.ONLINE
-                && profile.getVerificationStatus() != DriverVerificationStatus.APPROVED) {
+                && (profile.getVerificationStatus() != DriverVerificationStatus.APPROVED
+                || profile.getAccountStatus() == AccountLifecycleStatus.SUSPENDED)) {
             throw new AppException(ErrorCode.ACCOUNT_DISABLED);
         }
         if (availabilityStatus == DriverAvailabilityStatus.ON_TRIP && profile.getCurrentRideId() == null) {

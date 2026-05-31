@@ -122,8 +122,8 @@ spring:
 logging:
   level:
     root: INFO
-    org.springframework.cloud.gateway: DEBUG
-    iuh.fit.api_gateway: DEBUG
+    org.springframework.cloud.gateway: INFO
+    iuh.fit.api_gateway: INFO
 
 eureka:
   client:
