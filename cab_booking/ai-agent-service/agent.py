@@ -116,10 +116,9 @@ def _format_driver_earnings_report(report: dict) -> str:
             "• Nếu vẫn lỗi: báo CSKH/kiểm tra payment event."
         )
     return (
-        f"• Cuốc hoàn thành: {report.get('totalCompletedRides', 'N/A')}\n"
-        f"• Thu nhập profile: {_format_money(report.get('totalEarnings'))}\n"
-        f"• Thực nhận: {_format_money(report.get('totalDriverAmount'))}\n"
-        f"• Ghi chú: {report.get('diagnosis', 'Đã kiểm tra Driver Service.')}"
+        f"• Tổng cuốc xe hôm nay: {report.get('totalCompletedRidesToday', 0)}\n"
+        f"• Thu nhập: {_format_money(report.get('todayEarnings'))} (thu nhập từ các chuyến xe trong ngày)\n"
+        f"• Tổng thu nhập: {_format_money(report.get('walletBalance'))} (tổng tiền có trong ví có thể rút)"
     )
 
 def _format_hotspots(payload: dict) -> str:
@@ -202,9 +201,9 @@ def check_driver_earnings_report(auth_token: str = "") -> dict:
     profile = _unwrap_result(profile_payload)
     external_user_id = profile.get("externalUserId")
 
-    total_completed = 0
-    total_earnings = 0.0
-    total_driver_amount = 0.0
+    wallet_balance = 0.0
+    total_completed_today = 0
+    today_earnings = 0.0
 
     if external_user_id:
         try:
@@ -216,46 +215,41 @@ def check_driver_earnings_report(auth_token: str = "") -> dict:
             elif isinstance(bookings, list):
                 content = bookings
 
-            completed_rides = [b for b in content if b.get("status") == "COMPLETED"]
-            total_completed = len(completed_rides)
+            # All-time completed rides
+            completed_rides_all = [b for b in content if b.get("status") == "COMPLETED"]
+            wallet_balance = sum(float(b.get("estimatedFare") or b.get("finalFare") or 0) * 0.70 for b in completed_rides_all)
+
+            # Today's completed rides
+            now_utc = datetime.utcnow()
+            now_vn = now_utc + timedelta(hours=7)
+            today_vn = now_vn.strftime("%Y-%m-%d")
+            today_utc = now_utc.strftime("%Y-%m-%d")
+
+            completed_rides_today = []
+            for b in completed_rides_all:
+                created_at = b.get("createdAt") or ""
+                if created_at.startswith(today_vn) or created_at.startswith(today_utc):
+                    completed_rides_today.append(b)
+
+            total_completed_today = len(completed_rides_today)
             # Driver gets 70% share of each completed ride
-            computed_sum = sum(float(b.get("estimatedFare") or b.get("finalFare") or 0) * 0.70 for b in completed_rides)
-            total_earnings = computed_sum
-            total_driver_amount = computed_sum
-            logger.info("Successfully calculated dynamic driver stats: completed=%s, earnings=%s", total_completed, total_earnings)
+            today_earnings = sum(float(b.get("estimatedFare") or b.get("finalFare") or 0) * 0.70 for b in completed_rides_today)
+            logger.info("Successfully calculated dynamic driver stats: today_completed=%s, today_earnings=%s, wallet_balance=%s", total_completed_today, today_earnings, wallet_balance)
         except Exception as exc:
             logger.warning("Failed to calculate dynamic driver earnings from bookings: %s", exc)
-            # Fallback to profile and earnings endpoints
-            earnings_payload = _api_get("/api/drivers/me/earnings/summary", auth_token, timeout=8)
-            earnings = _unwrap_result(earnings_payload)
-            total_completed = earnings.get("totalCompletedRides", profile.get("totalCompletedRides") or 0)
-            total_earnings = earnings.get("totalEarnings", profile.get("totalEarnings") or 0)
-            total_driver_amount = earnings.get("totalDriverAmount") or total_earnings
-    else:
-        # Fallback to profile and earnings endpoints
-        earnings_payload = _api_get("/api/drivers/me/earnings/summary", auth_token, timeout=8)
-        earnings = _unwrap_result(earnings_payload)
-        total_completed = earnings.get("totalCompletedRides", profile.get("totalCompletedRides") or 0)
-        total_earnings = earnings.get("totalEarnings", profile.get("totalEarnings") or 0)
-        total_driver_amount = earnings.get("totalDriverAmount") or total_earnings
-
-    # Force format / cast float or int
-    try:
-        total_completed = int(total_completed)
-    except (TypeError, ValueError):
-        total_completed = 0
+            total_completed_today = 0
+            today_earnings = 0.0
+            wallet_balance = profile.get("totalEarnings") or 0.0
 
     return {
         "status": "OK",
-        "totalCompletedRides": total_completed,
-        "totalEarnings": total_earnings,
-        "totalGrossAmount": total_earnings,
-        "totalDriverAmount": total_driver_amount,
+        "totalCompletedRidesToday": total_completed_today,
+        "todayEarnings": today_earnings,
+        "walletBalance": wallet_balance,
         "availabilityStatus": profile.get("availabilityStatus", "AVAILABLE"),
         "currentRideActive": False,
         "lastOnlineAt": profile.get("lastOnlineAt"),
-        "diagnosis": "Đã đồng bộ và tính toán trực tiếp từ danh sách cuốc xe hoàn thành.",
-        "operatorNote": "Để đảm bảo tính chính xác nhất, số liệu thu nhập này được tính động (tài xế thực nhận 70%) dựa trên lịch sử chuyến đi thực tế của bạn.",
+        "diagnosis": "Đã đồng bộ và tính toán trực tiếp từ danh sách cuốc xe hôm nay.",
     }
 
 def get_active_hotspots(auth_token: str = "") -> dict:

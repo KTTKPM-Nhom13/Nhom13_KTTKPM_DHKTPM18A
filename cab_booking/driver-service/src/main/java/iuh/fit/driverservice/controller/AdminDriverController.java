@@ -20,6 +20,9 @@ import java.util.Map;
 import java.util.UUID;
 
 import iuh.fit.driverservice.entity.AccountLifecycleStatus;
+import iuh.fit.driverservice.entity.DriverAvailabilityStatus;
+import iuh.fit.driverservice.service.DriverLocationService;
+import iuh.fit.driverservice.service.DriverStatusService;
 
 @Slf4j
 @RestController
@@ -29,6 +32,8 @@ public class AdminDriverController {
 
     DriverProfileRepository driverProfileRepository;
     AuthAccountSyncClient authAccountSyncClient;
+    DriverLocationService driverLocationService;
+    DriverStatusService driverStatusService;
 
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/api/admin/drivers")
@@ -120,7 +125,18 @@ public class AdminDriverController {
                 .orElseThrow(() -> new RuntimeException("Driver profile not found"));
 
         profile.setAccountStatus(AccountLifecycleStatus.SUSPENDED);
+        profile.setAvailabilityStatus(DriverAvailabilityStatus.OFFLINE);
         DriverProfile savedProfile = driverProfileRepository.save(profile);
+
+        try {
+            if (savedProfile.getExternalUserId() != null) {
+                driverLocationService.removeFromAvailableGeo(savedProfile.getExternalUserId());
+                driverStatusService.clearAllDriverRedisKeys(savedProfile.getExternalUserId());
+                driverStatusService.writeDriverStatus(savedProfile);
+            }
+        } catch (Exception e) {
+            log.error("Failed to clear Redis keys for blocked driver {}: {}", driverId, e.getMessage());
+        }
 
         try {
             authAccountSyncClient.syncAccountLifecycle(savedProfile);
