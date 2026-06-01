@@ -51,6 +51,14 @@ spring:
           predicates:
             - Path=/socket.io/**
 
+        # Ride Socket.IO via ride-service standalone Netty port 9095
+        - id: ride-socket
+          uri: ws://ride-service:9095
+          predicates:
+            - Path=/ride/socket.io/**
+          filters:
+            - RewritePath=/ride/socket.io(?<segment>/?.*), /socket.io${segment}
+
         - id: user-service
           uri: lb://user-service
           predicates:
